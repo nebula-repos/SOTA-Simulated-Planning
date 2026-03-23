@@ -24,7 +24,6 @@ from config import (
     TREND_UP_GROWTH_RATE, TREND_DOWN_DECAY_RATE, TREND_DOWN_FLOOR,
     NEW_PRODUCT_RAMP_DAYS, NEW_PRODUCT_GROWTH,
     SPIKE_PARAMS, SPIKE_DURATION, SPIKE_MULTIPLIER, SPIKE_DISCOUNT_RANGE,
-    STOCKOUTS_PER_ABC, STOCKOUT_DURATION,
     ADI_THRESHOLD_FOR_CONTINUOUS,
     LOGNORMAL_SIGMA_FACTOR, NORMAL_NOISE_FLOOR,
     LOCATIONS_PER_ABC, LOCATION_FACTOR_RANGE,
@@ -44,7 +43,6 @@ def build_public_catalog(catalog):
         "subcategory",
         "brand",
         "supplier",
-        "supplier_avg_lead_time_days",
         "base_price",
         "cost",
         "moq",
@@ -54,7 +52,7 @@ def build_public_catalog(catalog):
 
 
 def build_public_transactions(df_transactions):
-    """Exporta solo movimientos transaccionales reales."""
+    """Exporta solo movimientos transaccionales ERP-like."""
     public_columns = ["date", "sku", "location", "quantity", "unit_price", "total_amount"]
     return df_transactions.loc[:, public_columns].copy()
 
@@ -76,13 +74,18 @@ def build_document_id(prefix, date_value, counter):
     return f"{prefix}-{date_str}-{counter:06d}"
 
 
-def generate_purchase_data(catalog, daily_demand_by_sku_location, dates):
+def generate_purchase_data(catalog, daily_demand_by_sku_location, daily_prices_by_sku_location, dates):
     """
     Genera compras coherentes con la demanda:
     - OCs nacen por reposición por sku/location
     - lead time depende del proveedor
     - cantidad pedida respeta MOQ
     - recepciones pueden ser totales o parciales
+
+    Nota de modelo:
+    - en industrial, la lógica busca aproximar abastecimiento importado con lead times largos
+    - como no existe una tabla de transferencias, la recepción se registra directo
+      en la location operativa que luego consume el stock
     """
     purchase_policy = {
         "A": {"history_days": 30, "review_days": 14, "safety_days": 10, "partial_prob": 0.10},
@@ -95,6 +98,8 @@ def generate_purchase_data(catalog, daily_demand_by_sku_location, dates):
     purchase_orders = []
     purchase_order_lines = []
     purchase_receipts = []
+    inventory_snapshots = []
+    transactions = []
     po_counter = 1
     receipt_counter = 1
 
@@ -112,6 +117,7 @@ def generate_purchase_data(catalog, daily_demand_by_sku_location, dates):
         payment_terms_days = int(supplier_profile.get("payment_terms_days", 30))
         moq = max(1, int(product["moq"]))
         base_cost = float(product["cost"])
+        prices = daily_prices_by_sku_location[(sku, location)]
 
         history_days = policy["history_days"]
         review_days = policy["review_days"]
@@ -135,8 +141,18 @@ def generate_purchase_data(catalog, daily_demand_by_sku_location, dates):
                 purchase_receipts.append(receipt)
 
             demand_qty = int(demand[day_idx])
-            if demand_qty > 0:
-                on_hand = max(0, on_hand - demand_qty)
+            fulfilled_qty = min(on_hand, demand_qty)
+            on_hand -= fulfilled_qty
+
+            if fulfilled_qty > 0:
+                transactions.append({
+                    "date": current_date,
+                    "sku": sku,
+                    "location": location,
+                    "quantity": int(fulfilled_qty),
+                    "unit_price": float(prices[day_idx]),
+                    "total_amount": float(fulfilled_qty * prices[day_idx]),
+                })
 
             history_start = max(0, day_idx - history_days + 1)
             demand_history = demand[history_start:day_idx + 1]
@@ -147,95 +163,107 @@ def generate_purchase_data(catalog, daily_demand_by_sku_location, dates):
             target_level = forecast_daily_demand * (lead_time_days + safety_days + review_days)
             inventory_position = on_hand + on_order
 
-            if inventory_position > reorder_point:
-                continue
+            if inventory_position <= reorder_point:
+                order_qty = ceil_to_multiple(max(target_level - inventory_position, moq), moq)
+                unit_cost = float(round(base_cost * random.uniform(0.97, 1.08), 0))
 
-            order_qty = ceil_to_multiple(max(target_level - inventory_position, moq), moq)
-            unit_cost = float(round(base_cost * random.uniform(0.97, 1.08), 0))
+                po_id = build_document_id("PO", current_date, po_counter)
+                po_counter += 1
+                po_line_id = f"{po_id}-L01"
 
-            po_id = build_document_id("PO", current_date, po_counter)
-            po_counter += 1
-            po_line_id = f"{po_id}-L01"
+                expected_receipt_date = current_date + pd.Timedelta(days=lead_time_days)
 
-            expected_receipt_date = current_date + pd.Timedelta(days=lead_time_days)
-
-            purchase_order_lines.append({
-                "po_id": po_id,
-                "po_line_id": po_line_id,
-                "sku": sku,
-                "ordered_qty": int(order_qty),
-                "unit_cost": unit_cost,
-                "line_amount": float(order_qty * unit_cost),
-                "moq_applied": moq,
-            })
-
-            receipt_plan = []
-            actual_lead_time = max(
-                1,
-                int(round(np.random.normal(
-                    loc=lead_time_days,
-                    scale=max(1.5, lead_time_days * 0.18),
-                ))),
-            )
-            first_receipt_idx = day_idx + actual_lead_time
-
-            if order_qty >= 2 * moq and random.random() < policy["partial_prob"]:
-                first_qty = floor_to_multiple(order_qty * random.uniform(0.45, 0.75), moq)
-                first_qty = min(max(moq, first_qty), order_qty - moq)
-                remaining_qty = order_qty - first_qty
-                gap_days = max(2, int(round(np.random.normal(loc=max(3, lead_time_days * 0.25), scale=2))))
-                receipt_plan.append((first_receipt_idx, first_qty, "partial"))
-                receipt_plan.append((first_receipt_idx + gap_days, remaining_qty, "received"))
-            else:
-                receipt_plan.append((first_receipt_idx, order_qty, "received"))
-
-            received_within_horizon = 0
-            for receipt_day_idx, received_qty, receipt_status in receipt_plan:
-                receipt_date = current_date + pd.Timedelta(days=receipt_day_idx - day_idx)
-                receipt_id = build_document_id("GR", receipt_date, receipt_counter)
-                receipt_counter += 1
-
-                receipt_record = {
-                    "receipt_id": receipt_id,
+                purchase_order_lines.append({
                     "po_id": po_id,
                     "po_line_id": po_line_id,
                     "sku": sku,
-                    "supplier": supplier,
-                    "location": location,
-                    "receipt_date": receipt_date,
-                    "received_qty": int(received_qty),
+                    "ordered_qty": int(order_qty),
                     "unit_cost": unit_cost,
-                    "total_cost": float(received_qty * unit_cost),
-                    "receipt_status": receipt_status,
-                }
+                    "line_amount": float(order_qty * unit_cost),
+                    "moq_applied": moq,
+                })
 
-                if receipt_day_idx < horizon_days:
-                    scheduled_receipts.setdefault(receipt_day_idx, []).append(receipt_record)
-                    received_within_horizon += received_qty
+                receipt_plan = []
+                actual_lead_time = int(round(np.random.normal(
+                    loc=lead_time_days,
+                    scale=max(1.5, lead_time_days * 0.12),
+                )))
+                min_actual_lead_time = max(1, int(round(lead_time_days * 0.7)))
+                max_actual_lead_time = max(min_actual_lead_time, int(round(lead_time_days * 1.35)))
+                actual_lead_time = min(max(min_actual_lead_time, actual_lead_time), max_actual_lead_time)
+                first_receipt_idx = day_idx + actual_lead_time
 
-            if received_within_horizon == 0:
-                order_status = "open"
-            elif received_within_horizon < order_qty:
-                order_status = "partially_received"
-            else:
-                order_status = "received"
+                if order_qty >= 2 * moq and random.random() < policy["partial_prob"]:
+                    first_qty = floor_to_multiple(order_qty * random.uniform(0.45, 0.75), moq)
+                    first_qty = min(max(moq, first_qty), order_qty - moq)
+                    remaining_qty = order_qty - first_qty
+                    gap_days = max(2, int(round(np.random.normal(loc=max(3, lead_time_days * 0.25), scale=2))))
+                    receipt_plan.append((first_receipt_idx, first_qty, "partial"))
+                    receipt_plan.append((first_receipt_idx + gap_days, remaining_qty, "received"))
+                else:
+                    receipt_plan.append((first_receipt_idx, order_qty, "received"))
 
-            purchase_orders.append({
-                "po_id": po_id,
-                "supplier": supplier,
-                "destination_location": location,
-                "order_date": current_date,
-                "expected_receipt_date": expected_receipt_date,
-                "order_status": order_status,
-                "currency": "CLP",
-                "payment_terms_days": payment_terms_days,
+                received_within_horizon = 0
+                for receipt_day_idx, received_qty, receipt_status in receipt_plan:
+                    receipt_date = current_date + pd.Timedelta(days=receipt_day_idx - day_idx)
+                    receipt_id = build_document_id("GR", receipt_date, receipt_counter)
+                    receipt_counter += 1
+
+                    receipt_record = {
+                        "receipt_id": receipt_id,
+                        "po_id": po_id,
+                        "po_line_id": po_line_id,
+                        "sku": sku,
+                        "supplier": supplier,
+                        "location": location,
+                        "receipt_date": receipt_date,
+                        "received_qty": int(received_qty),
+                        "unit_cost": unit_cost,
+                        "total_cost": float(received_qty * unit_cost),
+                        "receipt_status": receipt_status,
+                    }
+
+                    if receipt_day_idx < horizon_days:
+                        scheduled_receipts.setdefault(receipt_day_idx, []).append(receipt_record)
+                        received_within_horizon += received_qty
+
+                if received_within_horizon == 0:
+                    order_status = "open"
+                elif received_within_horizon < order_qty:
+                    order_status = "partially_received"
+                else:
+                    order_status = "received"
+
+                purchase_orders.append({
+                    "po_id": po_id,
+                    "supplier": supplier,
+                    "destination_location": location,
+                    "order_date": current_date,
+                    "expected_receipt_date": expected_receipt_date,
+                    "order_status": order_status,
+                    "currency": "CLP",
+                    "payment_terms_days": payment_terms_days,
+                })
+
+                on_order += order_qty
+
+            inventory_snapshots.append({
+                "snapshot_date": current_date,
+                "sku": sku,
+                "location": location,
+                "on_hand_qty": int(on_hand),
+                "on_order_qty": int(on_order),
             })
-
-            on_order += order_qty
 
     df_purchase_orders = pd.DataFrame(purchase_orders)
     df_purchase_order_lines = pd.DataFrame(purchase_order_lines)
     df_purchase_receipts = pd.DataFrame(purchase_receipts)
+    df_inventory_snapshots = pd.DataFrame(inventory_snapshots)
+    df_transactions = pd.DataFrame(transactions)
+
+    if not df_transactions.empty:
+        df_transactions.sort_values(["date", "sku", "location"], inplace=True)
+        df_transactions.reset_index(drop=True, inplace=True)
 
     if not df_purchase_orders.empty:
         df_purchase_orders.sort_values(["order_date", "po_id"], inplace=True)
@@ -246,8 +274,17 @@ def generate_purchase_data(catalog, daily_demand_by_sku_location, dates):
     if not df_purchase_receipts.empty:
         df_purchase_receipts.sort_values(["receipt_date", "receipt_id"], inplace=True)
         df_purchase_receipts.reset_index(drop=True, inplace=True)
+    if not df_inventory_snapshots.empty:
+        df_inventory_snapshots.sort_values(["snapshot_date", "sku", "location"], inplace=True)
+        df_inventory_snapshots.reset_index(drop=True, inplace=True)
 
-    return df_purchase_orders, df_purchase_order_lines, df_purchase_receipts
+    return (
+        df_transactions,
+        df_purchase_orders,
+        df_purchase_order_lines,
+        df_purchase_receipts,
+        df_inventory_snapshots,
+    )
 
 
 # ============================================================
@@ -382,20 +419,6 @@ def generate_demand_spikes(n_days, pattern):
     return spike_effects, spike_flags
 
 
-def generate_stockouts(n_days, abc_class):
-    """Simula quiebres de stock."""
-    stockout_mask = np.ones(n_days)
-    n_stockouts = random.randint(*STOCKOUTS_PER_ABC[abc_class])
-
-    for _ in range(n_stockouts):
-        start = random.randint(0, max(0, n_days - STOCKOUT_DURATION[0] - 1))
-        duration = random.randint(*STOCKOUT_DURATION)
-        end = min(start + duration, n_days)
-        stockout_mask[start:end] = 0
-
-    return stockout_mask
-
-
 def generate_intermittent_mask(n_days, adi_target):
     """Genera máscara de intermitencia para demanda esporádica."""
     if adi_target <= ADI_THRESHOLD_FOR_CONTINUOUS:
@@ -412,7 +435,6 @@ def generate_timeseries(product, dates):
     n_days = len(dates)
     pattern = product["demand_pattern"]
     base = product["base_daily_demand"]
-    abc = product["abc_class"]
 
     # 1. Tendencia base
     trend = generate_trend(n_days, pattern, base)
@@ -446,13 +468,10 @@ def generate_timeseries(product, dates):
     # 6. Picos de demanda
     spike_effects, spike_flags = generate_demand_spikes(n_days, pattern)
 
-    # 7. Stockouts
-    stockout_mask = generate_stockouts(n_days, abc)
-
     # Combinar todo
-    demand = trend * seasonality * dow * noise * intermittent_mask * spike_effects * stockout_mask
+    demand = trend * seasonality * dow * noise * intermittent_mask * spike_effects
 
-    # Redondear a enteros (unidades vendidas)
+    # Redondear a enteros de demanda latente
     demand = np.maximum(0, np.round(demand)).astype(int)
 
     # Calcular precio con variación por spikes
@@ -461,7 +480,7 @@ def generate_timeseries(product, dates):
     discount = random.uniform(*SPIKE_DISCOUNT_RANGE)
     prices[spike_flags == 1] = round(base_price * (1 - discount), 0)
 
-    return demand, prices, spike_flags, stockout_mask
+    return demand, prices, spike_flags
 
 
 # ============================================================
@@ -497,8 +516,8 @@ def main():
 
     # Generar transacciones
     print(f"\nGenerando series temporales...")
-    all_transactions = []
     daily_demand_by_sku_location = {}
+    daily_prices_by_sku_location = {}
     product_metrics = []
 
     for idx, product in catalog.iterrows():
@@ -518,20 +537,10 @@ def main():
 
         for location in selected_locations:
             loc_factor = random.uniform(*LOCATION_FACTOR_RANGE)
-            demand, prices, _spikes, _stockouts = generate_timeseries(product, date_list)
+            demand, prices, _spikes = generate_timeseries(product, date_list)
             demand = np.maximum(0, np.round(demand * loc_factor)).astype(int)
             daily_demand_by_sku_location[(product["sku"], location)] = demand.copy()
-
-            for i in range(n_days):
-                if demand[i] > 0:
-                    all_transactions.append({
-                        "date": dates[i],
-                        "sku": product["sku"],
-                        "location": location,
-                        "quantity": int(demand[i]),
-                        "unit_price": float(prices[i]),
-                        "total_amount": float(demand[i] * prices[i]),
-                    })
+            daily_prices_by_sku_location[(product["sku"], location)] = prices.copy()
 
             all_demands.extend(demand.tolist())
             sku_total_qty += demand.sum()
@@ -562,21 +571,23 @@ def main():
         })
 
     # Crear DataFrames
-    print(f"\nConsolidando {len(all_transactions):,} registros de transacciones...")
-    df_transactions = pd.DataFrame(all_transactions)
-    df_transactions.sort_values(["date", "sku", "location"], inplace=True)
-    df_transactions.reset_index(drop=True, inplace=True)
-    df_transactions_public = build_public_transactions(df_transactions)
-
     df_metrics = pd.DataFrame(product_metrics)
     catalog_public = build_public_catalog(catalog)
 
-    print("\nGenerando documentos de compras...")
-    df_purchase_orders, df_purchase_order_lines, df_purchase_receipts = generate_purchase_data(
+    print("\nGenerando documentos operacionales...")
+    (
+        df_transactions,
+        df_purchase_orders,
+        df_purchase_order_lines,
+        df_purchase_receipts,
+        df_inventory_snapshots,
+    ) = generate_purchase_data(
         catalog,
         daily_demand_by_sku_location,
+        daily_prices_by_sku_location,
         dates,
     )
+    df_transactions_public = build_public_transactions(df_transactions)
 
     # XYZ Classification based on CV²
     def classify_xyz(cv2):
@@ -631,6 +642,10 @@ def main():
     df_purchase_receipts.to_csv(receipts_path, index=False)
     print(f"Recepciones guardadas: {receipts_path} ({len(df_purchase_receipts):,} filas)")
 
+    inventory_snapshot_path = os.path.join(output_dir, "inventory_snapshot.csv")
+    df_inventory_snapshots.to_csv(inventory_snapshot_path, index=False)
+    print(f"Snapshots de inventario guardados: {inventory_snapshot_path} ({len(df_inventory_snapshots):,} filas)")
+
     # Resumen
     print("\n" + "=" * 60)
     print(f"RESUMEN DE DATOS GENERADOS [{PROFILE.upper()}]")
@@ -641,6 +656,7 @@ def main():
     print(f"Locaciones: {len(LOCATIONS)}")
     print(f"Órdenes de compra: {len(df_purchase_orders):,}")
     print(f"Recepciones: {len(df_purchase_receipts):,}")
+    print(f"Snapshots inventario: {len(df_inventory_snapshots):,}")
 
     print(f"\nSegmentación ABC-XYZ:")
     abc_xyz_dist = df_metrics["abc_xyz"].value_counts().sort_index()
@@ -670,8 +686,9 @@ def main():
         df_purchase_orders,
         df_purchase_order_lines,
         df_purchase_receipts,
+        df_inventory_snapshots,
     )
 
 
 if __name__ == "__main__":
-    df_tx, df_cat, df_met, df_po, df_po_lines, df_receipts = main()
+    df_tx, df_cat, df_met, df_po, df_po_lines, df_receipts, df_inventory = main()

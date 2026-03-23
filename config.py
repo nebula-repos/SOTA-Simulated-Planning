@@ -210,12 +210,12 @@ _INDUSTRIAL = {
 
     # Parámetros de catálogo
     "supplier_profiles": {
-        "Hydroline Andina": {"avg_lead_time_days": 14, "payment_terms_days": 30},
-        "Tecfluid Norte": {"avg_lead_time_days": 21, "payment_terms_days": 30},
-        "Andes Motion": {"avg_lead_time_days": 30, "payment_terms_days": 45},
-        "Pacific Seal Supply": {"avg_lead_time_days": 45, "payment_terms_days": 45},
-        "Industrial Flow Partners": {"avg_lead_time_days": 60, "payment_terms_days": 60},
-        "Maestranza Integral": {"avg_lead_time_days": 90, "payment_terms_days": 60},
+        "Hydroline Andina": {"avg_lead_time_days": 145, "payment_terms_days": 30},
+        "Tecfluid Norte": {"avg_lead_time_days": 155, "payment_terms_days": 30},
+        "Andes Motion": {"avg_lead_time_days": 165, "payment_terms_days": 45},
+        "Pacific Seal Supply": {"avg_lead_time_days": 180, "payment_terms_days": 45},
+        "Industrial Flow Partners": {"avg_lead_time_days": 190, "payment_terms_days": 60},
+        "Maestranza Integral": {"avg_lead_time_days": 200, "payment_terms_days": 60},
     },
     "moq_choices": [1, 2, 5, 10, 25],
     "extra_field_name": "warranty_months",

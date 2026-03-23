@@ -1,19 +1,21 @@
-# Esquema Minimo de Datos de Compras
+# Esquema Minimo de Datos de Compras e Inventario
 
 ## Objetivo
 
-Definir el conjunto minimo de tablas para modelar abastecimiento y compras,
+Definir el conjunto minimo de tablas para modelar abastecimiento, compras e inventario,
 calzando con los archivos actuales:
 
 - `output/product_catalog.csv`
 - `output/transactions.csv`
+- `output/inventory_snapshot.csv`
 
-La data actual representa `salidas` de inventario por `sku` y `location`.
+La data actual representa `salidas` reales de inventario por `sku` y `location`.
 Para completar el lado de supply, el minimo util es modelar:
 
 1. ordenes de compra
 2. lineas de orden de compra
 3. recepciones de compra
+4. snapshot de inventario
 
 Con estas 3 tablas ya se puede calcular:
 
@@ -23,6 +25,7 @@ Con estas 3 tablas ya se puede calcular:
 - backlog de recepcion
 - entradas de inventario por sucursal
 - costo de abastecimiento
+- posicion diaria de stock para reposicion
 
 ## Convencion Operativa
 
@@ -30,6 +33,7 @@ Agrupacion sugerida para el proyecto:
 
 - `salidas`: ventas, consumo, despacho
 - `entradas`: recepciones de compra
+- `posicion`: snapshot diario de inventario
 
 En el estado actual:
 
@@ -38,8 +42,42 @@ En el estado actual:
 Con el esquema de abajo:
 
 - `purchase_receipts.csv` = `entradas`
+- `inventory_snapshot.csv` = `posicion`
 
-## 1. purchase_orders.csv
+## Logica Particular de Este Modelo
+
+- el modelo canónico actual no incluye transferencias internas entre bodegas o sucursales.
+- por eso, aunque la logica de compras industrial se piense como abastecimiento centralizado de importacion, la recepcion queda registrada directamente en la ubicacion operativa.
+- esta simplificacion permite mantener consistencia entre `transactions`, `purchase_receipts` e `inventory_snapshot`.
+- si se quiere representar recepcion en bodega central y posterior redistribucion, hace falta una tabla operacional de transferencias.
+
+## 1. inventory_snapshot.csv
+
+Snapshot diario de inventario por SKU y ubicacion.
+Cada fila representa el saldo operacional al cierre del dia.
+
+Columnas:
+
+- `snapshot_date`: fecha del snapshot
+- `sku`: FK a `product_catalog.sku`
+- `location`: sucursal o bodega
+- `on_hand_qty`: stock fisicamente disponible
+- `on_order_qty`: stock ya ordenado y aun no recibido
+
+Notas:
+
+- esta tabla no es analitica; persiste estado operacional
+- permite separar baja venta de quiebre de stock
+- habilita recomendacion de compra usando posicion observable
+
+Ejemplo:
+
+```csv
+snapshot_date,sku,location,on_hand_qty,on_order_qty
+2024-03-15,SKU-00001,Santiago,8,10
+```
+
+## 2. purchase_orders.csv
 
 Cabecera de la orden de compra.
 Una OC pertenece a un solo proveedor y a una sola sucursal destino.
@@ -60,6 +98,7 @@ Notas:
 - `expected_receipt_date` debe derivarse del promedio del proveedor, no del producto
 - una OC puede tener varias lineas
 - una OC puede recibirse en una o varias recepciones
+- en `industrial`, los lead times deben interpretarse como importacion de largo plazo
 
 Ejemplo:
 
@@ -68,7 +107,7 @@ po_id,supplier,destination_location,order_date,expected_receipt_date,order_statu
 PO-20240315-000123,Maestranza Integral,Santiago,2024-03-15,2024-06-13,received,CLP,30
 ```
 
-## 2. purchase_order_lines.csv
+## 3. purchase_order_lines.csv
 
 Detalle de productos pedidos en cada OC.
 
@@ -95,7 +134,7 @@ po_id,po_line_id,sku,ordered_qty,unit_cost,line_amount,moq_applied
 PO-20240315-000123,PO-20240315-000123-L01,SKU-00001,10,319405,3194050,5
 ```
 
-## 3. purchase_receipts.csv
+## 4. purchase_receipts.csv
 
 Recepciones efectivas de mercaderia.
 Cada fila representa una recepcion de una linea de OC.
@@ -132,9 +171,11 @@ GR-20240614-000455,PO-20240315-000123,PO-20240315-000123-L01,SKU-00001,Maestranz
 Llaves y reglas de cruce:
 
 - `purchase_order_lines.sku -> product_catalog.sku`
+- `inventory_snapshot.sku -> product_catalog.sku`
 - `purchase_orders.supplier -> product_catalog.supplier`
 - `purchase_orders.destination_location -> transactions.location`
 - `purchase_receipts.location -> transactions.location`
+- `inventory_snapshot.location -> transactions.location`
 - `purchase_receipts.sku -> product_catalog.sku`
 
 Consistencias esperadas:
@@ -150,11 +191,12 @@ Consistencias esperadas:
 Si luego generamos data sintetica de compras, sugiero estas reglas:
 
 - una compra se gatilla por quiebre esperado o politica de reposicion
-- `expected_receipt_date = order_date + supplier_avg_lead_time_days`
+- `expected_receipt_date = order_date + supplier_lead_time_days`
 - `receipt_date` se mueve alrededor de la esperada con atraso o adelanto controlado
 - `ordered_qty` depende de cobertura objetivo, MOQ y tamaño de lote
 - `unit_cost` se mueve alrededor de `product_catalog.cost`
 - no todos los pedidos llegan completos; debe existir una fraccion de parciales
+- `inventory_snapshot` debe persistir `on_hand_qty` y `on_order_qty` por dia
 
 ## Vista Unificada Recomendada
 
@@ -177,15 +219,16 @@ Columnas minimas:
 
 Mapeo inicial:
 
-- `transactions.csv` -> `movement_direction = out`, `movement_type = sale`
+- `transactions.quantity` -> `movement_direction = out`, `movement_type = sale`
 - `purchase_receipts.csv` -> `movement_direction = in`, `movement_type = purchase_receipt`
 
 ## Esquema Minimo Recomendado
 
 Si hubiera que quedarse con lo estrictamente minimo para el siguiente modulo:
 
-1. `purchase_orders.csv`
-2. `purchase_order_lines.csv`
-3. `purchase_receipts.csv`
+1. `inventory_snapshot.csv`
+2. `purchase_orders.csv`
+3. `purchase_order_lines.csv`
+4. `purchase_receipts.csv`
 
-Ese es el punto minimo en que compras y abastecimiento quedan modelados con suficiente fidelidad para forecast, reposicion y analitica operacional.
+Ese es el punto minimo en que compras, abastecimiento e inventario quedan modelados con suficiente fidelidad para forecast, reposicion y analitica operacional.

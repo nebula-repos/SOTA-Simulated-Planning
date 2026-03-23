@@ -16,7 +16,7 @@ El objetivo es construir un modulo que clasifique automaticamente las series de 
 
 ## Estado actual
 
-El proyecto se encuentra en **Fase 0 (Data Generation)**: cuenta con un generador de datos sinteticos completo que produce series temporales con patrones de demanda diversos, junto con un modelo de datos relacional para transacciones y compras.
+El proyecto se encuentra en **Fase 0 (Data Generation)**: cuenta con un generador de datos sinteticos completo que produce series temporales con patrones de demanda diversos, junto con un modelo de datos operacional para demanda, compras e inventario.
 
 ### Que existe hoy
 
@@ -24,7 +24,7 @@ El proyecto se encuentra en **Fase 0 (Data Generation)**: cuenta con un generado
 |---|---|---|
 | Generador de transacciones | Series diarias con 10 patrones de demanda | Funcional |
 | Configuracion multi-perfil | Industrial (oleohidraulica) y Retail (supermercado) | Funcional |
-| Modelo de datos (5 tablas) | Catalogo, transacciones, OC, lineas OC, recepciones | Funcional |
+| Modelo de datos (6 tablas) | Catalogo, transacciones, snapshots inventario, OC, lineas OC, recepciones | Funcional |
 | Documentacion de esquema | E/R y especificacion de compras | Documentado |
 
 ### Que viene a continuacion
@@ -58,8 +58,9 @@ El generador produce **3 anos de datos diarios** (2022-2024) para un catalogo co
 
 | Archivo | Descripcion | Clave |
 |---|---|---|
-| `product_catalog.csv` | Maestro de productos (SKU, categoria, proveedor, precio, MOQ) | `sku` |
-| `transactions.csv` | Transacciones diarias de demanda por SKU y ubicacion | `date + sku + location` |
+| `product_catalog.csv` | Maestro de productos (SKU, categoria, proveedor, precio, costo, MOQ) | `sku` |
+| `transactions.csv` | Transacciones reales de salida por SKU y ubicacion | `date + sku + location` |
+| `inventory_snapshot.csv` | Posicion diaria de inventario por SKU y ubicacion | `snapshot_date + sku + location` |
 | `purchase_orders.csv` | Cabeceras de ordenes de compra | `po_id` |
 | `purchase_order_lines.csv` | Detalle de productos por orden de compra | `po_line_id` |
 | `purchase_receipts.csv` | Recepciones efectivas de mercaderia | `receipt_id` |
@@ -89,7 +90,7 @@ Se seleccionan cambiando `PROFILE` en `config.py`:
 - 800 productos, 5 ubicaciones (Santiago, Antofagasta, Copiapo, Concepcion, Lima)
 - 12 categorias (bombas, motores, valvulas, cilindros, filtros, etc.)
 - Precios: 5,000 - 8,000,000 CLP
-- Lead times: 7 - 120 dias
+- Lead times de importacion: 145 - 200 dias
 
 **Retail** (`"retail"`) - Supermercado:
 - 1,200 productos, 10 tiendas
@@ -120,18 +121,21 @@ Los archivos CSV se generan en el directorio `output/`.
 - **Ruido**: Lognormal para patrones erraticos/lumpy, normal para el resto
 - **Intermitencia**: Mascara probabilistica de demanda cero por periodo
 - **Spikes**: Picos de demanda por promociones o proyectos
-- **Stockouts**: Periodos de quiebre de stock por clase ABC
+- **Stockouts**: Quiebres emergentes cuando la demanda supera el stock disponible
 - **Compras**: Ordenes generadas por politica de reposicion con recepciones parciales
+- **Inventario**: Snapshot diario de stock disponible y stock en orden por SKU/ubicacion
 
 ## Modelo de datos
 
 El modelo relacional sigue la convencion operativa:
-- **Salidas** = `transactions.csv` (demanda/ventas)
+- **Salidas** = `transactions.csv` (ventas/consumo realmente registrados)
 - **Entradas** = `purchase_receipts.csv` (recepciones de compra)
+- **Posicion** = `inventory_snapshot.csv` (estado diario de inventario)
 
 ```
 product_catalog.sku
     -> transactions.sku
+    -> inventory_snapshot.sku
     -> purchase_order_lines.sku
     -> purchase_receipts.sku
 
@@ -143,13 +147,32 @@ purchase_order_lines.po_line_id
     -> purchase_receipts.po_line_id
 ```
 
+El modelo canónico operacional **no** incluye metricas, promedios, ADI, CV, ABC-XYZ ni clasificaciones Syntetos-Boylan. Todo eso se considera data derivada para capas analiticas posteriores.
+
+## Logica Del Modelo
+
+Reglas particulares de esta simulacion:
+
+- `transactions.csv` representa solo ventas o consumos realmente atendidos; no incluye demanda latente ni ventas perdidas.
+- `inventory_snapshot.csv` se materializa para cada par `sku + location` activo durante todo el horizonte diario.
+- un SKU del catalogo puede no aparecer en tablas operativas si su demanda total simulada es cero en todo el periodo.
+- en perfil `industrial`, los fines de semana no generan ventas operativas por defecto.
+- los quiebres de stock existen de forma implicita cuando `on_hand_qty` llega a cero; no se exportan como tabla separada.
+- en perfil `industrial`, la compra se piensa como abastecimiento centralizado de importacion, con lead times promedio altos.
+- aun asi, las recepciones se registran directo en la `destination_location` operativa, porque este modelo canónico no incluye transferencias internas entre bodegas o sucursales.
+
+Implicancia:
+
+- si se quiere modelar recepcion central en una bodega importadora y posterior redistribucion a sucursales, falta una entidad operacional de transferencias.
+
+
 Ver [docs/output_er_model.md](docs/output_er_model.md) para el diagrama E/R completo.
 
 ## Roadmap tecnico
 
 ### Fase 0 - Generacion de datos (completada)
 - [x] Generador de datos sinteticos multi-perfil
-- [x] Modelo de datos relacional (5 tablas)
+- [x] Modelo de datos relacional (6 tablas)
 - [x] Documentacion de esquema E/R
 
 ### Fase 1 - Clasificacion y preprocesamiento
