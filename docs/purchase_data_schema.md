@@ -8,6 +8,7 @@ calzando con los archivos actuales:
 - `output/product_catalog.csv`
 - `output/transactions.csv`
 - `output/inventory_snapshot.csv`
+- `output/internal_transfers.csv`
 
 La data actual representa `salidas` reales de inventario por `sku` y `location`.
 Para completar el lado de supply, el minimo util es modelar:
@@ -16,6 +17,7 @@ Para completar el lado de supply, el minimo util es modelar:
 2. lineas de orden de compra
 3. recepciones de compra
 4. snapshot de inventario
+5. transferencias internas
 
 Con estas 3 tablas ya se puede calcular:
 
@@ -26,6 +28,7 @@ Con estas 3 tablas ya se puede calcular:
 - entradas de inventario por sucursal
 - costo de abastecimiento
 - posicion diaria de stock para reposicion
+- lead time interno centro -> sucursal
 
 ## Convencion Operativa
 
@@ -33,6 +36,7 @@ Agrupacion sugerida para el proyecto:
 
 - `salidas`: ventas, consumo, despacho
 - `entradas`: recepciones de compra
+- `traslados`: transferencias internas
 - `posicion`: snapshot diario de inventario
 
 En el estado actual:
@@ -42,14 +46,15 @@ En el estado actual:
 Con el esquema de abajo:
 
 - `purchase_receipts.csv` = `entradas`
+- `internal_transfers.csv` = `traslados`
 - `inventory_snapshot.csv` = `posicion`
 
 ## Logica Particular de Este Modelo
 
-- el modelo canónico actual no incluye transferencias internas entre bodegas o sucursales.
-- por eso, aunque la logica de compras industrial se piense como abastecimiento centralizado de importacion, la recepcion queda registrada directamente en la ubicacion operativa.
-- esta simplificacion permite mantener consistencia entre `transactions`, `purchase_receipts` e `inventory_snapshot`.
-- si se quiere representar recepcion en bodega central y posterior redistribucion, hace falta una tabla operacional de transferencias.
+- el modelo canónico actual sí incluye transferencias internas entre nodo central y sucursales.
+- `internal_transfers.csv` es el cambio mínimo que permite representar compra centralizada sin perder consistencia operativa por sucursal.
+- la compra industrial se piensa como importacion a un nodo central y posterior redistribucion a sucursales.
+- esta estructura mantiene consistencia entre `transactions`, `purchase_receipts`, `internal_transfers` e `inventory_snapshot`.
 
 ## 1. inventory_snapshot.csv
 
@@ -77,7 +82,37 @@ snapshot_date,sku,location,on_hand_qty,on_order_qty
 2024-03-15,SKU-00001,Santiago,8,10
 ```
 
-## 2. purchase_orders.csv
+## 2. internal_transfers.csv
+
+Traslado interno entre nodo central y sucursal.
+Cada fila representa un embarque interno ya despachado desde origen.
+
+Columnas:
+
+- `transfer_id`: identificador unico del traslado
+- `sku`: FK a `product_catalog.sku`
+- `source_location`: nodo origen
+- `destination_location`: nodo destino
+- `ship_date`: fecha de despacho interno
+- `expected_receipt_date`: fecha esperada de recepcion
+- `receipt_date`: fecha efectiva de recepcion; puede quedar vacia si el traslado sigue abierto
+- `transfer_qty`: cantidad trasladada
+- `transfer_status`: `open`, `received`
+
+Notas:
+
+- desacopla lead time proveedor de lead time interno
+- permite que la compra sea centralizada y la demanda siga analizandose por sucursal
+- al no modelar orden de transferencia separada, esta tabla representa el movimiento interno despachado
+
+Ejemplo:
+
+```csv
+transfer_id,sku,source_location,destination_location,ship_date,expected_receipt_date,receipt_date,transfer_qty,transfer_status
+TR-20240315-000123,SKU-00001,CD Santiago,Antofagasta,2024-03-15,2024-03-19,2024-03-20,8,received
+```
+
+## 3. purchase_orders.csv
 
 Cabecera de la orden de compra.
 Una OC pertenece a un solo proveedor y a una sola sucursal destino.
@@ -107,7 +142,7 @@ po_id,supplier,destination_location,order_date,expected_receipt_date,order_statu
 PO-20240315-000123,Maestranza Integral,Santiago,2024-03-15,2024-06-13,received,CLP,30
 ```
 
-## 3. purchase_order_lines.csv
+## 4. purchase_order_lines.csv
 
 Detalle de productos pedidos en cada OC.
 
@@ -134,7 +169,7 @@ po_id,po_line_id,sku,ordered_qty,unit_cost,line_amount,moq_applied
 PO-20240315-000123,PO-20240315-000123-L01,SKU-00001,10,319405,3194050,5
 ```
 
-## 4. purchase_receipts.csv
+## 5. purchase_receipts.csv
 
 Recepciones efectivas de mercaderia.
 Cada fila representa una recepcion de una linea de OC.
@@ -172,10 +207,13 @@ Llaves y reglas de cruce:
 
 - `purchase_order_lines.sku -> product_catalog.sku`
 - `inventory_snapshot.sku -> product_catalog.sku`
+- `internal_transfers.sku -> product_catalog.sku`
 - `purchase_orders.supplier -> product_catalog.supplier`
-- `purchase_orders.destination_location -> transactions.location`
-- `purchase_receipts.location -> transactions.location`
-- `inventory_snapshot.location -> transactions.location`
+- `purchase_orders.destination_location -> inventory_snapshot.location`
+- `purchase_receipts.location -> inventory_snapshot.location`
+- `internal_transfers.source_location -> inventory_snapshot.location`
+- `internal_transfers.destination_location -> inventory_snapshot.location`
+- `inventory_snapshot.location` contiene nodos operativos y nodo central
 - `purchase_receipts.sku -> product_catalog.sku`
 
 Consistencias esperadas:
@@ -185,6 +223,7 @@ Consistencias esperadas:
 - la recepcion debe ocurrir en la misma `destination_location` de la OC
 - `receipt_date >= order_date`
 - `sum(received_qty por po_line_id) <= ordered_qty`, salvo sobre-recepcion explicita
+- un traslado interno no debe crear ni destruir stock; solo moverlo entre nodos
 
 ## Reglas Minimas de Generacion
 
@@ -196,6 +235,9 @@ Si luego generamos data sintetica de compras, sugiero estas reglas:
 - `ordered_qty` depende de cobertura objetivo, MOQ y tamaño de lote
 - `unit_cost` se mueve alrededor de `product_catalog.cost`
 - no todos los pedidos llegan completos; debe existir una fraccion de parciales
+- la compra industrial se recibe en nodo central
+- el reabastecimiento a sucursal se mueve con `internal_transfers`
+- cada sucursal usa su propio lead time interno para reposicion
 - `inventory_snapshot` debe persistir `on_hand_qty` y `on_order_qty` por dia
 
 ## Vista Unificada Recomendada
@@ -221,14 +263,16 @@ Mapeo inicial:
 
 - `transactions.quantity` -> `movement_direction = out`, `movement_type = sale`
 - `purchase_receipts.csv` -> `movement_direction = in`, `movement_type = purchase_receipt`
+- `internal_transfers.csv` -> `movement_type = transfer`
 
 ## Esquema Minimo Recomendado
 
 Si hubiera que quedarse con lo estrictamente minimo para el siguiente modulo:
 
 1. `inventory_snapshot.csv`
-2. `purchase_orders.csv`
-3. `purchase_order_lines.csv`
-4. `purchase_receipts.csv`
+2. `internal_transfers.csv`
+3. `purchase_orders.csv`
+4. `purchase_order_lines.csv`
+5. `purchase_receipts.csv`
 
 Ese es el punto minimo en que compras, abastecimiento e inventario quedan modelados con suficiente fidelidad para forecast, reposicion y analitica operacional.

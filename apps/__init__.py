@@ -1,0 +1,1 @@
+"""Aplicaciones livianas del monorepo."""

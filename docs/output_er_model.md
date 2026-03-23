@@ -7,6 +7,7 @@ Este E/R considera las tablas operativas actuales generadas en `output/`:
 - `product_catalog.csv`
 - `transactions.csv`
 - `inventory_snapshot.csv`
+- `internal_transfers.csv`
 - `purchase_orders.csv`
 - `purchase_order_lines.csv`
 - `purchase_receipts.csv`
@@ -20,12 +21,12 @@ Las metricas, promedios y clasificaciones derivadas no forman parte del modelo o
 - un SKU del catalogo puede no quedar materializado en tablas operativas si no tuvo demanda total en el horizonte.
 - los quiebres de stock no se exportan como tabla; quedan implicitos en snapshots con `on_hand_qty = 0` y en ausencia de venta atendida.
 - en el perfil `industrial`, la logica de compras busca aproximar abastecimiento centralizado de importacion, por eso los proveedores tienen lead times promedio altos.
-- como este modelo no incluye transferencias internas, las recepciones se registran directamente en la ubicacion operativa que consume el inventario.
+- la compra llega a un nodo central y luego se redistribuye a sucursales via `internal_transfers`.
 
 Consecuencia de diseño:
 
 - el modelo sirve para forecasting, reposicion y conciliacion operacional basica.
-- no representa todavia la pata fisica de recepcion central + transferencia interna a sucursales.
+- la demanda sigue observandose por sucursal, mientras el abastecimiento se modela centralizado.
 
 ## Diagrama E/R
 
@@ -59,6 +60,18 @@ erDiagram
         string location
         int on_hand_qty
         int on_order_qty
+    }
+
+    INTERNAL_TRANSFERS {
+        string transfer_id PK
+        string sku FK
+        string source_location
+        string destination_location
+        date ship_date
+        date expected_receipt_date
+        date receipt_date
+        int transfer_qty
+        string transfer_status
     }
 
     PURCHASE_ORDERS {
@@ -98,6 +111,7 @@ erDiagram
 
     PRODUCT_CATALOG ||--o{ TRANSACTIONS : "sku"
     PRODUCT_CATALOG ||--o{ INVENTORY_SNAPSHOT : "sku"
+    PRODUCT_CATALOG ||--o{ INTERNAL_TRANSFERS : "sku"
     PRODUCT_CATALOG ||--o{ PURCHASE_ORDER_LINES : "sku"
     PRODUCT_CATALOG ||--o{ PURCHASE_RECEIPTS : "sku"
     PURCHASE_ORDERS ||--o{ PURCHASE_ORDER_LINES : "po_id"
@@ -186,7 +200,36 @@ Semantica:
 - representa el estado operativo diario del inventario
 - no es una metrica analitica, sino un saldo operacional persistido
 
-### 4. `purchase_orders.csv`
+### 4. `internal_transfers.csv`
+
+Traslados internos desde nodo central hacia sucursales.
+
+Clave primaria:
+
+- `transfer_id`
+
+Relaciones:
+
+- `sku -> product_catalog.sku`
+
+Columnas:
+
+- `transfer_id`
+- `sku`
+- `source_location`
+- `destination_location`
+- `ship_date`
+- `expected_receipt_date`
+- `receipt_date`
+- `transfer_qty`
+- `transfer_status`
+
+Semantica:
+
+- representa reposicion interna entre nodos del inventario
+- desacopla lead time proveedor de lead time interno
+
+### 5. `purchase_orders.csv`
 
 Cabecera de orden de compra.
 Una OC pertenece a un proveedor y a una sucursal destino.
@@ -211,7 +254,7 @@ Columnas:
 - `currency`
 - `payment_terms_days`
 
-### 5. `purchase_order_lines.csv`
+### 6. `purchase_order_lines.csv`
 
 Detalle de cada OC.
 
@@ -238,7 +281,7 @@ Nota:
 
 - hoy el generador crea 1 linea por OC, pero el modelo permite varias lineas por OC
 
-### 6. `purchase_receipts.csv`
+### 7. `purchase_receipts.csv`
 
 Entradas efectivas de inventario por recepcion.
 
@@ -274,6 +317,7 @@ Semantica:
 
 - un `producto` puede tener muchas `transactions`
 - un `producto` puede tener muchos `inventory_snapshot`
+- un `producto` puede tener muchas `internal_transfers`
 - un `producto` puede aparecer en muchas `purchase_order_lines`
 - una `purchase_order` puede tener muchas `purchase_order_lines`
 - una `purchase_order_line` puede tener una o varias `purchase_receipts`
@@ -285,16 +329,18 @@ Agrupacion recomendada:
 
 - `transactions.csv` = salidas
 - `purchase_receipts.csv` = entradas
+- `internal_transfers.csv` = reabastecimiento interno
 - `inventory_snapshot.csv` = posicion de inventario
 
 Con eso, el flujo operacional queda:
 
 1. el catalogo define producto, proveedor, costo y MOQ
 2. las `transactions` representan consumo o venta
-3. `inventory_snapshot` persiste la posicion diaria de inventario
-4. las `purchase_orders` representan decision de abastecimiento
-5. las `purchase_order_lines` detallan que SKU se compra
-6. las `purchase_receipts` representan ingreso efectivo de stock
+3. `purchase_receipts` representan ingreso al nodo central
+4. `internal_transfers` mueven inventario desde el nodo central a sucursales
+5. `inventory_snapshot` persiste la posicion diaria por nodo
+6. las `purchase_orders` representan decision de abastecimiento al proveedor
+7. las `purchase_order_lines` detallan que SKU se compra
 
 ## Relacion Logica de Llaves
 
@@ -302,6 +348,7 @@ Con eso, el flujo operacional queda:
 product_catalog.sku
     -> transactions.sku
     -> inventory_snapshot.sku
+    -> internal_transfers.sku
     -> purchase_order_lines.sku
     -> purchase_receipts.sku
 

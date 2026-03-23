@@ -1,12 +1,12 @@
 """
-Generador de Datos Sintéticos de Transacciones para Motor de Forecast
-=====================================================================
+Generador de Dataset Canonico para Motor de Planning
+====================================================
 Genera SKUs con patrones de demanda diversos para testing de:
 - Clasificación de patrones (constante, errático, irregular, estacional, tendencia, intermitente, lumpy)
 - Segmentación ABC-XYZ
 - Motor recomendador de compras
 
-Todos los parámetros se importan desde config.py (ver PROFILE para cambiar dominio).
+Todos los parámetros se importan desde apps.simulator.config (ver PROFILE para cambiar dominio).
 """
 
 import numpy as np
@@ -15,11 +15,12 @@ from datetime import datetime
 import random
 import os
 
-from config import (
+from apps.simulator.config import (
     RANDOM_SEED, N_PRODUCTS, START_DATE, END_DATE, OUTPUT_DIR, PROFILE,
     LOCATIONS, BRANDS, CATEGORIES, DEMAND_PATTERNS,
     ABC_RATIOS, BASE_DEMAND_RANGES,
     SUPPLIER_PROFILES, MOQ_CHOICES, EXTRA_FIELD_NAME, EXTRA_FIELD_CHOICES,
+    CENTRAL_SUPPLY_MODE, CENTRAL_LOCATION, INTERNAL_TRANSFER_PROFILES,
     SEASONALITY_PROFILES, SEASON_STRENGTH_RANGES, DOW_MAP, WEEKDAY_FRACTION,
     TREND_UP_GROWTH_RATE, TREND_DOWN_DECAY_RATE, TREND_DOWN_FLOOR,
     NEW_PRODUCT_RAMP_DAYS, NEW_PRODUCT_GROWTH,
@@ -57,6 +58,24 @@ def build_public_transactions(df_transactions):
     return df_transactions.loc[:, public_columns].copy()
 
 
+def build_public_internal_transfers(df_internal_transfers):
+    """Exporta traslados internos entre nodos de inventario."""
+    public_columns = [
+        "transfer_id",
+        "sku",
+        "source_location",
+        "destination_location",
+        "ship_date",
+        "expected_receipt_date",
+        "receipt_date",
+        "transfer_qty",
+        "transfer_status",
+    ]
+    if df_internal_transfers.empty:
+        return pd.DataFrame(columns=public_columns)
+    return df_internal_transfers.loc[:, public_columns].copy()
+
+
 def ceil_to_multiple(quantity, multiple):
     """Redondea hacia arriba respetando MOQ o múltiplos de empaque."""
     multiple = max(1, int(multiple))
@@ -74,19 +93,18 @@ def build_document_id(prefix, date_value, counter):
     return f"{prefix}-{date_str}-{counter:06d}"
 
 
-def generate_purchase_data(catalog, daily_demand_by_sku_location, daily_prices_by_sku_location, dates):
-    """
-    Genera compras coherentes con la demanda:
-    - OCs nacen por reposición por sku/location
-    - lead time depende del proveedor
-    - cantidad pedida respeta MOQ
-    - recepciones pueden ser totales o parciales
+def sample_actual_lead_time(lead_time_days, variability=0.12, lower_bound=0.7, upper_bound=1.35):
+    sampled = int(round(np.random.normal(
+        loc=lead_time_days,
+        scale=max(1.5, lead_time_days * variability),
+    )))
+    min_days = max(1, int(round(lead_time_days * lower_bound)))
+    max_days = max(min_days, int(round(lead_time_days * upper_bound)))
+    return min(max(min_days, sampled), max_days)
 
-    Nota de modelo:
-    - en industrial, la lógica busca aproximar abastecimiento importado con lead times largos
-    - como no existe una tabla de transferencias, la recepción se registra directo
-      en la location operativa que luego consume el stock
-    """
+
+def generate_purchase_data_direct(catalog, daily_demand_by_sku_location, daily_prices_by_sku_location, dates):
+    """Abastecimiento directo a la location operativa."""
     purchase_policy = {
         "A": {"history_days": 30, "review_days": 14, "safety_days": 10, "partial_prob": 0.10},
         "B": {"history_days": 45, "review_days": 21, "safety_days": 14, "partial_prob": 0.14},
@@ -100,6 +118,7 @@ def generate_purchase_data(catalog, daily_demand_by_sku_location, daily_prices_b
     purchase_receipts = []
     inventory_snapshots = []
     transactions = []
+    internal_transfers = []
     po_counter = 1
     receipt_counter = 1
 
@@ -166,11 +185,9 @@ def generate_purchase_data(catalog, daily_demand_by_sku_location, daily_prices_b
             if inventory_position <= reorder_point:
                 order_qty = ceil_to_multiple(max(target_level - inventory_position, moq), moq)
                 unit_cost = float(round(base_cost * random.uniform(0.97, 1.08), 0))
-
                 po_id = build_document_id("PO", current_date, po_counter)
                 po_counter += 1
                 po_line_id = f"{po_id}-L01"
-
                 expected_receipt_date = current_date + pd.Timedelta(days=lead_time_days)
 
                 purchase_order_lines.append({
@@ -184,13 +201,7 @@ def generate_purchase_data(catalog, daily_demand_by_sku_location, daily_prices_b
                 })
 
                 receipt_plan = []
-                actual_lead_time = int(round(np.random.normal(
-                    loc=lead_time_days,
-                    scale=max(1.5, lead_time_days * 0.12),
-                )))
-                min_actual_lead_time = max(1, int(round(lead_time_days * 0.7)))
-                max_actual_lead_time = max(min_actual_lead_time, int(round(lead_time_days * 1.35)))
-                actual_lead_time = min(max(min_actual_lead_time, actual_lead_time), max_actual_lead_time)
+                actual_lead_time = sample_actual_lead_time(lead_time_days)
                 first_receipt_idx = day_idx + actual_lead_time
 
                 if order_qty >= 2 * moq and random.random() < policy["partial_prob"]:
@@ -255,16 +266,338 @@ def generate_purchase_data(catalog, daily_demand_by_sku_location, daily_prices_b
                 "on_order_qty": int(on_order),
             })
 
-    df_purchase_orders = pd.DataFrame(purchase_orders)
-    df_purchase_order_lines = pd.DataFrame(purchase_order_lines)
-    df_purchase_receipts = pd.DataFrame(purchase_receipts)
-    df_inventory_snapshots = pd.DataFrame(inventory_snapshots)
-    df_transactions = pd.DataFrame(transactions)
+    return (
+        pd.DataFrame(transactions),
+        pd.DataFrame(internal_transfers),
+        pd.DataFrame(purchase_orders),
+        pd.DataFrame(purchase_order_lines),
+        pd.DataFrame(purchase_receipts),
+        pd.DataFrame(inventory_snapshots),
+    )
+
+
+def generate_purchase_data_central(catalog, daily_demand_by_sku_location, daily_prices_by_sku_location, dates):
+    """Compra centralizada a proveedor y abastecimiento a sucursales vía traslado interno."""
+    purchase_policy = {
+        "A": {"history_days": 30, "review_days": 14, "safety_days": 10, "partial_prob": 0.10},
+        "B": {"history_days": 45, "review_days": 21, "safety_days": 14, "partial_prob": 0.14},
+        "C": {"history_days": 60, "review_days": 30, "safety_days": 21, "partial_prob": 0.18},
+    }
+    transfer_policy = {
+        "A": {"history_days": 21, "review_days": 7, "safety_days": 5},
+        "B": {"history_days": 30, "review_days": 10, "safety_days": 7},
+        "C": {"history_days": 45, "review_days": 14, "safety_days": 10},
+    }
+
+    catalog_lookup = {row["sku"]: row for _, row in catalog.iterrows()}
+    horizon_days = len(dates)
+    transactions = []
+    internal_transfers = []
+    purchase_orders = []
+    purchase_order_lines = []
+    purchase_receipts = []
+    inventory_snapshots = []
+    po_counter = 1
+    receipt_counter = 1
+    transfer_counter = 1
+
+    sku_locations = {}
+    for (sku, location), demand in daily_demand_by_sku_location.items():
+        if demand.sum() > 0:
+            sku_locations.setdefault(sku, []).append(location)
+
+    for sku in sorted(sku_locations):
+        branch_locations = sorted(sku_locations[sku])
+        product = catalog_lookup[sku]
+        supplier = product["supplier"]
+        supplier_profile = SUPPLIER_PROFILES[supplier]
+        abc_class = product["abc_class"]
+        central_policy = purchase_policy[abc_class]
+        branch_policy = transfer_policy[abc_class]
+        supplier_lead_time_days = int(supplier_profile["avg_lead_time_days"])
+        payment_terms_days = int(supplier_profile.get("payment_terms_days", 30))
+        moq = max(1, int(product["moq"]))
+        base_cost = float(product["cost"])
+
+        branch_demands = {loc: daily_demand_by_sku_location[(sku, loc)] for loc in branch_locations}
+        branch_prices = {loc: daily_prices_by_sku_location[(sku, loc)] for loc in branch_locations}
+        aggregate_demand = np.sum(np.vstack([branch_demands[loc] for loc in branch_locations]), axis=0)
+
+        central_seed_window = min(
+            horizon_days,
+            max(central_policy["history_days"], supplier_lead_time_days, 14),
+        )
+        central_initial_forecast = max(float(np.mean(aggregate_demand[:central_seed_window])), 0.05)
+        central_initial_cover_days = (
+            supplier_lead_time_days
+            + central_policy["review_days"]
+            + central_policy["safety_days"]
+        )
+        central_on_hand = ceil_to_multiple(
+            central_initial_forecast * central_initial_cover_days * random.uniform(1.05, 1.35),
+            moq,
+        )
+        central_on_order = 0
+        scheduled_purchase_receipts = {}
+
+        branch_state = {}
+        for location in branch_locations:
+            demand = branch_demands[location]
+            transfer_lead_time_days = int(
+                INTERNAL_TRANSFER_PROFILES.get(location, {"avg_lead_time_days": 3})["avg_lead_time_days"]
+            )
+            branch_seed_window = min(
+                horizon_days,
+                max(branch_policy["history_days"], transfer_lead_time_days, 14),
+            )
+            branch_initial_forecast = max(float(np.mean(demand[:branch_seed_window])), 0.05)
+            branch_initial_cover_days = (
+                transfer_lead_time_days
+                + branch_policy["review_days"]
+                + branch_policy["safety_days"]
+            )
+            branch_on_hand = int(np.ceil(
+                branch_initial_forecast * branch_initial_cover_days * random.uniform(0.95, 1.20)
+            ))
+            branch_state[location] = {
+                "on_hand": max(0, branch_on_hand),
+                "on_order": 0,
+                "transfer_lead_time_days": transfer_lead_time_days,
+                "scheduled_receipts": {},
+            }
+
+        for day_idx, current_date in enumerate(dates):
+            due_central_receipts = scheduled_purchase_receipts.pop(day_idx, [])
+            for receipt in due_central_receipts:
+                central_on_hand += receipt["received_qty"]
+                central_on_order -= receipt["received_qty"]
+                purchase_receipts.append(receipt)
+
+            for location in branch_locations:
+                branch = branch_state[location]
+                due_branch_receipts = branch["scheduled_receipts"].pop(day_idx, [])
+                for transfer_qty in due_branch_receipts:
+                    branch["on_hand"] += transfer_qty
+                    branch["on_order"] -= transfer_qty
+
+            for location in branch_locations:
+                branch = branch_state[location]
+                demand_qty = int(branch_demands[location][day_idx])
+                fulfilled_qty = min(branch["on_hand"], demand_qty)
+                branch["on_hand"] -= fulfilled_qty
+
+                if fulfilled_qty > 0:
+                    unit_price = float(branch_prices[location][day_idx])
+                    transactions.append({
+                        "date": current_date,
+                        "sku": sku,
+                        "location": location,
+                        "quantity": int(fulfilled_qty),
+                        "unit_price": unit_price,
+                        "total_amount": float(fulfilled_qty * unit_price),
+                    })
+
+            for location in branch_locations:
+                branch = branch_state[location]
+                demand = branch_demands[location]
+                transfer_lead_time_days = branch["transfer_lead_time_days"]
+                history_start = max(0, day_idx - branch_policy["history_days"] + 1)
+                branch_history = demand[history_start:day_idx + 1]
+                branch_forecast = max(float(np.mean(branch_history)) if len(branch_history) else 0.05, 0.05)
+                reorder_point = branch_forecast * (transfer_lead_time_days + branch_policy["safety_days"])
+                target_level = branch_forecast * (
+                    transfer_lead_time_days + branch_policy["safety_days"] + branch_policy["review_days"]
+                )
+                inventory_position = branch["on_hand"] + branch["on_order"]
+
+                if inventory_position <= reorder_point and central_on_hand > 0:
+                    requested_qty = max(int(np.ceil(target_level - inventory_position)), 1)
+                    transfer_qty = min(requested_qty, int(central_on_hand))
+                    if transfer_qty > 0:
+                        transfer_id = build_document_id("TR", current_date, transfer_counter)
+                        transfer_counter += 1
+                        expected_receipt_date = current_date + pd.Timedelta(days=transfer_lead_time_days)
+                        actual_transfer_lead_time = sample_actual_lead_time(
+                            transfer_lead_time_days,
+                            variability=0.25,
+                            lower_bound=0.5,
+                            upper_bound=1.75,
+                        )
+                        receipt_day_idx = day_idx + actual_transfer_lead_time
+                        receipt_date = current_date + pd.Timedelta(days=actual_transfer_lead_time)
+
+                        central_on_hand -= transfer_qty
+                        branch["on_order"] += transfer_qty
+
+                        if receipt_day_idx < horizon_days:
+                            branch["scheduled_receipts"].setdefault(receipt_day_idx, []).append(transfer_qty)
+                            transfer_status = "received"
+                            transfer_receipt_date = receipt_date
+                        else:
+                            transfer_status = "open"
+                            transfer_receipt_date = pd.NaT
+
+                        internal_transfers.append({
+                            "transfer_id": transfer_id,
+                            "sku": sku,
+                            "source_location": CENTRAL_LOCATION,
+                            "destination_location": location,
+                            "ship_date": current_date,
+                            "expected_receipt_date": expected_receipt_date,
+                            "receipt_date": transfer_receipt_date,
+                            "transfer_qty": int(transfer_qty),
+                            "transfer_status": transfer_status,
+                        })
+
+            central_history_start = max(0, day_idx - central_policy["history_days"] + 1)
+            central_history = aggregate_demand[central_history_start:day_idx + 1]
+            central_trailing_mean = float(np.mean(central_history)) if len(central_history) else central_initial_forecast
+            central_forecast = max(central_initial_forecast if day_idx < 7 else central_trailing_mean, 0.05)
+            central_reorder_point = central_forecast * (
+                supplier_lead_time_days + central_policy["safety_days"]
+            )
+            central_target_level = central_forecast * (
+                supplier_lead_time_days + central_policy["safety_days"] + central_policy["review_days"]
+            )
+            central_inventory_position = central_on_hand + central_on_order
+
+            if central_inventory_position <= central_reorder_point:
+                order_qty = ceil_to_multiple(max(central_target_level - central_inventory_position, moq), moq)
+                unit_cost = float(round(base_cost * random.uniform(0.97, 1.08), 0))
+                po_id = build_document_id("PO", current_date, po_counter)
+                po_counter += 1
+                po_line_id = f"{po_id}-L01"
+                expected_receipt_date = current_date + pd.Timedelta(days=supplier_lead_time_days)
+
+                purchase_order_lines.append({
+                    "po_id": po_id,
+                    "po_line_id": po_line_id,
+                    "sku": sku,
+                    "ordered_qty": int(order_qty),
+                    "unit_cost": unit_cost,
+                    "line_amount": float(order_qty * unit_cost),
+                    "moq_applied": moq,
+                })
+
+                receipt_plan = []
+                actual_supplier_lead_time = sample_actual_lead_time(supplier_lead_time_days)
+                first_receipt_idx = day_idx + actual_supplier_lead_time
+
+                if order_qty >= 2 * moq and random.random() < central_policy["partial_prob"]:
+                    first_qty = floor_to_multiple(order_qty * random.uniform(0.45, 0.75), moq)
+                    first_qty = min(max(moq, first_qty), order_qty - moq)
+                    remaining_qty = order_qty - first_qty
+                    gap_days = max(7, int(round(np.random.normal(
+                        loc=max(10, supplier_lead_time_days * 0.10),
+                        scale=4,
+                    ))))
+                    receipt_plan.append((first_receipt_idx, first_qty, "partial"))
+                    receipt_plan.append((first_receipt_idx + gap_days, remaining_qty, "received"))
+                else:
+                    receipt_plan.append((first_receipt_idx, order_qty, "received"))
+
+                received_within_horizon = 0
+                for receipt_day_idx, received_qty, receipt_status in receipt_plan:
+                    receipt_date = current_date + pd.Timedelta(days=receipt_day_idx - day_idx)
+                    receipt_id = build_document_id("GR", receipt_date, receipt_counter)
+                    receipt_counter += 1
+
+                    receipt_record = {
+                        "receipt_id": receipt_id,
+                        "po_id": po_id,
+                        "po_line_id": po_line_id,
+                        "sku": sku,
+                        "supplier": supplier,
+                        "location": CENTRAL_LOCATION,
+                        "receipt_date": receipt_date,
+                        "received_qty": int(received_qty),
+                        "unit_cost": unit_cost,
+                        "total_cost": float(received_qty * unit_cost),
+                        "receipt_status": receipt_status,
+                    }
+
+                    if receipt_day_idx < horizon_days:
+                        scheduled_purchase_receipts.setdefault(receipt_day_idx, []).append(receipt_record)
+                        received_within_horizon += received_qty
+
+                if received_within_horizon == 0:
+                    order_status = "open"
+                elif received_within_horizon < order_qty:
+                    order_status = "partially_received"
+                else:
+                    order_status = "received"
+
+                purchase_orders.append({
+                    "po_id": po_id,
+                    "supplier": supplier,
+                    "destination_location": CENTRAL_LOCATION,
+                    "order_date": current_date,
+                    "expected_receipt_date": expected_receipt_date,
+                    "order_status": order_status,
+                    "currency": "CLP",
+                    "payment_terms_days": payment_terms_days,
+                })
+
+                central_on_order += order_qty
+
+            inventory_snapshots.append({
+                "snapshot_date": current_date,
+                "sku": sku,
+                "location": CENTRAL_LOCATION,
+                "on_hand_qty": int(central_on_hand),
+                "on_order_qty": int(central_on_order),
+            })
+            for location in branch_locations:
+                branch = branch_state[location]
+                inventory_snapshots.append({
+                    "snapshot_date": current_date,
+                    "sku": sku,
+                    "location": location,
+                    "on_hand_qty": int(branch["on_hand"]),
+                    "on_order_qty": int(branch["on_order"]),
+                })
+
+    return (
+        pd.DataFrame(transactions),
+        pd.DataFrame(internal_transfers),
+        pd.DataFrame(purchase_orders),
+        pd.DataFrame(purchase_order_lines),
+        pd.DataFrame(purchase_receipts),
+        pd.DataFrame(inventory_snapshots),
+    )
+
+
+def generate_purchase_data(catalog, daily_demand_by_sku_location, daily_prices_by_sku_location, dates):
+    if CENTRAL_SUPPLY_MODE:
+        result = generate_purchase_data_central(
+            catalog,
+            daily_demand_by_sku_location,
+            daily_prices_by_sku_location,
+            dates,
+        )
+    else:
+        result = generate_purchase_data_direct(
+            catalog,
+            daily_demand_by_sku_location,
+            daily_prices_by_sku_location,
+            dates,
+        )
+
+    (
+        df_transactions,
+        df_internal_transfers,
+        df_purchase_orders,
+        df_purchase_order_lines,
+        df_purchase_receipts,
+        df_inventory_snapshots,
+    ) = result
 
     if not df_transactions.empty:
         df_transactions.sort_values(["date", "sku", "location"], inplace=True)
         df_transactions.reset_index(drop=True, inplace=True)
-
+    if not df_internal_transfers.empty:
+        df_internal_transfers.sort_values(["ship_date", "transfer_id"], inplace=True)
+        df_internal_transfers.reset_index(drop=True, inplace=True)
     if not df_purchase_orders.empty:
         df_purchase_orders.sort_values(["order_date", "po_id"], inplace=True)
         df_purchase_orders.reset_index(drop=True, inplace=True)
@@ -280,6 +613,7 @@ def generate_purchase_data(catalog, daily_demand_by_sku_location, daily_prices_b
 
     return (
         df_transactions,
+        df_internal_transfers,
         df_purchase_orders,
         df_purchase_order_lines,
         df_purchase_receipts,
@@ -577,6 +911,7 @@ def main():
     print("\nGenerando documentos operacionales...")
     (
         df_transactions,
+        df_internal_transfers,
         df_purchase_orders,
         df_purchase_order_lines,
         df_purchase_receipts,
@@ -588,6 +923,7 @@ def main():
         dates,
     )
     df_transactions_public = build_public_transactions(df_transactions)
+    df_internal_transfers_public = build_public_internal_transfers(df_internal_transfers)
 
     # XYZ Classification based on CV²
     def classify_xyz(cv2):
@@ -626,6 +962,10 @@ def main():
     df_transactions_public.to_csv(tx_path, index=False)
     print(f"\nTransacciones guardadas: {tx_path} ({len(df_transactions_public):,} filas)")
 
+    transfers_path = os.path.join(output_dir, "internal_transfers.csv")
+    df_internal_transfers_public.to_csv(transfers_path, index=False)
+    print(f"Transferencias internas guardadas: {transfers_path} ({len(df_internal_transfers_public):,} filas)")
+
     cat_path = os.path.join(output_dir, "product_catalog.csv")
     catalog_public.to_csv(cat_path, index=False)
     print(f"Catálogo guardado: {cat_path} ({len(catalog_public):,} productos)")
@@ -654,6 +994,9 @@ def main():
     print(f"Total SKUs: {N_PRODUCTS}")
     print(f"Período: {START_DATE} → {END_DATE}")
     print(f"Locaciones: {len(LOCATIONS)}")
+    if CENTRAL_SUPPLY_MODE:
+        print(f"Supply central: {CENTRAL_LOCATION}")
+        print(f"Transferencias internas: {len(df_internal_transfers_public):,}")
     print(f"Órdenes de compra: {len(df_purchase_orders):,}")
     print(f"Recepciones: {len(df_purchase_receipts):,}")
     print(f"Snapshots inventario: {len(df_inventory_snapshots):,}")
@@ -683,6 +1026,7 @@ def main():
         df_transactions_public,
         catalog_public,
         df_metrics,
+        df_internal_transfers_public,
         df_purchase_orders,
         df_purchase_order_lines,
         df_purchase_receipts,
@@ -691,4 +1035,4 @@ def main():
 
 
 if __name__ == "__main__":
-    df_tx, df_cat, df_met, df_po, df_po_lines, df_receipts, df_inventory = main()
+    df_tx, df_cat, df_met, df_transfers, df_po, df_po_lines, df_receipts, df_inventory = main()

@@ -24,7 +24,7 @@ El proyecto se encuentra en **Fase 0 (Data Generation)**: cuenta con un generado
 |---|---|---|
 | Generador de transacciones | Series diarias con 10 patrones de demanda | Funcional |
 | Configuracion multi-perfil | Industrial (oleohidraulica) y Retail (supermercado) | Funcional |
-| Modelo de datos (6 tablas) | Catalogo, transacciones, snapshots inventario, OC, lineas OC, recepciones | Funcional |
+| Modelo de datos (7 tablas) | Catalogo, transacciones, snapshots inventario, transferencias internas, OC, lineas OC, recepciones | Funcional |
 | Documentacion de esquema | E/R y especificacion de compras | Documentado |
 
 ### Que viene a continuacion
@@ -39,11 +39,16 @@ El proyecto se encuentra en **Fase 0 (Data Generation)**: cuenta con un generado
 
 ```
 SOTA-Simulated-Planning/
-├── config.py                    # Configuracion global (perfiles, umbrales, parametros)
-├── generate_transactions.py     # Generador de datos sinteticos
-├── requirements.txt             # Dependencias Python
+├── apps/
+│   ├── api/                     # API liviana para explorar el canonico
+│   ├── simulator/               # Configuracion y generador del dataset canonico
+│   └── viz/                     # Visualizadora basica con Streamlit
+├── planning_core/               # Capa reusable de consultas y validaciones
+├── pyproject.toml               # Dependencias por capa via extras
+├── requirements.txt             # Dependencias base del simulador/core
 ├── output/                      # Datos generados (no versionado)
 └── docs/
+    ├── lightweight_monorepo_architecture.md
     ├── output_er_model.md       # Modelo E/R de las tablas de salida
     └── purchase_data_schema.md  # Especificacion del esquema de compras
 ```
@@ -61,6 +66,7 @@ El generador produce **3 anos de datos diarios** (2022-2024) para un catalogo co
 | `product_catalog.csv` | Maestro de productos (SKU, categoria, proveedor, precio, costo, MOQ) | `sku` |
 | `transactions.csv` | Transacciones reales de salida por SKU y ubicacion | `date + sku + location` |
 | `inventory_snapshot.csv` | Posicion diaria de inventario por SKU y ubicacion | `snapshot_date + sku + location` |
+| `internal_transfers.csv` | Traslados internos entre nodo central y sucursales | `transfer_id` |
 | `purchase_orders.csv` | Cabeceras de ordenes de compra | `po_id` |
 | `purchase_order_lines.csv` | Detalle de productos por orden de compra | `po_line_id` |
 | `purchase_receipts.csv` | Recepciones efectivas de mercaderia | `receipt_id` |
@@ -84,7 +90,7 @@ El generador cubre los cuatro cuadrantes de la clasificacion Syntetos-Boylan mas
 
 ### Perfiles disponibles
 
-Se seleccionan cambiando `PROFILE` en `config.py`:
+Se seleccionan cambiando `PROFILE` en `apps/simulator/config.py`:
 
 **Industrial** (`"industrial"`) - Oleohidraulica:
 - 800 productos, 5 ubicaciones (Santiago, Antofagasta, Copiapo, Concepcion, Lima)
@@ -101,17 +107,53 @@ Se seleccionan cambiando `PROFILE` en `config.py`:
 ### Como ejecutar el generador
 
 ```bash
-# Instalar dependencias
+# Instalar dependencias base
 pip install -r requirements.txt
 
-# Seleccionar perfil en config.py (linea 11)
+# Seleccionar perfil en apps/simulator/config.py
 # PROFILE = "industrial"  o  PROFILE = "retail"
 
 # Ejecutar
-python generate_transactions.py
+python3 -m apps.simulator.generate_canonical_dataset
 ```
 
 Los archivos CSV se generan en el directorio `output/`.
+
+### Capas livianas del monorepo
+
+La arquitectura modular del repo esta documentada en [docs/lightweight_monorepo_architecture.md](docs/lightweight_monorepo_architecture.md).
+
+Instalacion sugerida por capa:
+
+```bash
+# Core + simulador
+python3 -m pip install -e .
+
+# Visualizadora
+python3 -m pip install -e .[viz]
+
+# API
+python3 -m pip install -e .[api]
+```
+
+Ejecucion basica:
+
+```bash
+# Wrapper del simulador
+python3 -m apps.simulator.generate_canonical_dataset
+
+# Wrapper alternativo
+python3 -m apps.simulator
+
+# Wrapper alternativo
+python3 -m apps.simulator.run
+
+# Visualizadora
+python3 -m streamlit run apps/viz/app.py
+
+# API
+python3 -m uvicorn apps.api.main:app --reload
+```
 
 ### Caracteristicas del generador
 
@@ -123,6 +165,7 @@ Los archivos CSV se generan en el directorio `output/`.
 - **Spikes**: Picos de demanda por promociones o proyectos
 - **Stockouts**: Quiebres emergentes cuando la demanda supera el stock disponible
 - **Compras**: Ordenes generadas por politica de reposicion con recepciones parciales
+- **Transferencias**: Reposicion desde nodo central hacia sucursales con lead times internos
 - **Inventario**: Snapshot diario de stock disponible y stock en orden por SKU/ubicacion
 
 ## Modelo de datos
@@ -130,12 +173,14 @@ Los archivos CSV se generan en el directorio `output/`.
 El modelo relacional sigue la convencion operativa:
 - **Salidas** = `transactions.csv` (ventas/consumo realmente registrados)
 - **Entradas** = `purchase_receipts.csv` (recepciones de compra)
+- **Reabastecimiento interno** = `internal_transfers.csv`
 - **Posicion** = `inventory_snapshot.csv` (estado diario de inventario)
 
 ```
 product_catalog.sku
     -> transactions.sku
     -> inventory_snapshot.sku
+    -> internal_transfers.sku
     -> purchase_order_lines.sku
     -> purchase_receipts.sku
 
@@ -159,11 +204,12 @@ Reglas particulares de esta simulacion:
 - en perfil `industrial`, los fines de semana no generan ventas operativas por defecto.
 - los quiebres de stock existen de forma implicita cuando `on_hand_qty` llega a cero; no se exportan como tabla separada.
 - en perfil `industrial`, la compra se piensa como abastecimiento centralizado de importacion, con lead times promedio altos.
-- aun asi, las recepciones se registran directo en la `destination_location` operativa, porque este modelo canónico no incluye transferencias internas entre bodegas o sucursales.
+- la compra llega a un nodo central de abastecimiento y luego se redistribuye a sucursales via `internal_transfers`.
+- `transactions` sigue representando solo demanda atendida en sucursal; el nodo central no genera ventas operativas.
 
 Implicancia:
 
-- si se quiere modelar recepcion central en una bodega importadora y posterior redistribucion a sucursales, falta una entidad operacional de transferencias.
+- la agregacion de demanda para compra central y el abastecimiento por sucursal quedan ambos soportados por movimientos operacionales consistentes.
 
 
 Ver [docs/output_er_model.md](docs/output_er_model.md) para el diagrama E/R completo.
@@ -172,7 +218,7 @@ Ver [docs/output_er_model.md](docs/output_er_model.md) para el diagrama E/R comp
 
 ### Fase 0 - Generacion de datos (completada)
 - [x] Generador de datos sinteticos multi-perfil
-- [x] Modelo de datos relacional (6 tablas)
+- [x] Modelo de datos relacional (7 tablas)
 - [x] Documentacion de esquema E/R
 
 ### Fase 1 - Clasificacion y preprocesamiento
@@ -211,7 +257,7 @@ Ver [docs/output_er_model.md](docs/output_er_model.md) para el diagrama E/R comp
 
 | Componente | Tecnologia |
 |---|---|
-| Lenguaje | Python 3.10+ |
+| Lenguaje | Python 3.9+ |
 | Modelos clasicos | StatsForecast (Nixtla) |
 | Modelos ML | MLForecast + LightGBM |
 | Modelos DL (futuro) | NeuralForecast (Nixtla) |

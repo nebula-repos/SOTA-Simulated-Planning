@@ -1,5 +1,5 @@
 """
-Configuración para Generador de Datos Sintéticos de Transacciones
+Configuración para Generador de Dataset Canónico de Planning
 =================================================================
 Dos perfiles seleccionables: "industrial" (oleohidráulica) y "retail" (supermercado).
 Cambiar PROFILE para seleccionar el dominio.
@@ -43,6 +43,8 @@ STOCKOUT_RECORD_PROBABILITY = 0.3
 # ============================================================
 _INDUSTRIAL = {
     "n_products": 800,
+    "central_supply_mode": True,
+    "central_location": "CD Santiago",
 
     "locations": [
         "Santiago",
@@ -217,6 +219,13 @@ _INDUSTRIAL = {
         "Industrial Flow Partners": {"avg_lead_time_days": 190, "payment_terms_days": 60},
         "Maestranza Integral": {"avg_lead_time_days": 200, "payment_terms_days": 60},
     },
+    "internal_transfer_profiles": {
+        "Santiago": {"avg_lead_time_days": 1},
+        "Antofagasta": {"avg_lead_time_days": 4},
+        "Copiapó": {"avg_lead_time_days": 3},
+        "Concepción": {"avg_lead_time_days": 3},
+        "Lima": {"avg_lead_time_days": 7},
+    },
     "moq_choices": [1, 2, 5, 10, 25],
     "extra_field_name": "warranty_months",
     "extra_field_choices": [None, 6, 12, 18, 24, 36],
@@ -306,6 +315,8 @@ _INDUSTRIAL = {
 # ============================================================
 _RETAIL = {
     "n_products": 1200,
+    "central_supply_mode": False,
+    "central_location": None,
 
     "locations": [f"Tienda_{i:03d}" for i in range(1, 11)],
 
@@ -448,6 +459,7 @@ _RETAIL = {
         "Abastecimiento Nacional": {"avg_lead_time_days": 14, "payment_terms_days": 30},
         "Canal Moderno Supply": {"avg_lead_time_days": 21, "payment_terms_days": 45},
     },
+    "internal_transfer_profiles": {},
     "moq_choices": [1, 6, 12, 24, 48],
     "extra_field_name": "shelf_life_days",
     "extra_field_choices": [None, 7, 14, 30, 60, 90, 180, 365],
@@ -548,6 +560,9 @@ ABC_RATIOS = _active["abc_ratios"]
 BASE_DEMAND_RANGES = _active["base_demand_ranges"]
 
 SUPPLIER_PROFILES = _active["supplier_profiles"]
+CENTRAL_SUPPLY_MODE = _active["central_supply_mode"]
+CENTRAL_LOCATION = _active["central_location"]
+INTERNAL_TRANSFER_PROFILES = _active["internal_transfer_profiles"]
 MOQ_CHOICES = _active["moq_choices"]
 EXTRA_FIELD_NAME = _active["extra_field_name"]
 EXTRA_FIELD_CHOICES = _active["extra_field_choices"]
