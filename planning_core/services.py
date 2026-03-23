@@ -2,6 +2,14 @@ from __future__ import annotations
 
 import pandas as pd
 
+from planning_core.classification import (
+    classify_all_skus,
+    classify_sku,
+    compute_acf,
+    detect_outliers,
+    prepare_demand_series,
+    select_granularity,
+)
 from planning_core.repository import CanonicalRepository
 from planning_core.validation import basic_health_report
 
@@ -250,3 +258,155 @@ class PlanningService:
             "transfer_status",
         ]
         return filtered.loc[:, columns].sort_values("ship_date").reset_index(drop=True)
+
+    # ------------------------------------------------------------------
+    # Clasificacion de demanda (Fase 1)
+    # ------------------------------------------------------------------
+
+    def classify_catalog(self, granularity: str | None = None) -> pd.DataFrame:
+        """Clasifica todos los SKUs del catalogo.
+
+        Agrega transacciones a nivel SKU global (todas las locations sumadas),
+        ejecuta el pipeline completo de clasificacion y retorna un DataFrame
+        con una fila por SKU.
+        """
+        transactions = self.repository.load_table("transactions")
+        catalog = self.repository.load_table("product_catalog")
+        return classify_all_skus(transactions, catalog, granularity=granularity)
+
+    def classify_single_sku(
+        self,
+        sku: str,
+        location: str | None = None,
+        granularity: str | None = None,
+    ) -> dict | None:
+        """Clasifica un SKU individual.
+
+        Parameters
+        ----------
+        sku : str
+            SKU a clasificar.
+        location : str, optional
+            Si se provee, filtra transacciones a esa ubicacion.
+        granularity : str, optional
+            Granularidad forzada. Si es None, se selecciona automaticamente.
+        """
+        transactions = self.repository.load_table("transactions")
+        sku_tx = transactions[transactions["sku"] == sku]
+
+        if location:
+            sku_tx = sku_tx[sku_tx["location"] == location]
+
+        if sku_tx.empty:
+            return None
+
+        return classify_sku(sku_tx, sku=sku, granularity=granularity)
+
+    def sku_demand_series(
+        self,
+        sku: str,
+        location: str | None = None,
+        granularity: str | None = None,
+    ) -> pd.DataFrame:
+        """Retorna la serie temporal de demanda preparada (con ceros rellenados).
+
+        Util para visualizacion directa de la serie subyacente.
+        """
+        transactions = self.repository.load_table("transactions")
+        sku_tx = transactions[transactions["sku"] == sku]
+
+        if location:
+            sku_tx = sku_tx[sku_tx["location"] == location]
+
+        if granularity is None:
+            granularity = select_granularity(sku_tx)
+
+        return prepare_demand_series(sku_tx, granularity=granularity)
+
+    def sku_outlier_series(
+        self,
+        sku: str,
+        location: str | None = None,
+        granularity: str | None = None,
+        method: str = "iqr",
+    ) -> pd.DataFrame:
+        """Retorna la serie de demanda con columna de outliers marcados.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columnas ``[period, demand, is_outlier]``.
+        """
+        series_df = self.sku_demand_series(sku, location=location, granularity=granularity)
+
+        if series_df.empty:
+            series_df["is_outlier"] = pd.Series(dtype=bool)
+            return series_df
+
+        outlier_mask = detect_outliers(series_df["demand"], method=method)
+        series_df["is_outlier"] = outlier_mask.values
+        return series_df
+
+    def sku_acf(
+        self,
+        sku: str,
+        location: str | None = None,
+        granularity: str | None = None,
+        max_lags: int = 40,
+    ) -> dict:
+        """Calcula la funcion de autocorrelacion para un SKU.
+
+        Returns
+        -------
+        dict
+            ``{"lags": list[int], "acf": list[float], "confidence_bound": float}``
+        """
+        series_df = self.sku_demand_series(sku, location=location, granularity=granularity)
+
+        if series_df.empty:
+            return {"lags": [], "acf": [], "confidence_bound": 0.0}
+
+        acf_values = compute_acf(series_df["demand"], max_lags=max_lags)
+        n = len(series_df)
+        confidence_bound = 1.96 / (n ** 0.5)  # intervalo de confianza al 95%
+
+        return {
+            "lags": list(range(len(acf_values))),
+            "acf": [round(float(v), 4) for v in acf_values],
+            "confidence_bound": round(confidence_bound, 4),
+        }
+
+    def classification_summary(self, granularity: str | None = None) -> dict:
+        """Resumen agregado de la clasificacion del catalogo.
+
+        Retorna conteos por clase Syntetos-Boylan, ABC, XYZ, lifecycle,
+        y la matriz ABC-XYZ.
+        """
+        df = self.classify_catalog(granularity=granularity)
+
+        sb_counts = df["sb_class"].value_counts().to_dict()
+        abc_counts = df["abc_class"].value_counts().to_dict()
+        xyz_counts = df["xyz_class"].value_counts().to_dict()
+        lifecycle_counts = df["lifecycle"].value_counts().to_dict()
+        abc_xyz_counts = df["abc_xyz"].value_counts().to_dict()
+
+        # Matriz ABC-XYZ (3x3)
+        abc_xyz_matrix = {}
+        for abc in ["A", "B", "C"]:
+            abc_xyz_matrix[abc] = {}
+            for xyz in ["X", "Y", "Z"]:
+                key = f"{abc}{xyz}"
+                abc_xyz_matrix[abc][xyz] = int(abc_xyz_counts.get(key, 0))
+
+        return {
+            "total_skus": len(df),
+            "granularity": df["granularity"].iloc[0] if not df.empty else None,
+            "sb_counts": sb_counts,
+            "abc_counts": abc_counts,
+            "xyz_counts": xyz_counts,
+            "lifecycle_counts": lifecycle_counts,
+            "abc_xyz_matrix": abc_xyz_matrix,
+            "avg_quality_score": round(float(df["quality_score"].mean()), 3) if not df.empty else 0.0,
+            "seasonal_pct": round(float(df["is_seasonal"].mean()), 3) if not df.empty else 0.0,
+            "trend_pct": round(float(df["has_trend"].mean()), 3) if not df.empty else 0.0,
+        }
