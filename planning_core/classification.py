@@ -874,7 +874,7 @@ def _empty_classification(sku: str, granularity: str) -> dict:
         "adi": float("inf"),
         "cv2": 0.0,
         "sb_class": "inactive",
-        "xyz_class": "Z",
+        "xyz_class": "X",  # cv2=0.0 -> X por definicion
         "is_seasonal": False,
         "seasonal_strength": 0.0,
         "has_trend": False,
