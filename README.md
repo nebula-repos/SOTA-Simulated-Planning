@@ -48,6 +48,8 @@ SOTA-Simulated-Planning/
 ├── requirements.txt             # Dependencias base del simulador/core
 ├── output/                      # Datos generados (no versionado)
 └── docs/
+    ├── business_logic_simulation.md
+    ├── data_health_checks.md
     ├── lightweight_monorepo_architecture.md
     ├── output_er_model.md       # Modelo E/R de las tablas de salida
     └── purchase_data_schema.md  # Especificacion del esquema de compras
@@ -122,6 +124,8 @@ Los archivos CSV se generan en el directorio `output/`.
 ### Capas livianas del monorepo
 
 La arquitectura modular del repo esta documentada en [docs/lightweight_monorepo_architecture.md](docs/lightweight_monorepo_architecture.md).
+
+Los criterios de calidad y auditoria del dato estan documentados en [docs/data_health_checks.md](docs/data_health_checks.md).
 
 Instalacion sugerida por capa:
 

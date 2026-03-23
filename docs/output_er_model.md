@@ -22,11 +22,13 @@ Las metricas, promedios y clasificaciones derivadas no forman parte del modelo o
 - los quiebres de stock no se exportan como tabla; quedan implicitos en snapshots con `on_hand_qty = 0` y en ausencia de venta atendida.
 - en el perfil `industrial`, la logica de compras busca aproximar abastecimiento centralizado de importacion, por eso los proveedores tienen lead times promedio altos.
 - la compra llega a un nodo central y luego se redistribuye a sucursales via `internal_transfers`.
+- el nodo central puede operar como nodo hibrido: abastece a sucursales y tambien puede vender directo, por lo que puede aparecer en `transactions.csv`.
 
 Consecuencia de diseño:
 
 - el modelo sirve para forecasting, reposicion y conciliacion operacional basica.
-- la demanda sigue observandose por sucursal, mientras el abastecimiento se modela centralizado.
+- la demanda sigue observandose por sucursal y tambien puede existir en nodo central cuando ese nodo es hibrido.
+- el abastecimiento sigue modelandose centralizado.
 
 ## Diagrama E/R
 

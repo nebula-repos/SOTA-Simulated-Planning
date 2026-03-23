@@ -54,6 +54,7 @@ Con el esquema de abajo:
 - el modelo canónico actual sí incluye transferencias internas entre nodo central y sucursales.
 - `internal_transfers.csv` es el cambio mínimo que permite representar compra centralizada sin perder consistencia operativa por sucursal.
 - la compra industrial se piensa como importacion a un nodo central y posterior redistribucion a sucursales.
+- el nodo central puede operar como nodo hibrido: recibe compra, despacha a sucursales y tambien puede registrar salidas directas en `transactions.csv`.
 - esta estructura mantiene consistencia entre `transactions`, `purchase_receipts`, `internal_transfers` e `inventory_snapshot`.
 
 ## 1. inventory_snapshot.csv

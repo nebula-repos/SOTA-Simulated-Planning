@@ -45,6 +45,9 @@ _INDUSTRIAL = {
     "n_products": 800,
     "central_supply_mode": True,
     "central_location": "CD Santiago",
+    "central_node_sales_mode": True,
+    "central_node_sales_probability_by_abc": {"A": 1.0, "B": 0.85, "C": 0.55},
+    "central_node_sales_factor_range": (0.35, 0.90),
 
     "locations": [
         "Santiago",
@@ -317,6 +320,9 @@ _RETAIL = {
     "n_products": 1200,
     "central_supply_mode": False,
     "central_location": None,
+    "central_node_sales_mode": False,
+    "central_node_sales_probability_by_abc": {"A": 0.0, "B": 0.0, "C": 0.0},
+    "central_node_sales_factor_range": (0.0, 0.0),
 
     "locations": [f"Tienda_{i:03d}" for i in range(1, 11)],
 
@@ -562,6 +568,9 @@ BASE_DEMAND_RANGES = _active["base_demand_ranges"]
 SUPPLIER_PROFILES = _active["supplier_profiles"]
 CENTRAL_SUPPLY_MODE = _active["central_supply_mode"]
 CENTRAL_LOCATION = _active["central_location"]
+CENTRAL_NODE_SALES_MODE = _active["central_node_sales_mode"]
+CENTRAL_NODE_SALES_PROBABILITY_BY_ABC = _active["central_node_sales_probability_by_abc"]
+CENTRAL_NODE_SALES_FACTOR_RANGE = _active["central_node_sales_factor_range"]
 INTERNAL_TRANSFER_PROFILES = _active["internal_transfer_profiles"]
 MOQ_CHOICES = _active["moq_choices"]
 EXTRA_FIELD_NAME = _active["extra_field_name"]

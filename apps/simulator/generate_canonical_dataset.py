@@ -20,6 +20,7 @@ from apps.simulator.config import (
     LOCATIONS, BRANDS, CATEGORIES, DEMAND_PATTERNS,
     ABC_RATIOS, BASE_DEMAND_RANGES,
     SUPPLIER_PROFILES, MOQ_CHOICES, EXTRA_FIELD_NAME, EXTRA_FIELD_CHOICES,
+    CENTRAL_NODE_SALES_MODE, CENTRAL_NODE_SALES_PROBABILITY_BY_ABC, CENTRAL_NODE_SALES_FACTOR_RANGE,
     CENTRAL_SUPPLY_MODE, CENTRAL_LOCATION, INTERNAL_TRANSFER_PROFILES,
     SEASONALITY_PROFILES, SEASON_STRENGTH_RANGES, DOW_MAP, WEEKDAY_FRACTION,
     TREND_UP_GROWTH_RATE, TREND_DOWN_DECAY_RATE, TREND_DOWN_FLOOR,
@@ -307,7 +308,8 @@ def generate_purchase_data_central(catalog, daily_demand_by_sku_location, daily_
             sku_locations.setdefault(sku, []).append(location)
 
     for sku in sorted(sku_locations):
-        branch_locations = sorted(sku_locations[sku])
+        sku_active_locations = sorted(sku_locations[sku])
+        branch_locations = [location for location in sku_active_locations if location != CENTRAL_LOCATION]
         product = catalog_lookup[sku]
         supplier = product["supplier"]
         supplier_profile = SUPPLIER_PROFILES[supplier]
@@ -321,7 +323,18 @@ def generate_purchase_data_central(catalog, daily_demand_by_sku_location, daily_
 
         branch_demands = {loc: daily_demand_by_sku_location[(sku, loc)] for loc in branch_locations}
         branch_prices = {loc: daily_prices_by_sku_location[(sku, loc)] for loc in branch_locations}
-        aggregate_demand = np.sum(np.vstack([branch_demands[loc] for loc in branch_locations]), axis=0)
+        if CENTRAL_LOCATION in sku_active_locations:
+            central_direct_demand = daily_demand_by_sku_location[(sku, CENTRAL_LOCATION)]
+            central_direct_prices = daily_prices_by_sku_location[(sku, CENTRAL_LOCATION)]
+        else:
+            central_direct_demand = np.zeros(horizon_days, dtype=int)
+            central_direct_prices = np.zeros(horizon_days, dtype=float)
+
+        if branch_locations:
+            branch_aggregate_demand = np.sum(np.vstack([branch_demands[loc] for loc in branch_locations]), axis=0)
+        else:
+            branch_aggregate_demand = np.zeros(horizon_days, dtype=int)
+        aggregate_demand = branch_aggregate_demand + central_direct_demand
 
         central_seed_window = min(
             horizon_days,
@@ -339,6 +352,7 @@ def generate_purchase_data_central(catalog, daily_demand_by_sku_location, daily_
         )
         central_on_order = 0
         scheduled_purchase_receipts = {}
+        central_next_review_day = 0
 
         branch_state = {}
         for location in branch_locations:
@@ -379,6 +393,21 @@ def generate_purchase_data_central(catalog, daily_demand_by_sku_location, daily_
                 for transfer_qty in due_branch_receipts:
                     branch["on_hand"] += transfer_qty
                     branch["on_order"] -= transfer_qty
+
+            central_direct_qty = int(central_direct_demand[day_idx])
+            central_fulfilled_qty = min(central_on_hand, central_direct_qty)
+            central_on_hand -= central_fulfilled_qty
+
+            if central_fulfilled_qty > 0:
+                unit_price = float(central_direct_prices[day_idx])
+                transactions.append({
+                    "date": current_date,
+                    "sku": sku,
+                    "location": CENTRAL_LOCATION,
+                    "quantity": int(central_fulfilled_qty),
+                    "unit_price": unit_price,
+                    "total_amount": float(central_fulfilled_qty * unit_price),
+                })
 
             for location in branch_locations:
                 branch = branch_state[location]
@@ -461,7 +490,7 @@ def generate_purchase_data_central(catalog, daily_demand_by_sku_location, daily_
             )
             central_inventory_position = central_on_hand + central_on_order
 
-            if central_inventory_position <= central_reorder_point:
+            if day_idx >= central_next_review_day and central_inventory_position <= central_reorder_point:
                 order_qty = ceil_to_multiple(max(central_target_level - central_inventory_position, moq), moq)
                 unit_cost = float(round(base_cost * random.uniform(0.97, 1.08), 0))
                 po_id = build_document_id("PO", current_date, po_counter)
@@ -539,6 +568,9 @@ def generate_purchase_data_central(catalog, daily_demand_by_sku_location, daily_
                 })
 
                 central_on_order += order_qty
+                central_next_review_day = day_idx + central_policy["review_days"]
+            elif day_idx >= central_next_review_day:
+                central_next_review_day = day_idx + central_policy["review_days"]
 
             inventory_snapshots.append({
                 "snapshot_date": current_date,
@@ -862,6 +894,10 @@ def main():
         loc_range = LOCATIONS_PER_ABC[product["abc_class"]]
         n_locs = random.randint(loc_range[0], min(loc_range[1], len(LOCATIONS)))
         selected_locations = random.sample(LOCATIONS, n_locs)
+        if CENTRAL_SUPPLY_MODE and CENTRAL_NODE_SALES_MODE:
+            central_sales_probability = CENTRAL_NODE_SALES_PROBABILITY_BY_ABC.get(product["abc_class"], 0.0)
+            if random.random() < central_sales_probability:
+                selected_locations = selected_locations + [CENTRAL_LOCATION]
 
         sku_total_qty = 0
         sku_total_revenue = 0
@@ -870,7 +906,10 @@ def main():
         all_demands = []
 
         for location in selected_locations:
-            loc_factor = random.uniform(*LOCATION_FACTOR_RANGE)
+            if location == CENTRAL_LOCATION:
+                loc_factor = random.uniform(*CENTRAL_NODE_SALES_FACTOR_RANGE)
+            else:
+                loc_factor = random.uniform(*LOCATION_FACTOR_RANGE)
             demand, prices, _spikes = generate_timeseries(product, date_list)
             demand = np.maximum(0, np.round(demand * loc_factor)).astype(int)
             daily_demand_by_sku_location[(product["sku"], location)] = demand.copy()
