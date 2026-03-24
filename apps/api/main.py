@@ -76,7 +76,7 @@ def sku_supply(sku: str):
 @app.get("/classification")
 def classification(
     granularity: Optional[str] = Query(
-        default=None, description="Granularidad: M (mensual), W (semanal), D (diaria). None = automatica.",
+        default=None, description="Granularidad: M, W, D. None = default oficial del repo (mensual, agregado de red).",
     ),
     abc_class: Optional[str] = Query(default=None, description="Filtrar por clase ABC (A, B, C)"),
     sb_class: Optional[str] = Query(default=None, description="Filtrar por clase Syntetos-Boylan"),
@@ -105,7 +105,7 @@ def classification(
 
 @app.get("/classification/summary")
 def classification_summary(
-    granularity: Optional[str] = Query(default=None, description="Granularidad: M, W, D. None = automatica."),
+    granularity: Optional[str] = Query(default=None, description="Granularidad: M, W, D. None = default oficial del repo."),
 ):
     """Resumen agregado: conteos por clase, matriz ABC-XYZ, distribuciones."""
     return service.classification_summary(granularity=granularity)
@@ -115,7 +115,7 @@ def classification_summary(
 def sku_classification(
     sku: str,
     location: Optional[str] = Query(default=None, description="Location especifica (default: global)"),
-    granularity: Optional[str] = Query(default=None, description="Granularidad: M, W, D. None = automatica."),
+    granularity: Optional[str] = Query(default=None, description="Granularidad: M, W, D. None = mensual oficial si no hay location; automatica si se consulta una location."),
 ):
     """Clasificacion detallada de un SKU individual."""
     result = service.classify_single_sku(sku, location=location, granularity=granularity)

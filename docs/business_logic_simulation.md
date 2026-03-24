@@ -203,7 +203,29 @@ Esto es intencional para separar:
 - red comercial distribuida
 - red completa incluyendo pulmón central
 
-## 12. Reglas de agregacion temporal en la UI
+## 12. Semantica actual de clasificacion
+
+La clasificacion oficial de demanda de este repo, por ahora, se calcula a nivel `SKU` agregado de red.
+
+Eso significa:
+
+- se suman las `transactions` de todas las locations activas del SKU
+- si `CD Santiago` tiene venta directa, esa demanda tambien entra en la serie clasificada
+- no se calcula clasificacion oficial por sucursal en este repo
+
+Razon:
+
+- el caso actual prioriza compra centralizada y lectura de demanda agregada de red
+- la logica por sucursal se abordara en otro piloto separado
+
+Implicancia:
+
+- la clasificacion actual sirve para decisiones agregadas de planning
+- no debe interpretarse como clasificacion local de cada sucursal
+- la granularidad oficial por defecto para esta clasificacion es mensual
+- si existe censura por stockout, la clasificacion sigue calculandose sobre demanda observada y la censura se expone como metadata/flags de calidad, no como correccion automatica de demanda
+
+## 13. Reglas de agregacion temporal en la UI
 
 Cuando la UI cambia granularidad:
 
@@ -217,7 +239,7 @@ Razon:
 - ventas, recepciones y transferencias son flujos
 - stock es una posicion de cierre
 
-## 13. Consistencia exigida
+## 14. Consistencia exigida
 
 La simulacion actual se considera valida si mantiene:
 
@@ -228,7 +250,7 @@ La simulacion actual se considera valida si mantiene:
 - sin recepciones antes de orden
 - sin sobre-recepciones
 
-## 14. Conclusión
+## 15. Conclusión
 
 La logica actual representa un caso industrial bastante especifico:
 

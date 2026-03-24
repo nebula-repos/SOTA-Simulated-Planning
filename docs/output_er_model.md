@@ -12,7 +12,20 @@ Este E/R considera las tablas operativas actuales generadas en `output/`:
 - `purchase_order_lines.csv`
 - `purchase_receipts.csv`
 
+Ademas del canonico operacional, el dataset exporta metadata en:
+
+- `dataset_manifest.json`
+
 Las metricas, promedios y clasificaciones derivadas no forman parte del modelo operacional canónico.
+
+`dataset_manifest.json` no es una tabla del E/R. Se usa como metadata del dataset para describir contexto de generacion y reglas semanticas externas al canonico, por ejemplo:
+
+- perfil activo
+- moneda
+- horizonte temporal
+- contrato de locations del dataset
+- nodo central
+- alcance oficial de clasificacion
 
 ## Logica Particular de Esta Simulacion
 

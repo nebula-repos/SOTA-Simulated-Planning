@@ -16,6 +16,10 @@ from planning_core.repository import CanonicalRepository
 from planning_core.validation import basic_health_report
 
 
+OFFICIAL_CLASSIFICATION_SCOPE = "network_aggregate"
+OFFICIAL_CLASSIFICATION_GRANULARITY = "M"
+
+
 class PlanningService:
     """Servicios de lectura y agregacion sobre el modelo canonico."""
 
@@ -27,6 +31,7 @@ class PlanningService:
         inventory = self.repository.load_table("inventory_snapshot")
         manifest = self.repository.load_manifest()
         central_location = self.central_location()
+        classification_config = self.classification_config()
 
         return {
             "profile": manifest.get("profile"),
@@ -34,6 +39,8 @@ class PlanningService:
             "sku_count": int(catalog["sku"].nunique()),
             "location_count": int(inventory["location"].nunique()),
             "central_location": central_location,
+            "classification_scope": classification_config["scope"],
+            "classification_default_granularity": classification_config["default_granularity"],
             "date_range": {
                 "start": inventory["snapshot_date"].min().date().isoformat(),
                 "end": inventory["snapshot_date"].max().date().isoformat(),
@@ -65,7 +72,60 @@ class PlanningService:
     def dataset_health(self) -> dict:
         return basic_health_report(self.repository)
 
+    def classification_config(self) -> dict:
+        manifest = self.repository.load_manifest()
+        config = manifest.get("classification", {})
+        return {
+            "scope": str(config.get("scope", OFFICIAL_CLASSIFICATION_SCOPE)),
+            "default_granularity": str(config.get("default_granularity", OFFICIAL_CLASSIFICATION_GRANULARITY)),
+        }
+
+    def official_classification_granularity(self) -> str:
+        return self.classification_config()["default_granularity"]
+
+    def classification_scope(self) -> str:
+        return self.classification_config()["scope"]
+
+    def location_model(self) -> dict:
+        manifest = self.repository.load_manifest()
+        location_model = manifest.get("location_model", {})
+        manifest_central = location_model.get("central_location") or manifest.get("central_location")
+
+        inventory = self.repository.load_table("inventory_snapshot")
+        inventory_locations = sorted(inventory["location"].dropna().unique().tolist())
+
+        branch_locations = location_model.get("branch_locations")
+        if branch_locations is None:
+            branch_locations = [
+                location
+                for location in inventory_locations
+                if location and location != manifest_central
+            ]
+
+        all_locations = location_model.get("all_locations")
+        if all_locations is None:
+            all_locations = list(branch_locations)
+            if manifest_central and manifest_central not in all_locations:
+                all_locations.append(manifest_central)
+            all_locations.extend([
+                location
+                for location in inventory_locations
+                if location not in all_locations
+            ])
+
+        return {
+            "all_locations": list(all_locations),
+            "branch_locations": list(branch_locations),
+            "central_location": manifest_central,
+            "central_supply_mode": bool(location_model.get("central_supply_mode", manifest.get("central_supply_mode", False))),
+            "central_node_sales_mode": bool(location_model.get("central_node_sales_mode", False)),
+        }
+
     def central_location(self) -> str | None:
+        manifest_central = self.location_model()["central_location"]
+        if manifest_central:
+            return manifest_central
+
         purchase_orders = self.repository.load_table("purchase_orders")
         purchase_destinations = [
             location
@@ -121,8 +181,7 @@ class PlanningService:
         return catalog.to_dict(orient="records")
 
     def list_locations(self) -> list[str]:
-        inventory = self.repository.load_table("inventory_snapshot")
-        return sorted(inventory["location"].dropna().unique().tolist())
+        return self.location_model()["all_locations"]
 
     def list_sku_locations(self, sku: str) -> list[str]:
         inventory = self.repository.load_table("inventory_snapshot")
@@ -289,13 +348,24 @@ class PlanningService:
     def classify_catalog(self, granularity: str | None = None) -> pd.DataFrame:
         """Clasifica todos los SKUs del catalogo.
 
-        Agrega transacciones a nivel SKU global (todas las locations sumadas),
-        ejecuta el pipeline completo de clasificacion y retorna un DataFrame
-        con una fila por SKU.
+        La clasificacion oficial del repo se calcula a nivel SKU agregado de red.
+        Si no se fuerza granularidad, usa el default oficial definido en el manifest.
         """
         transactions = self.repository.load_table("transactions")
         catalog = self.repository.load_table("product_catalog")
-        return classify_all_skus(transactions, catalog, granularity=granularity)
+        inventory = self.repository.load_table("inventory_snapshot")
+
+        if granularity is None:
+            granularity = self.official_classification_granularity()
+
+        classification_df = classify_all_skus(transactions, catalog, granularity=granularity)
+        classification_df["classification_scope"] = self.classification_scope()
+        return self._augment_catalog_classification_with_censoring(
+            classification_df=classification_df,
+            transactions=transactions,
+            inventory=inventory,
+            granularity=granularity,
+        )
 
     def classify_single_sku(
         self,
@@ -305,25 +375,27 @@ class PlanningService:
     ) -> dict | None:
         """Clasifica un SKU individual.
 
-        Parameters
-        ----------
-        sku : str
-            SKU a clasificar.
-        location : str, optional
-            Si se provee, filtra transacciones a esa ubicacion.
-        granularity : str, optional
-            Granularidad forzada. Si es None, se selecciona automaticamente.
+        Si no se provee `location`, usa la clasificacion oficial agregada de red.
         """
         transactions = self.repository.load_table("transactions")
+        inventory = self.repository.load_table("inventory_snapshot")
+
         sku_tx = transactions[transactions["sku"] == sku]
+        sku_inv = inventory[inventory["sku"] == sku]
 
         if location:
             sku_tx = sku_tx[sku_tx["location"] == location]
+            sku_inv = sku_inv[sku_inv["location"] == location]
 
         if sku_tx.empty:
             return None
 
-        return classify_sku(sku_tx, sku=sku, granularity=granularity)
+        if granularity is None:
+            granularity = self.official_classification_granularity() if location is None else select_granularity(sku_tx)
+
+        profile = classify_sku(sku_tx, sku=sku, granularity=granularity)
+        profile["classification_scope"] = self.classification_scope() if location is None else "location"
+        return self._augment_profile_with_censoring(profile, sku_tx, sku_inv, granularity)
 
     def sku_demand_series(
         self,
@@ -331,10 +403,7 @@ class PlanningService:
         location: str | None = None,
         granularity: str | None = None,
     ) -> pd.DataFrame:
-        """Retorna la serie temporal de demanda preparada (con ceros rellenados).
-
-        Util para visualizacion directa de la serie subyacente.
-        """
+        """Retorna la serie temporal de demanda preparada (con ceros rellenados)."""
         transactions = self.repository.load_table("transactions")
         sku_tx = transactions[transactions["sku"] == sku]
 
@@ -353,13 +422,7 @@ class PlanningService:
         granularity: str | None = None,
         method: str = "iqr",
     ) -> pd.DataFrame:
-        """Retorna la serie de demanda con columna de outliers marcados.
-
-        Returns
-        -------
-        pd.DataFrame
-            Columnas ``[period, demand, is_outlier]``.
-        """
+        """Retorna la serie de demanda con columna de outliers marcados."""
         series_df = self.sku_demand_series(sku, location=location, granularity=granularity)
 
         if series_df.empty:
@@ -377,13 +440,7 @@ class PlanningService:
         granularity: str | None = None,
         max_lags: int = 40,
     ) -> dict:
-        """Calcula la funcion de autocorrelacion para un SKU.
-
-        Returns
-        -------
-        dict
-            ``{"lags": list[int], "acf": list[float], "confidence_bound": float}``
-        """
+        """Calcula la funcion de autocorrelacion para un SKU."""
         series_df = self.sku_demand_series(sku, location=location, granularity=granularity)
 
         if series_df.empty:
@@ -391,7 +448,7 @@ class PlanningService:
 
         acf_values = compute_acf(series_df["demand"], max_lags=max_lags)
         n = len(series_df)
-        confidence_bound = 1.96 / (n ** 0.5)  # intervalo de confianza al 95%
+        confidence_bound = 1.96 / (n ** 0.5)
 
         return {
             "lags": list(range(len(acf_values))),
@@ -411,18 +468,7 @@ class PlanningService:
         outlier_method: str = "iqr",
         treat_strategy: str = "winsorize",
     ) -> pd.DataFrame:
-        """Devuelve la serie de demanda con outliers tratados, lista para modelado.
-
-        Ejecuta el pipeline completo de limpieza:
-        prepare_demand_series -> detect_outliers -> treat_outliers.
-
-        Returns
-        -------
-        pd.DataFrame
-            Columnas ``[period, demand, demand_clean, is_outlier]``.
-            ``demand`` es la serie original; ``demand_clean`` tiene los outliers
-            reemplazados segun la estrategia indicada.
-        """
+        """Devuelve la serie de demanda con outliers tratados, lista para modelado."""
         series_df = self.sku_demand_series(sku, location=location, granularity=granularity)
         if series_df.empty:
             series_df["demand_clean"] = pd.Series(dtype=float)
@@ -438,48 +484,47 @@ class PlanningService:
     def sku_censored_mask(
         self,
         sku: str,
+        location: str | None = None,
         granularity: str | None = None,
         stockout_threshold: float = 0.0,
     ) -> dict:
-        """Identifica periodos de demanda censurada (lost sales) para un SKU.
-
-        Cruza la serie de demanda con el inventario diario para detectar
-        periodos donde el stock llego a cero, indicando que la demanda
-        observada puede ser menor a la demanda real.
-
-        Returns
-        -------
-        dict
-            ``{"series": pd.DataFrame, "censored_mask": pd.Series[bool], "summary": dict}``
-            donde ``series`` incluye la demanda y el flag de censura por periodo.
-        """
+        """Identifica periodos de demanda censurada para un SKU."""
         transactions = self.repository.load_table("transactions")
         inventory = self.repository.load_table("inventory_snapshot")
 
         sku_tx = transactions[transactions["sku"] == sku]
         sku_inv = inventory[inventory["sku"] == sku]
 
+        if location:
+            sku_tx = sku_tx[sku_tx["location"] == location]
+            sku_inv = sku_inv[sku_inv["location"] == location]
+
         if granularity is None:
             granularity = select_granularity(sku_tx)
 
-        demand_df = prepare_demand_series(sku_tx, granularity=granularity)
-        censored = mark_censored_demand(
-            demand_df, sku_inv,
+        demand_df, censored, summary = self._compute_censoring_info(
+            sku_tx=sku_tx,
+            sku_inv=sku_inv,
             granularity=granularity,
             stockout_threshold=stockout_threshold,
         )
-        summary = censored_summary(censored, demand_df)
 
         result_df = demand_df.copy()
         result_df["is_censored"] = censored.values
+        result_df["is_stockout_no_sale"] = result_df["is_censored"] & (result_df["demand"] == 0)
+
+        stockout_no_sale_periods = int(result_df["is_stockout_no_sale"].sum())
+        total_periods = len(result_df)
+        summary = {
+            **summary,
+            "stockout_no_sale_periods": stockout_no_sale_periods,
+            "stockout_no_sale_pct": round(stockout_no_sale_periods / total_periods, 4) if total_periods > 0 else 0.0,
+        }
+
         return {"series": result_df, "censored_mask": censored, "summary": summary}
 
     def classification_summary(self, granularity: str | None = None) -> dict:
-        """Resumen agregado de la clasificacion del catalogo.
-
-        Retorna conteos por clase Syntetos-Boylan, ABC, XYZ, lifecycle,
-        y la matriz ABC-XYZ.
-        """
+        """Resumen agregado de la clasificacion del catalogo."""
         df = self.classify_catalog(granularity=granularity)
 
         sb_counts = df["sb_class"].value_counts().to_dict()
@@ -488,7 +533,6 @@ class PlanningService:
         lifecycle_counts = df["lifecycle"].value_counts().to_dict()
         abc_xyz_counts = df["abc_xyz"].value_counts().to_dict()
 
-        # Matriz ABC-XYZ (3x3)
         abc_xyz_matrix = {}
         for abc in ["A", "B", "C"]:
             abc_xyz_matrix[abc] = {}
@@ -499,6 +543,7 @@ class PlanningService:
         return {
             "total_skus": len(df),
             "granularity": df["granularity"].iloc[0] if not df.empty else None,
+            "classification_scope": df["classification_scope"].iloc[0] if not df.empty else self.classification_scope(),
             "sb_counts": sb_counts,
             "abc_counts": abc_counts,
             "xyz_counts": xyz_counts,
@@ -507,4 +552,89 @@ class PlanningService:
             "avg_quality_score": round(float(df["quality_score"].mean()), 3) if not df.empty else 0.0,
             "seasonal_pct": round(float(df["is_seasonal"].mean()), 3) if not df.empty else 0.0,
             "trend_pct": round(float(df["has_trend"].mean()), 3) if not df.empty else 0.0,
+            "censored_sku_pct": round(float(df["has_censored_demand"].mean()), 3) if not df.empty else 0.0,
         }
+
+    def _compute_censoring_info(
+        self,
+        sku_tx: pd.DataFrame,
+        sku_inv: pd.DataFrame,
+        granularity: str,
+        stockout_threshold: float = 0.0,
+    ) -> tuple[pd.DataFrame, pd.Series, dict]:
+        demand_df = prepare_demand_series(sku_tx, granularity=granularity)
+        censored = mark_censored_demand(
+            demand_df,
+            sku_inv,
+            granularity=granularity,
+            stockout_threshold=stockout_threshold,
+        )
+        summary = censored_summary(censored, demand_df)
+        return demand_df, censored, summary
+
+    def _compute_censoring_penalty(self, summary: dict) -> float:
+        penalty = (0.15 * float(summary.get("censored_pct", 0.0))) + (0.35 * float(summary.get("censored_demand_pct", 0.0)))
+        return round(min(0.25, penalty), 3)
+
+    def _augment_profile_with_censoring(
+        self,
+        profile: dict,
+        sku_tx: pd.DataFrame,
+        sku_inv: pd.DataFrame,
+        granularity: str,
+    ) -> dict:
+        demand_df, censored, summary = self._compute_censoring_info(sku_tx, sku_inv, granularity=granularity)
+        stockout_no_sale_periods = int(((censored.values) & (demand_df["demand"].values == 0)).sum()) if not demand_df.empty else 0
+        total_periods = len(demand_df)
+        penalty = self._compute_censoring_penalty(summary)
+
+        base_quality = float(profile.get("quality_score", 0.0))
+        quality_flags = profile.get("quality_flags", [])
+        if not isinstance(quality_flags, list):
+            quality_flags = []
+
+        if summary["censored_periods"] > 0:
+            quality_flags.append(
+                f"demanda_censurada ({summary['censored_periods']}/{summary['total_periods']} periodos; {summary['censored_demand_pct']:.1%} volumen)"
+            )
+        if stockout_no_sale_periods > 0:
+            quality_flags.append(f"sin_venta_por_stockout ({stockout_no_sale_periods} periodos)")
+
+        profile["has_censored_demand"] = bool(summary["censored_periods"] > 0)
+        profile["censored_periods"] = int(summary["censored_periods"])
+        profile["censored_pct"] = float(summary["censored_pct"])
+        profile["censored_demand"] = float(summary["censored_demand"])
+        profile["censored_demand_pct"] = float(summary["censored_demand_pct"])
+        profile["stockout_no_sale_periods"] = stockout_no_sale_periods
+        profile["stockout_no_sale_pct"] = round(stockout_no_sale_periods / total_periods, 4) if total_periods > 0 else 0.0
+        profile["quality_score_base"] = round(base_quality, 3)
+        profile["censoring_penalty"] = penalty
+        profile["quality_score"] = round(max(0.0, base_quality - penalty), 3)
+        profile["quality_flags"] = quality_flags
+        return profile
+
+    def _augment_catalog_classification_with_censoring(
+        self,
+        classification_df: pd.DataFrame,
+        transactions: pd.DataFrame,
+        inventory: pd.DataFrame,
+        granularity: str,
+    ) -> pd.DataFrame:
+        tx_groups = {sku: frame.copy() for sku, frame in transactions.groupby("sku")}
+        inv_groups = {sku: frame.copy() for sku, frame in inventory.groupby("sku")}
+
+        enriched_rows = []
+        empty_tx = transactions.iloc[0:0].copy()
+        empty_inv = inventory.iloc[0:0].copy()
+        for _, row in classification_df.iterrows():
+            sku = row["sku"]
+            enriched_rows.append(
+                self._augment_profile_with_censoring(
+                    row.to_dict(),
+                    sku_tx=tx_groups.get(sku, empty_tx),
+                    sku_inv=inv_groups.get(sku, empty_inv),
+                    granularity=granularity,
+                )
+            )
+
+        return pd.DataFrame(enriched_rows)

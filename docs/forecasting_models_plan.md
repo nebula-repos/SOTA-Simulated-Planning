@@ -3,6 +3,22 @@
 Plan de implementación de modelos de forecast, ordenados por prioridad y complejidad.
 Cada modelo tiene su propio `.md` con contexto de aplicación, limitaciones y reglas de selección.
 
+## Estado actual del repo
+
+Implementado hoy:
+
+- wrappers de modelos en `planning_core/forecasting/models/`
+- utilidades comunes en `planning_core/forecasting/utils.py`
+- métricas en `planning_core/forecasting/metrics.py`
+- tests unitarios/integración para wrappers y métricas
+
+Pendiente:
+
+- `backtest.py`
+- `selector.py`
+- integración formal del forecast a `planning_core/services.py`
+- exposición en API/UI
+
 ---
 
 ## Secuencia de implementación
@@ -54,21 +70,21 @@ Basado en la Sección 8.1 de la Guía Técnica:
 
 ---
 
-## Arquitectura del módulo de forecast (Fase 2)
+## Arquitectura del módulo de forecast (estado objetivo de Fase 2)
 
 ```
 planning_core/
 ├── classification.py     ← Fase 1 (completa)
 ├── preprocessing.py      ← Fase 2a/2b (completa)
-├── forecasting/          ← Fase 2 (por implementar)
+├── forecasting/          ← Fase 2 (parcialmente implementada)
 │   ├── __init__.py
 │   ├── models/
-│   │   ├── ets.py        ← ETS automático vía StatsForecast
-│   │   ├── sba.py        ← SBA / Croston / TSB
-│   │   └── naive.py      ← Naive estacional (baseline)
-│   ├── backtest.py       ← Framework expanding window
-│   ├── metrics.py        ← MAE, MASE, WAPE, Bias, RMSE
-│   └── selector.py       ← Reglas clasificación → candidatos + horse-race
+│   │   ├── ets.py        ← Implementado
+│   │   ├── sba.py        ← Implementado
+│   │   └── naive.py      ← Implementado
+│   ├── backtest.py       ← Pendiente
+│   ├── metrics.py        ← Implementado
+│   └── selector.py       ← Pendiente
 ```
 
 ---

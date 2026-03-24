@@ -1,7 +1,13 @@
 # Métricas de Evaluación de Forecast
 
-**Módulo**: `planning_core/forecasting/metrics.py` (por implementar)
+**Módulo**: `planning_core/forecasting/metrics.py` (implementado)
 **Fase**: 2.5
+
+**Estado actual**:
+
+- implementadas en código: `compute_mase`, `compute_wape`, `compute_bias`, `compute_mae`, `compute_rmse`, `compute_all_metrics`
+- cubiertas por tests en `tests/test_metrics.py`
+- todavía no integradas a un `backtest.py` o `selector.py` porque esos módulos siguen pendientes
 
 ---
 
@@ -37,13 +43,13 @@ Similar al MAPE pero ponderado por el volumen real. Evita el problema de MAPE co
 
 ---
 
-### Bias (sesgo sistemático)
+### Bias relativo (sesgo sistemático)
 
 ```
-Bias = mean(F_t - y_t)
+Bias = mean(F_t - y_t) / mean(y_t)
 ```
 
-Mide si el modelo sobreestima (Bias > 0) o subestima (Bias < 0) de forma sistemática. Un modelo con MAE bajo pero Bias alto es peligroso: genera stocks incorrectos de forma consistente.
+Mide si el modelo sobreestima (Bias > 0) o subestima (Bias < 0) de forma sistemática en relación al nivel medio real de la serie. Un modelo con MAE bajo pero Bias alto es peligroso: genera stocks incorrectos de forma consistente.
 
 **Umbral de alerta**: `|Bias| / mean(y) > 0.10` → el modelo tiene sesgo > 10% del nivel medio de demanda.
 
@@ -84,29 +90,22 @@ Penaliza errores grandes de forma cuadrática. Útil cuando los errores grandes 
 
 ## Implementación
 
+La implementación real vive en `planning_core/forecasting/metrics.py` y usa firmas orientadas a forecast operativo:
+
 ```python
-import numpy as np
-import pandas as pd
-
-def compute_mase(y_true: pd.Series, y_pred: pd.Series, y_naive: pd.Series) -> float:
-    """MASE respecto al Naive Estacional."""
-    mae_model = np.mean(np.abs(y_true - y_pred))
-    mae_naive = np.mean(np.abs(y_true - y_naive))
-    if mae_naive == 0:
-        return np.nan  # Serie constante: MASE indefinido
-    return mae_model / mae_naive
-
-def compute_wape(y_true: pd.Series, y_pred: pd.Series) -> float:
-    """Weighted Absolute Percentage Error."""
-    total_real = np.sum(np.abs(y_true))
-    if total_real == 0:
-        return np.nan
-    return np.sum(np.abs(y_true - y_pred)) / total_real
-
-def compute_bias(y_true: pd.Series, y_pred: pd.Series) -> float:
-    """Sesgo medio (positivo = sobreestimación, negativo = subestimación)."""
-    return float(np.mean(y_pred - y_true))
+compute_mase(actual, forecast, season_length=12, train_actual=None)
+compute_wape(actual, forecast)
+compute_bias(actual, forecast)
+compute_mae(actual, forecast)
+compute_rmse(actual, forecast)
+compute_all_metrics(actual, forecast, season_length=12, train_actual=None)
 ```
+
+Notas de implementación:
+
+- `compute_mase()` usa `train_actual` para escalar contra naive estacional cuando está disponible
+- `compute_bias()` retorna sesgo relativo, no sesgo absoluto
+- cuando el denominador de la métrica es cero, la función retorna `NaN`
 
 ---
 

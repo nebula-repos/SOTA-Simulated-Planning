@@ -16,7 +16,18 @@ El objetivo es construir un modulo que clasifique automaticamente las series de 
 
 ## Estado actual
 
-El proyecto se encuentra en **Fase 0 (Data Generation)**: cuenta con un generador de datos sinteticos completo que produce series temporales con patrones de demanda diversos, junto con un modelo de datos operacional para demanda, compras e inventario.
+El repo ya no esta solo en `Fase 0`.
+
+Hoy combina:
+
+- un generador de dataset canonico operacional
+- una capa reusable `planning_core`
+- clasificacion de demanda operativa
+- preprocesamiento basico para forecasting
+- wrappers iniciales de modelos de forecast
+- una UI exploratoria y una API liviana
+
+La parte mas madura sigue siendo la simulacion y el modelo canonico. La clasificacion ya esta implementada y expuesta; forecasting existe de forma parcial como libreria interna, pero aun no esta integrado end-to-end ni tiene backtest/selector.
 
 ### Que existe hoy
 
@@ -25,15 +36,20 @@ El proyecto se encuentra en **Fase 0 (Data Generation)**: cuenta con un generado
 | Generador de transacciones | Series diarias con 10 patrones de demanda | Funcional |
 | Configuracion multi-perfil | Industrial (oleohidraulica) y Retail (supermercado) | Funcional |
 | Modelo de datos (7 tablas) | Catalogo, transacciones, snapshots inventario, transferencias internas, OC, lineas OC, recepciones | Funcional |
+| `planning_core` | Repository, servicios, agregaciones y health checks basicos | Funcional |
+| Clasificacion de demanda | Syntetos-Boylan, ABC-XYZ, estacionalidad, tendencia, outliers, quality score | Funcional |
+| Preprocessing | Limpieza de outliers y deteccion de demanda censurada | Funcional |
+| Forecasting base | Wrappers `SeasonalNaive`, `HistoricAverage`, `AutoETS`, `CrostonSBA`, `ADIDA`, metricas | Parcial |
+| UI + API | Exploracion operacional y clasificacion | Funcional |
 | Documentacion de esquema | E/R y especificacion de compras | Documentado |
 
 ### Que viene a continuacion
 
-- Clasificacion de demanda desde datos crudos (ADI-CV2, estacionalidad, tendencia)
-- Deteccion de outliers y quality gate
-- Modelos de forecast (ETS, SBA, ARIMA, Prophet, XGBoost)
+- Integracion formal del forecasting a `planning_core`, API y UI
 - Seleccion automatica de modelos via backtest
+- Selector clasificacion -> modelos candidatos
 - Motor de recomendacion de compra
+- Fortalecimiento de validaciones y tests por capa
 
 ## Estructura del repositorio
 
@@ -141,6 +157,12 @@ python3 -m pip install -e .[viz]
 
 # API
 python3 -m pip install -e .[api]
+
+# Forecasting
+python3 -m pip install -e .[forecast]
+
+# Desarrollo / tests
+python3 -m pip install -e .[dev]
 ```
 
 Ejecucion basica:
@@ -212,7 +234,14 @@ Reglas particulares de esta simulacion:
 - los quiebres de stock existen de forma implicita cuando `on_hand_qty` llega a cero; no se exportan como tabla separada.
 - en perfil `industrial`, la compra se piensa como abastecimiento centralizado de importacion, con lead times promedio altos.
 - la compra llega a un nodo central de abastecimiento y luego se redistribuye a sucursales via `internal_transfers`.
-- `transactions` sigue representando solo demanda atendida en sucursal; el nodo central no genera ventas operativas.
+- en el perfil `industrial`, el nodo central actual (`CD Santiago`) es hibrido: recibe compra, abastece sucursales y tambien puede vender directo, por lo que puede aparecer en `transactions.csv`.
+
+Regla actual de clasificacion:
+
+- la clasificacion oficial de este repo, por ahora, se calcula a nivel `SKU` agregado de red
+- eso significa que se suman las `transactions` de todas las locations activas del SKU
+- si el nodo central tiene venta directa, esa demanda tambien entra en la serie agregada
+- la clasificacion por sucursal queda fuera de este repo y se abordara en otro piloto
 
 Implicancia:
 
@@ -229,18 +258,23 @@ Ver [docs/output_er_model.md](docs/output_er_model.md) para el diagrama E/R comp
 - [x] Documentacion de esquema E/R
 
 ### Fase 1 - Clasificacion y preprocesamiento
-- [ ] Clasificador ADI-CV2 (Syntetos-Boylan) desde datos crudos
-- [ ] Segmentacion ABC-XYZ calculada
-- [ ] Tests de estacionalidad (STL, autocorrelacion)
-- [ ] Tests de tendencia (Mann-Kendall)
-- [ ] Deteccion de outliers (IQR, STL + residuos, Hampel)
-- [ ] Quality gate de datos
+- [x] Clasificador ADI-CV2 (Syntetos-Boylan) desde `transactions`
+- [x] Segmentacion ABC-XYZ calculada
+- [x] Test de estacionalidad por autocorrelacion
+- [x] Test de tendencia por Mann-Kendall
+- [x] Deteccion y tratamiento de outliers (`IQR`, `Hampel`)
+- [x] Quality score basico por serie
+- [x] Deteccion de demanda censurada
+- [ ] Integracion de censura en la clasificacion principal
+- [ ] Tests y validaciones mas profundas de la capa
 
 ### Fase 2 - Forecasting base
-- [ ] ETS automatico (StatsForecast) para demanda smooth/erratic
-- [ ] SBA / Croston / TSB para demanda intermitente/lumpy
+- [x] `AutoETS` wrapper (StatsForecast)
+- [x] `SeasonalNaive` / `HistoricAverage` baseline
+- [x] `CrostonSBA` / `ADIDA` wrappers
+- [x] Metricas de evaluacion (`MAE`, `RMSE`, `MASE`, `WAPE`, `Bias`)
 - [ ] Framework de backtest (expanding window)
-- [ ] Metricas de evaluacion (MAE, RMSE, MASE, WAPE, Bias)
+- [ ] Integracion del forecast a `planning_core`
 
 ### Fase 3 - Forecasting avanzado
 - [ ] ARIMA / SARIMA automatico

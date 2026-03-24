@@ -1026,6 +1026,11 @@ def main():
     df_inventory_snapshots.to_csv(inventory_snapshot_path, index=False)
     print(f"Snapshots de inventario guardados: {inventory_snapshot_path} ({len(df_inventory_snapshots):,} filas)")
 
+    branch_locations = list(LOCATIONS)
+    all_locations = list(branch_locations)
+    if CENTRAL_SUPPLY_MODE and CENTRAL_LOCATION and CENTRAL_LOCATION not in all_locations:
+        all_locations.append(CENTRAL_LOCATION)
+
     manifest = {
         "profile": PROFILE,
         "currency": CURRENCY,
@@ -1035,6 +1040,17 @@ def main():
         "locations": LOCATIONS,
         "central_supply_mode": CENTRAL_SUPPLY_MODE,
         "central_location": CENTRAL_LOCATION if CENTRAL_SUPPLY_MODE else None,
+        "location_model": {
+            "all_locations": all_locations,
+            "branch_locations": branch_locations,
+            "central_location": CENTRAL_LOCATION if CENTRAL_SUPPLY_MODE else None,
+            "central_supply_mode": CENTRAL_SUPPLY_MODE,
+            "central_node_sales_mode": bool(CENTRAL_SUPPLY_MODE and CENTRAL_NODE_SALES_MODE),
+        },
+        "classification": {
+            "scope": "network_aggregate",
+            "default_granularity": "M",
+        },
         "table_rows": {
             "product_catalog": int(len(catalog_public)),
             "transactions": int(len(df_transactions_public)),

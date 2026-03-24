@@ -12,7 +12,7 @@ from planning_core.services import PlanningService
 
 GRANULARITY_FREQUENCIES = {
     "Diaria": None,
-    "Semanal": "W",
+    "Semanal": "W-MON",
     "Mensual": "MS",
 }
 
@@ -181,6 +181,7 @@ def build_location_comparison_frame(
 def build_location_comparison_figure(
     dataframe: pd.DataFrame,
     title: str,
+    stockout_points: pd.DataFrame | None = None,
 ) -> go.Figure:
     figure = go.Figure()
     for line_name in [column for column in dataframe.columns if column != "date"]:
@@ -192,6 +193,23 @@ def build_location_comparison_figure(
                 y=dataframe[line_name],
                 mode="lines",
                 name=line_name,
+            )
+        )
+
+    if stockout_points is not None and not stockout_points.empty:
+        figure.add_trace(
+            go.Scatter(
+                x=stockout_points["date"],
+                y=stockout_points["y"],
+                mode="markers",
+                name="Sin venta por stockout",
+                marker=dict(color="#c0392b", size=10, symbol="x"),
+                hovertemplate=(
+                    "<b>Sin venta por stockout</b><br>"
+                    "Fecha: %{x}<br>"
+                    "Ventas red: %{y:.0f}"
+                    "<extra></extra>"
+                ),
             )
         )
 
@@ -245,8 +263,8 @@ LIFECYCLE_COLORS = {
 }
 
 CLASSIFICATION_GRANULARITY_OPTIONS = {
+    "Mensual (Oficial)": "M",
     "Automatica": None,
-    "Mensual": "M",
     "Semanal": "W",
     "Diaria": "D",
 }
@@ -443,6 +461,7 @@ def build_demand_with_outliers_figure(
     series_df: pd.DataFrame,
     outlier_mask: pd.Series,
     title: str,
+    stockout_points: pd.DataFrame | None = None,
 ) -> go.Figure:
     """Serie temporal de demanda con outliers marcados en rojo."""
     figure = go.Figure()
@@ -463,6 +482,21 @@ def build_demand_with_outliers_figure(
             mode="markers",
             name="Outliers",
             marker=dict(color="#e74c3c", size=9, symbol="x"),
+        ))
+
+    if stockout_points is not None and not stockout_points.empty:
+        figure.add_trace(go.Scatter(
+            x=stockout_points["period"],
+            y=stockout_points["demand"],
+            mode="markers",
+            name="Sin venta por stockout",
+            marker=dict(color="#c0392b", size=10, symbol="diamond"),
+            hovertemplate=(
+                "<b>Sin venta por stockout</b><br>"
+                "Periodo: %{x}<br>"
+                "Demanda observada: %{y:.0f}"
+                "<extra></extra>"
+            ),
         ))
 
     figure.update_layout(
@@ -639,7 +673,7 @@ def render_classification_panoramic(service: PlanningService, classification_df:
         "sku", "abc_class", "xyz_class", "abc_xyz", "sb_class",
         "adi", "cv2", "is_seasonal", "has_trend", "trend_direction",
         "lifecycle", "quality_score", "total_demand", "total_revenue",
-        "mean_demand", "zero_pct", "outlier_count",
+        "mean_demand", "zero_pct", "outlier_count", "censored_pct", "censored_demand_pct",
     ]
     display_df = filtered_df[[c for c in display_columns if c in filtered_df.columns]]
 
@@ -668,6 +702,8 @@ def render_classification_panoramic(service: PlanningService, classification_df:
             "mean_demand": st.column_config.NumberColumn("Media demanda", format="%.1f"),
             "zero_pct": st.column_config.NumberColumn("% Ceros", format="%.1%"),
             "outlier_count": st.column_config.NumberColumn("Outliers", format="%d"),
+            "censored_pct": st.column_config.NumberColumn("% Periodos cens.", format="%.1%"),
+            "censored_demand_pct": st.column_config.NumberColumn("% Volumen cens.", format="%.1%"),
         },
         key="classification_table",
     )
@@ -768,12 +804,33 @@ def _render_sku_section_operacional(service: PlanningService, selected_sku: str,
         temporality=inventory_temporality,
     )
 
+    stockout_points = None
+    if selected_flow_metric == "sales_qty" and not sales_comparison.empty:
+        granularity_map = {"Diaria": "D", "Semanal": "W", "Mensual": "M"}
+        censor_info = service.sku_censored_mask(selected_sku, granularity=granularity_map[sales_granularity])
+        stockout_series = (
+            censor_info["series"]
+            .rename(columns={"period": "date"})
+            .loc[:, ["date", "is_stockout_no_sale"]]
+        )
+        stockout_series = apply_temporality_filter(stockout_series, flow_temporality)
+        stockout_points = (
+            sales_comparison[["date", "Agregado total red"]]
+            .merge(stockout_series, on="date", how="left")
+            .loc[lambda df: df["is_stockout_no_sale"].fillna(False)]
+            .rename(columns={"Agregado total red": "y"})
+            .loc[:, ["date", "y"]]
+        )
+
     with flow_chart_col:
         sales_figure = build_location_comparison_figure(
             sales_comparison,
             f"{selected_flow_metric_label} por sucursal ({sales_granularity}, {flow_temporality})",
+            stockout_points=stockout_points,
         )
         st.plotly_chart(sales_figure, use_container_width=True)
+        if stockout_points is not None and not stockout_points.empty:
+            st.caption("Marcadores rojos: periodos sin venta observada en la red con quiebre de stock.")
         render_copyable_dataframe(
             sales_comparison.tail(60),
             "sku_flow_comparison",
@@ -813,7 +870,7 @@ def _render_sku_section_clasificacion(service: PlanningService, selected_sku: st
         granularity = profile["granularity"]
 
     # KPIs de clasificacion
-    cls_cols = st.columns(8)
+    cls_cols = st.columns(10)
     cls_cols[0].metric("Clase S-B", profile["sb_class"])
     cls_cols[1].metric("ABC", profile.get("abc_class", "—"))
     cls_cols[2].metric("XYZ", profile["xyz_class"])
@@ -822,6 +879,8 @@ def _render_sku_section_clasificacion(service: PlanningService, selected_sku: st
     cls_cols[5].metric("Lifecycle", profile["lifecycle"])
     cls_cols[6].metric("Quality", f"{profile['quality_score']:.2f}")
     cls_cols[7].metric("Estacional", "Si" if profile["is_seasonal"] else "No")
+    cls_cols[8].metric("Periodos cens.", f"{profile.get('censored_pct', 0.0):.1%}")
+    cls_cols[9].metric("Vol. cens.", f"{profile.get('censored_demand_pct', 0.0):.1%}")
 
     quality_flags = profile.get("quality_flags")
     if quality_flags:
@@ -831,18 +890,27 @@ def _render_sku_section_clasificacion(service: PlanningService, selected_sku: st
 
     # Serie temporal con outliers + ACF
     series_df = service.sku_demand_series(selected_sku, granularity=granularity)
+    censor_info = service.sku_censored_mask(selected_sku, granularity=granularity)
 
     if not series_df.empty:
         outlier_mask = detect_outliers(series_df["demand"], method="iqr")
+        stockout_points = censor_info["series"].loc[
+            censor_info["series"]["is_stockout_no_sale"],
+            ["period", "demand"],
+        ]
 
         demand_col, acf_col = st.columns(2)
 
         with demand_col:
             demand_fig = build_demand_with_outliers_figure(
-                series_df, outlier_mask,
+                series_df,
+                outlier_mask,
                 f"Demanda {selected_sku} (granularidad {granularity})",
+                stockout_points=stockout_points,
             )
             st.plotly_chart(demand_fig, use_container_width=True)
+            if not stockout_points.empty:
+                st.caption("Diamantes rojos: periodos sin venta observada con quiebre de stock.")
 
         with acf_col:
             acf_data = service.sku_acf(selected_sku, granularity=granularity)
@@ -851,7 +919,11 @@ def _render_sku_section_clasificacion(service: PlanningService, selected_sku: st
                 st.plotly_chart(acf_fig, use_container_width=True)
 
         st.write("Serie temporal de demanda")
-        series_display = series_df.copy()
+        series_display = series_df.copy().merge(
+            censor_info["series"][["period", "is_censored", "is_stockout_no_sale"]],
+            on="period",
+            how="left",
+        )
         series_display["is_outlier"] = outlier_mask.values
         render_copyable_dataframe(series_display, f"demand_series_{selected_sku}")
     else:
