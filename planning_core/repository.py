@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -17,6 +18,8 @@ TABLE_FILES = {
     "purchase_receipts": "purchase_receipts.csv",
 }
 
+MANIFEST_FILE = "dataset_manifest.json"
+
 DATE_COLUMNS = {
     "transactions": ["date"],
     "inventory_snapshot": ["snapshot_date"],
@@ -32,6 +35,7 @@ class CanonicalRepository:
     def __init__(self, base_path: str | Path | None = None):
         self.base_path = Path(base_path) if base_path else OUTPUT_DIR
         self._cache: dict[str, pd.DataFrame] = {}
+        self._manifest_cache: dict | None = None
 
     def available_tables(self) -> list[str]:
         return [table_name for table_name in TABLE_FILES if self.file_path(table_name).exists()]
@@ -52,3 +56,16 @@ class CanonicalRepository:
                 low_memory=False,
             )
         return self._cache[table_name].copy()
+
+    def manifest_path(self) -> Path:
+        return self.base_path / MANIFEST_FILE
+
+    def load_manifest(self) -> dict:
+        if self._manifest_cache is None:
+            manifest_path = self.manifest_path()
+            if not manifest_path.exists():
+                self._manifest_cache = {}
+            else:
+                with open(manifest_path, "r", encoding="utf-8") as manifest_file:
+                    self._manifest_cache = json.load(manifest_file)
+        return dict(self._manifest_cache)

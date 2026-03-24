@@ -9,6 +9,7 @@ Genera SKUs con patrones de demanda diversos para testing de:
 Todos los parámetros se importan desde apps.simulator.config (ver PROFILE para cambiar dominio).
 """
 
+import json
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -16,7 +17,7 @@ import random
 import os
 
 from apps.simulator.config import (
-    RANDOM_SEED, N_PRODUCTS, START_DATE, END_DATE, OUTPUT_DIR, PROFILE,
+    RANDOM_SEED, N_PRODUCTS, START_DATE, END_DATE, OUTPUT_DIR, PROFILE, CURRENCY,
     LOCATIONS, BRANDS, CATEGORIES, DEMAND_PATTERNS,
     ABC_RATIOS, BASE_DEMAND_RANGES,
     SUPPLIER_PROFILES, MOQ_CHOICES, EXTRA_FIELD_NAME, EXTRA_FIELD_CHOICES,
@@ -253,7 +254,7 @@ def generate_purchase_data_direct(catalog, daily_demand_by_sku_location, daily_p
                     "order_date": current_date,
                     "expected_receipt_date": expected_receipt_date,
                     "order_status": order_status,
-                    "currency": "CLP",
+                    "currency": CURRENCY,
                     "payment_terms_days": payment_terms_days,
                 })
 
@@ -563,7 +564,7 @@ def generate_purchase_data_central(catalog, daily_demand_by_sku_location, daily_
                     "order_date": current_date,
                     "expected_receipt_date": expected_receipt_date,
                     "order_status": order_status,
-                    "currency": "CLP",
+                    "currency": CURRENCY,
                     "payment_terms_days": payment_terms_days,
                 })
 
@@ -1024,6 +1025,30 @@ def main():
     inventory_snapshot_path = os.path.join(output_dir, "inventory_snapshot.csv")
     df_inventory_snapshots.to_csv(inventory_snapshot_path, index=False)
     print(f"Snapshots de inventario guardados: {inventory_snapshot_path} ({len(df_inventory_snapshots):,} filas)")
+
+    manifest = {
+        "profile": PROFILE,
+        "currency": CURRENCY,
+        "start_date": START_DATE,
+        "end_date": END_DATE,
+        "n_products": N_PRODUCTS,
+        "locations": LOCATIONS,
+        "central_supply_mode": CENTRAL_SUPPLY_MODE,
+        "central_location": CENTRAL_LOCATION if CENTRAL_SUPPLY_MODE else None,
+        "table_rows": {
+            "product_catalog": int(len(catalog_public)),
+            "transactions": int(len(df_transactions_public)),
+            "inventory_snapshot": int(len(df_inventory_snapshots)),
+            "internal_transfers": int(len(df_internal_transfers_public)),
+            "purchase_orders": int(len(df_purchase_orders)),
+            "purchase_order_lines": int(len(df_purchase_order_lines)),
+            "purchase_receipts": int(len(df_purchase_receipts)),
+        },
+    }
+    manifest_path = os.path.join(output_dir, "dataset_manifest.json")
+    with open(manifest_path, "w", encoding="utf-8") as manifest_file:
+        json.dump(manifest, manifest_file, ensure_ascii=True, indent=2)
+    print(f"Manifest guardado: {manifest_path}")
 
     # Resumen
     print("\n" + "=" * 60)

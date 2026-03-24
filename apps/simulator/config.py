@@ -43,6 +43,7 @@ STOCKOUT_RECORD_PROBABILITY = 0.3
 # ============================================================
 _INDUSTRIAL = {
     "n_products": 800,
+    "currency": "CLP",
     "central_supply_mode": True,
     "central_location": "CD Santiago",
     "central_node_sales_mode": True,
@@ -318,6 +319,7 @@ _INDUSTRIAL = {
 # ============================================================
 _RETAIL = {
     "n_products": 1200,
+    "currency": "CLP",
     "central_supply_mode": False,
     "central_location": None,
     "central_node_sales_mode": False,
@@ -557,6 +559,7 @@ _PROFILES = {
 _active = _PROFILES[PROFILE]
 
 N_PRODUCTS = _active["n_products"]
+CURRENCY = _active["currency"]
 LOCATIONS = _active["locations"]
 BRANDS = _active["brands"]
 CATEGORIES = _active["categories"]

@@ -1,0 +1,25 @@
+{
+  "profile": "industrial",
+  "currency": "CLP",
+  "start_date": "2022-01-01",
+  "end_date": "2024-12-31",
+  "n_products": 800,
+  "locations": [
+    "Santiago",
+    "Antofagasta",
+    "Copiap\u00f3",
+    "Concepci\u00f3n",
+    "Lima"
+  ],
+  "central_supply_mode": true,
+  "central_location": "CD Santiago",
+  "table_rows": {
+    "product_catalog": 800,
+    "transactions": 682997,
+    "inventory_snapshot": 2414488,
+    "internal_transfers": 89790,
+    "purchase_orders": 11573,
+    "purchase_order_lines": 11573,
+    "purchase_receipts": 11038
+  }
+}

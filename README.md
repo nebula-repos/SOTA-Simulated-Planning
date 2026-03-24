@@ -49,6 +49,7 @@ SOTA-Simulated-Planning/
 ├── output/                      # Datos generados (no versionado)
 └── docs/
     ├── business_logic_simulation.md
+    ├── currency_modeling.md
     ├── data_health_checks.md
     ├── lightweight_monorepo_architecture.md
     ├── output_er_model.md       # Modelo E/R de las tablas de salida
@@ -126,6 +127,8 @@ Los archivos CSV se generan en el directorio `output/`.
 La arquitectura modular del repo esta documentada en [docs/lightweight_monorepo_architecture.md](docs/lightweight_monorepo_architecture.md).
 
 Los criterios de calidad y auditoria del dato estan documentados en [docs/data_health_checks.md](docs/data_health_checks.md).
+
+La decision de modelado de moneda esta documentada en [docs/currency_modeling.md](docs/currency_modeling.md).
 
 Instalacion sugerida por capa:
 
