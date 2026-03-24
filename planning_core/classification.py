@@ -14,6 +14,7 @@ Pipeline de clasificacion:
     7. test_seasonality         — deteccion de estacionalidad (autocorrelacion)
     8. test_trend               — deteccion de tendencia (Mann-Kendall)
     9. detect_outliers          — deteccion de valores atipicos (IQR / Hampel)
+    9b. treat_outliers          — tratamiento de outliers detectados (winsorize / interpolate / median)
     10. classify_lifecycle      — etapa del ciclo de vida del producto
     11. compute_quality_score   — quality gate con score 0-1
     12. classify_sku            — orquestador por SKU individual
@@ -592,6 +593,133 @@ def _detect_outliers_hampel(
             is_outlier.iloc[i] = True
 
     return is_outlier
+
+
+# ---------------------------------------------------------------------------
+# 9b. Tratamiento de outliers
+# ---------------------------------------------------------------------------
+
+def treat_outliers(
+    demand: pd.Series,
+    outlier_mask: pd.Series,
+    strategy: str = "winsorize",
+    window: int = 5,
+) -> pd.Series:
+    """Aplica tratamiento a los valores atipicos y devuelve una serie limpia para modelado.
+
+    La serie original no se modifica. Solo los periodos marcados como outlier
+    por ``detect_outliers()`` son alterados; el resto se mantiene intacto.
+
+    Parameters
+    ----------
+    demand : pd.Series
+        Serie de demanda original (resultado de ``prepare_demand_series``).
+    outlier_mask : pd.Series
+        Mascara booleana (True = outlier). Resultado de ``detect_outliers()``.
+    strategy : str
+        Estrategia de tratamiento:
+
+        ``"winsorize"``
+            Reemplaza el outlier por el limite del rango intercuartilico
+            (Q3 + 1.5*IQR para picos altos, max(0, Q1 - 1.5*IQR) para bajos).
+            Es conservadora: no elimina el pico, solo lo recorta. Rapida y
+            reproducible. Recomendada como default para demanda smooth y erratica.
+
+        ``"interpolate"``
+            Sustituye el outlier por interpolacion lineal entre sus vecinos
+            no atipicos. Adecuada cuando el outlier es claramente un error de
+            registro puntual (AO: Additive Outlier). En los extremos de la serie
+            donde no hay vecinos suficientes, usa la mediana global como fallback.
+
+        ``"median"``
+            Reemplaza por la mediana de los ``window`` periodos vecinos no atipicos.
+            Variante robusta de la interpolacion, util para series intermitentes
+            donde la interpolacion lineal puede introducir valores no enteros
+            en zonas de ceros.
+
+    window : int
+        Semiancho de ventana para ``"median"`` (default 5 = mira ±2 periodos).
+
+    Returns
+    -------
+    pd.Series
+        Serie con outliers corregidos. Mismo indice y largo que ``demand``.
+        Los ceros nunca se alteran (la demanda nula es un estado valido).
+
+    Notes
+    -----
+    **Cuándo usar cada estrategia:**
+
+    - ``smooth``/``erratic``: ``"winsorize"`` — preserva la estructura temporal
+      sin introducir dependencias artificiales entre periodos.
+    - Error de registro confirmado: ``"interpolate"`` — suaviza sin sesgar el nivel.
+    - ``intermittent``/``lumpy``: ``"median"`` — evita propagar valores no nulos
+      en zonas de ceros naturales.
+
+    **Limitaciones:**
+
+    - No distingue entre outlier por error vs. por evento real (promocion, proyecto).
+      Si el outlier es una venta real excepcional, corregirlo puede subestimar
+      la demanda futura. La automatizacion debe complementarse con revision manual
+      para SKUs A de alto impacto.
+    - ``"interpolate"`` puede producir valores no enteros en series de conteo.
+      Considerar redondear al entero mas cercano si el modelo requiere enteros.
+    - Con muy pocos periodos de historia (< 8), los limites IQR son inestables
+      y ``"winsorize"`` puede ser demasiado agresiva.
+    """
+    if not outlier_mask.any():
+        return demand.copy()
+
+    clean = demand.copy().astype(float)
+    mask_arr = outlier_mask.values
+
+    if strategy == "winsorize":
+        positive = demand[demand > 0]
+        if len(positive) >= 4:
+            q1 = positive.quantile(0.25)
+            q3 = positive.quantile(0.75)
+            iqr = q3 - q1
+            upper_cap = q3 + 1.5 * iqr
+            lower_cap = max(0.0, q1 - 1.5 * iqr)
+            high_mask = outlier_mask & (demand > upper_cap)
+            low_mask = outlier_mask & (demand > 0) & (demand < lower_cap)
+            clean[high_mask] = upper_cap
+            clean[low_mask] = lower_cap
+        return clean
+
+    elif strategy == "interpolate":
+        clean[outlier_mask] = np.nan
+        # Interpolacion lineal; los extremos se rellenan con el valor mas cercano
+        clean = clean.interpolate(method="linear", limit_direction="both")
+        # Fallback para NaN residuales (serie completamente outlier en los extremos)
+        fallback = float(demand[~outlier_mask & (demand > 0)].median()) \
+            if (~outlier_mask & (demand > 0)).any() else 0.0
+        clean = clean.fillna(fallback).clip(lower=0.0)
+        return clean
+
+    elif strategy == "median":
+        values = demand.values.astype(float)
+        n = len(values)
+        half_w = window // 2
+        for idx in range(n):
+            if not mask_arr[idx]:
+                continue
+            start = max(0, idx - half_w)
+            end = min(n, idx + half_w + 1)
+            neighbors = [values[j] for j in range(start, end) if j != idx and not mask_arr[j]]
+            if neighbors:
+                clean.iloc[idx] = np.median(neighbors)
+            else:
+                fallback = float(demand[~outlier_mask & (demand > 0)].median()) \
+                    if (~outlier_mask & (demand > 0)).any() else 0.0
+                clean.iloc[idx] = fallback
+        return clean
+
+    else:
+        raise ValueError(
+            f"Estrategia no soportada: {strategy!r}. "
+            "Usar 'winsorize', 'interpolate' o 'median'."
+        )
 
 
 # ---------------------------------------------------------------------------

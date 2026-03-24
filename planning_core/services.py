@@ -9,7 +9,9 @@ from planning_core.classification import (
     detect_outliers,
     prepare_demand_series,
     select_granularity,
+    treat_outliers,
 )
+from planning_core.preprocessing import censored_summary, mark_censored_demand
 from planning_core.repository import CanonicalRepository
 from planning_core.validation import basic_health_report
 
@@ -23,9 +25,12 @@ class PlanningService:
     def dataset_overview(self) -> dict:
         catalog = self.repository.load_table("product_catalog")
         inventory = self.repository.load_table("inventory_snapshot")
+        manifest = self.repository.load_manifest()
         central_location = self.central_location()
 
         return {
+            "profile": manifest.get("profile"),
+            "currency": manifest.get("currency", self.currency_code()),
             "sku_count": int(catalog["sku"].nunique()),
             "location_count": int(inventory["location"].nunique()),
             "central_location": central_location,
@@ -38,6 +43,24 @@ class PlanningService:
                 for table_name in self.repository.available_tables()
             },
         }
+
+    def currency_code(self) -> str:
+        manifest = self.repository.load_manifest()
+        manifest_currency = manifest.get("currency")
+        if manifest_currency:
+            return str(manifest_currency)
+
+        purchase_orders = self.repository.load_table("purchase_orders")
+        if "currency" in purchase_orders.columns:
+            currencies = [
+                currency
+                for currency in purchase_orders["currency"].dropna().astype(str).unique().tolist()
+                if currency
+            ]
+            if len(currencies) == 1:
+                return currencies[0]
+
+        return "CLP"
 
     def dataset_health(self) -> dict:
         return basic_health_report(self.repository)
@@ -375,6 +398,81 @@ class PlanningService:
             "acf": [round(float(v), 4) for v in acf_values],
             "confidence_bound": round(confidence_bound, 4),
         }
+
+    # ------------------------------------------------------------------
+    # Preprocesamiento para modelado (Fase 2a / 2b)
+    # ------------------------------------------------------------------
+
+    def sku_clean_series(
+        self,
+        sku: str,
+        location: str | None = None,
+        granularity: str | None = None,
+        outlier_method: str = "iqr",
+        treat_strategy: str = "winsorize",
+    ) -> pd.DataFrame:
+        """Devuelve la serie de demanda con outliers tratados, lista para modelado.
+
+        Ejecuta el pipeline completo de limpieza:
+        prepare_demand_series -> detect_outliers -> treat_outliers.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columnas ``[period, demand, demand_clean, is_outlier]``.
+            ``demand`` es la serie original; ``demand_clean`` tiene los outliers
+            reemplazados segun la estrategia indicada.
+        """
+        series_df = self.sku_demand_series(sku, location=location, granularity=granularity)
+        if series_df.empty:
+            series_df["demand_clean"] = pd.Series(dtype=float)
+            series_df["is_outlier"] = pd.Series(dtype=bool)
+            return series_df
+
+        outlier_mask = detect_outliers(series_df["demand"], method=outlier_method)
+        clean = treat_outliers(series_df["demand"], outlier_mask, strategy=treat_strategy)
+        series_df["is_outlier"] = outlier_mask.values
+        series_df["demand_clean"] = clean.values
+        return series_df
+
+    def sku_censored_mask(
+        self,
+        sku: str,
+        granularity: str | None = None,
+        stockout_threshold: float = 0.0,
+    ) -> dict:
+        """Identifica periodos de demanda censurada (lost sales) para un SKU.
+
+        Cruza la serie de demanda con el inventario diario para detectar
+        periodos donde el stock llego a cero, indicando que la demanda
+        observada puede ser menor a la demanda real.
+
+        Returns
+        -------
+        dict
+            ``{"series": pd.DataFrame, "censored_mask": pd.Series[bool], "summary": dict}``
+            donde ``series`` incluye la demanda y el flag de censura por periodo.
+        """
+        transactions = self.repository.load_table("transactions")
+        inventory = self.repository.load_table("inventory_snapshot")
+
+        sku_tx = transactions[transactions["sku"] == sku]
+        sku_inv = inventory[inventory["sku"] == sku]
+
+        if granularity is None:
+            granularity = select_granularity(sku_tx)
+
+        demand_df = prepare_demand_series(sku_tx, granularity=granularity)
+        censored = mark_censored_demand(
+            demand_df, sku_inv,
+            granularity=granularity,
+            stockout_threshold=stockout_threshold,
+        )
+        summary = censored_summary(censored, demand_df)
+
+        result_df = demand_df.copy()
+        result_df["is_censored"] = censored.values
+        return {"series": result_df, "censored_mask": censored, "summary": summary}
 
     def classification_summary(self, granularity: str | None = None) -> dict:
         """Resumen agregado de la clasificacion del catalogo.

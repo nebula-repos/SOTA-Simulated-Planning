@@ -43,6 +43,10 @@ def get_service() -> PlanningService:
     return PlanningService(CanonicalRepository())
 
 
+def format_currency(value: float | int) -> str:
+    return f"$ {value:,.0f}"
+
+
 def build_line_figure(dataframe: pd.DataFrame, title: str, series: list[tuple[str, str]]) -> go.Figure:
     figure = go.Figure()
     for column_name, label in series:
@@ -170,16 +174,16 @@ def build_location_comparison_frame(
         numeric_columns = active_locations + ["Agregado sucursales", "Agregado total red"]
         comparison_frame[numeric_columns] = comparison_frame[numeric_columns].round(0).astype(int)
 
-    return comparison_frame
+    ordered_columns = ["date", "Agregado sucursales", "Agregado total red"] + active_locations
+    return comparison_frame.loc[:, ordered_columns]
 
 
 def build_location_comparison_figure(
     dataframe: pd.DataFrame,
     title: str,
-    selected_lines: list[str],
 ) -> go.Figure:
     figure = go.Figure()
-    for line_name in selected_lines:
+    for line_name in [column for column in dataframe.columns if column != "date"]:
         if line_name not in dataframe.columns:
             continue
         figure.add_trace(
@@ -202,27 +206,6 @@ def build_location_comparison_figure(
     return figure
 
 
-def render_line_selector_box(title: str, available_lines: list[str], key_prefix: str) -> list[str]:
-    with st.container(border=True):
-        st.caption(title)
-        select_all_key = f"{key_prefix}_all"
-        if select_all_key not in st.session_state:
-            st.session_state[select_all_key] = True
-
-        select_all = st.checkbox("Todas", key=select_all_key)
-        selected_lines: list[str] = []
-        for line_name in available_lines:
-            line_key = f"{key_prefix}_{line_name}"
-            if line_key not in st.session_state:
-                st.session_state[line_key] = True
-            if select_all:
-                st.session_state[line_key] = True
-            checked = st.checkbox(line_name, key=line_key)
-            if checked:
-                selected_lines.append(line_name)
-        return selected_lines
-
-
 def render_copyable_dataframe(
     dataframe: pd.DataFrame,
     key_prefix: str,
@@ -241,26 +224,6 @@ def render_copyable_dataframe(
         dataframe_args["column_config"] = column_config
 
     st.dataframe(dataframe, **dataframe_args)
-
-    csv_content = dataframe.to_csv(index=False)
-    actions_col_a, actions_col_b = st.columns([1.2, 4.8])
-    with actions_col_a:
-        st.download_button(
-            "Descargar CSV",
-            data=csv_content.encode("utf-8"),
-            file_name=f"{key_prefix}.csv",
-            mime="text/csv",
-            key=f"{key_prefix}_download",
-            use_container_width=True,
-        )
-    with actions_col_b:
-        with st.expander("Copiar contenido"):
-            st.text_area(
-                "CSV",
-                value=csv_content,
-                height=140,
-                key=f"{key_prefix}_copybox",
-            )
 
 
 SB_COLORS = {
@@ -294,9 +257,18 @@ def get_classification_data(_service: PlanningService, granularity: str | None =
     return _service.classify_catalog(granularity=granularity)
 
 
-def build_sb_scatter_figure(df: pd.DataFrame) -> go.Figure:
-    """Scatter plot ADI vs CV2 con los 4 cuadrantes de Syntetos-Boylan."""
+def build_sb_scatter_figure(
+    df: pd.DataFrame,
+    currency_code: str,
+    highlight_mask: pd.Series | None = None,
+) -> go.Figure:
+    """Scatter plot ADI vs CV2 con los 4 cuadrantes de Syntetos-Boylan.
+
+    Si ``highlight_mask`` se provee, los puntos filtrados se muestran opacos
+    y el resto atenuado.
+    """
     figure = go.Figure()
+    has_filter = highlight_mask is not None and not highlight_mask.all()
 
     for sb_class, color in SB_COLORS.items():
         subset = df[df["sb_class"] == sb_class]
@@ -304,15 +276,23 @@ def build_sb_scatter_figure(df: pd.DataFrame) -> go.Figure:
             continue
 
         # Escalar tamaño por revenue (log scale para visibilidad)
+        max_rev = df["total_revenue"].clip(lower=1).max()
         revenue = subset["total_revenue"].clip(lower=1)
-        sizes = 5 + 15 * (np.log1p(revenue) / np.log1p(revenue.max()))
+        sizes = 5 + 15 * (np.log1p(revenue) / np.log1p(max_rev))
+
+        # Opacidad: resaltado vs atenuado
+        if has_filter:
+            subset_mask = highlight_mask.reindex(subset.index, fill_value=False)
+            opacities = np.where(subset_mask.values, 0.85, 0.08)
+        else:
+            opacities = np.full(len(subset), 0.7)
 
         figure.add_trace(go.Scatter(
             x=subset["adi"],
             y=subset["cv2"],
             mode="markers",
             name=f"{sb_class} ({len(subset)})",
-            marker=dict(color=color, size=sizes, opacity=0.7, line=dict(width=0.5, color="white")),
+            marker=dict(color=color, size=sizes, opacity=opacities, line=dict(width=0.5, color="white")),
             text=subset["sku"],
             customdata=np.stack([
                 subset["abc_class"],
@@ -327,7 +307,7 @@ def build_sb_scatter_figure(df: pd.DataFrame) -> go.Figure:
                 "CV2: %{y:.3f}<br>"
                 "ABC: %{customdata[0]} | XYZ: %{customdata[1]}<br>"
                 "Lifecycle: %{customdata[2]}<br>"
-                "Revenue: $%{customdata[3]}<br>"
+                f"Revenue ({currency_code}): $%{{customdata[3]}}<br>"
                 "Quality: %{customdata[4]:.2f}"
                 "<extra></extra>"
             ),
@@ -354,8 +334,11 @@ def build_sb_scatter_figure(df: pd.DataFrame) -> go.Figure:
     figure.add_annotation(x=(adi_cutoff + max_adi) / 2, y=max_cv2 * 0.95, text="LUMPY", showarrow=False,
                           font=dict(size=11, color="gray"), opacity=0.6)
 
+    n_highlighted = int(highlight_mask.sum()) if has_filter else len(df)
+    title_suffix = f" — {n_highlighted}/{len(df)} SKUs" if has_filter else ""
+
     figure.update_layout(
-        title="Clasificacion Syntetos-Boylan (ADI vs CV2)",
+        title=f"Clasificacion Syntetos-Boylan (ADI vs CV2){title_suffix}",
         xaxis_title="ADI (Average Demand Interval)",
         yaxis_title="CV2 (Squared Coefficient of Variation)",
         xaxis=dict(range=[0, max_adi]),
@@ -367,14 +350,34 @@ def build_sb_scatter_figure(df: pd.DataFrame) -> go.Figure:
     return figure
 
 
-def build_abc_xyz_matrix_figure(df: pd.DataFrame) -> go.Figure:
-    """Heatmap de la matriz ABC-XYZ (3x3)."""
+def build_abc_xyz_matrix_figure(
+    df: pd.DataFrame,
+    highlight_abc: list[str] | None = None,
+    highlight_xyz: list[str] | None = None,
+) -> go.Figure:
+    """Heatmap de la matriz ABC-XYZ (3x3) con celdas seleccionadas resaltadas."""
     abc_order = ["A", "B", "C"]
     xyz_order = ["X", "Y", "Z"]
     matrix = pd.crosstab(df["abc_class"], df["xyz_class"]).reindex(index=abc_order, columns=xyz_order, fill_value=0)
 
+    # Mascara de celdas activas (para borde de seleccion)
+    has_filter = (highlight_abc is not None and len(highlight_abc) < 3) or \
+                 (highlight_xyz is not None and len(highlight_xyz) < 3)
+
+    if has_filter:
+        active_abc = set(highlight_abc) if highlight_abc else set(abc_order)
+        active_xyz = set(highlight_xyz) if highlight_xyz else set(xyz_order)
+        # Atenuar celdas no seleccionadas
+        display_matrix = matrix.copy().astype(float)
+        for i, abc in enumerate(abc_order):
+            for j, xyz in enumerate(xyz_order):
+                if abc not in active_abc or xyz not in active_xyz:
+                    display_matrix.iloc[i, j] = display_matrix.iloc[i, j] * 0.15
+    else:
+        display_matrix = matrix.astype(float)
+
     figure = go.Figure(data=go.Heatmap(
-        z=matrix.values,
+        z=display_matrix.values,
         x=xyz_order,
         y=abc_order,
         text=matrix.values,
@@ -382,7 +385,7 @@ def build_abc_xyz_matrix_figure(df: pd.DataFrame) -> go.Figure:
         textfont=dict(size=16),
         colorscale="Blues",
         showscale=False,
-        hovertemplate="ABC: %{y} | XYZ: %{x}<br>SKUs: %{z}<extra></extra>",
+        hovertemplate="ABC: %{y} | XYZ: %{x}<br>SKUs: %{text}<extra></extra>",
     ))
 
     figure.update_layout(
@@ -401,18 +404,27 @@ def build_distribution_bar_figure(
     column: str,
     title: str,
     color_map: dict[str, str],
+    highlight_values: list[str] | None = None,
 ) -> go.Figure:
-    """Grafico de barras para distribucion de una variable categorica."""
+    """Grafico de barras con valores seleccionados resaltados."""
+    all_values = sorted(df[column].unique(), key=lambda v: -df[column].value_counts().get(v, 0))
     counts = df[column].value_counts()
+    has_filter = highlight_values is not None and len(highlight_values) < len(all_values)
+
     figure = go.Figure()
 
-    for category in counts.index:
+    for category in all_values:
+        is_active = not has_filter or category in (highlight_values or [])
+        opacity = 1.0 if is_active else 0.15
+        base_color = color_map.get(category, "#bdc3c7")
+
         figure.add_trace(go.Bar(
             x=[category],
-            y=[counts[category]],
+            y=[counts.get(category, 0)],
             name=category,
-            marker_color=color_map.get(category, "#bdc3c7"),
-            text=[counts[category]],
+            marker_color=base_color,
+            opacity=opacity,
+            text=[counts.get(category, 0)],
             textposition="outside",
         ))
 
@@ -495,56 +507,141 @@ def build_acf_figure(acf_data: dict, title: str) -> go.Figure:
 
 
 def render_classification_panoramic(service: PlanningService, classification_df: pd.DataFrame):
-    """Vista panoramica de clasificacion del catalogo."""
+    """Vista panoramica de clasificacion con filtros interactivos.
 
-    # --- KPIs ---
+    Los filtros (multiselects y selectboxes) controlan simultaneamente:
+    - Resaltado/atenuacion en todos los graficos
+    - Contenido de la tabla inferior
+    - KPIs agregados
+    """
+    currency_code = service.currency_code()
+    # Valores unicos disponibles en el dataset
+    all_sb = sorted(classification_df["sb_class"].dropna().unique())
+    all_abc = sorted(classification_df["abc_class"].dropna().unique())
+    all_xyz = sorted(classification_df["xyz_class"].dropna().unique())
+    all_lifecycle = sorted(classification_df["lifecycle"].dropna().unique())
+
+    # --- Controles de filtro ---
+    with st.expander("Filtros de clasificacion", expanded=True):
+        fc = st.columns([1.2, 0.8, 0.8, 1.2, 1.5, 0.5])
+        with fc[0]:
+            sel_sb = st.multiselect("Clase S-B", all_sb, default=all_sb, key="clf_f_sb")
+        with fc[1]:
+            sel_abc = st.multiselect("ABC", all_abc, default=all_abc, key="clf_f_abc")
+        with fc[2]:
+            sel_xyz = st.multiselect("XYZ", all_xyz, default=all_xyz, key="clf_f_xyz")
+        with fc[3]:
+            sel_lc = st.multiselect("Lifecycle", all_lifecycle, default=all_lifecycle, key="clf_f_lc")
+        with fc[4]:
+            sc = st.columns(2)
+            with sc[0]:
+                sel_seas = st.selectbox("Estacional", ["Todos", "Si", "No"], key="clf_f_seas")
+            with sc[1]:
+                sel_trend = st.selectbox("Tendencia", ["Todos", "Si", "No"], key="clf_f_trend")
+        with fc[5]:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Limpiar", key="clf_reset_filters", use_container_width=True):
+                st.session_state["clf_f_sb"] = all_sb
+                st.session_state["clf_f_abc"] = all_abc
+                st.session_state["clf_f_xyz"] = all_xyz
+                st.session_state["clf_f_lc"] = all_lifecycle
+                st.session_state["clf_f_seas"] = "Todos"
+                st.session_state["clf_f_trend"] = "Todos"
+                st.rerun()
+
+    # --- Mascara combinada de filtros ---
+    mask = pd.Series(True, index=classification_df.index)
+
+    if sel_sb:
+        mask &= classification_df["sb_class"].isin(sel_sb)
+    else:
+        mask[:] = False
+
+    if sel_abc:
+        mask &= classification_df["abc_class"].isin(sel_abc)
+    else:
+        mask[:] = False
+
+    if sel_xyz:
+        mask &= classification_df["xyz_class"].isin(sel_xyz)
+    else:
+        mask[:] = False
+
+    if sel_lc:
+        mask &= classification_df["lifecycle"].isin(sel_lc)
+    else:
+        mask[:] = False
+
+    if sel_seas == "Si":
+        mask &= classification_df["is_seasonal"]
+    elif sel_seas == "No":
+        mask &= ~classification_df["is_seasonal"]
+
+    if sel_trend == "Si":
+        mask &= classification_df["has_trend"]
+    elif sel_trend == "No":
+        mask &= ~classification_df["has_trend"]
+
+    has_active_filter = not mask.all()
+    filtered_df = classification_df[mask]
+
+    # --- KPIs (reflejan filtro activo) ---
     total = len(classification_df)
-    sb_counts = classification_df["sb_class"].value_counts()
-    avg_quality = classification_df["quality_score"].mean()
+    n_filtered = len(filtered_df)
+    sb_counts = filtered_df["sb_class"].value_counts()
+    avg_quality = filtered_df["quality_score"].mean() if not filtered_df.empty else 0.0
 
     kpi_cols = st.columns(6)
-    kpi_cols[0].metric("SKUs clasificados", total)
+    kpi_cols[0].metric("SKUs", f"{n_filtered} / {total}" if has_active_filter else str(total))
     kpi_cols[1].metric("Smooth", sb_counts.get("smooth", 0))
     kpi_cols[2].metric("Erratic", sb_counts.get("erratic", 0))
     kpi_cols[3].metric("Intermittent", sb_counts.get("intermittent", 0))
     kpi_cols[4].metric("Lumpy", sb_counts.get("lumpy", 0))
     kpi_cols[5].metric("Quality promedio", f"{avg_quality:.2f}")
 
-    # --- Scatter ADI-CV2 ---
-    # Filtrar infinitos para el scatter
+    # --- Scatter ADI-CV2 (resalta puntos filtrados) ---
     plot_df = classification_df[classification_df["adi"] != float("inf")].copy()
     if not plot_df.empty:
-        scatter_fig = build_sb_scatter_figure(plot_df)
+        scatter_mask = mask.reindex(plot_df.index, fill_value=False) if has_active_filter else None
+        scatter_fig = build_sb_scatter_figure(plot_df, currency_code=currency_code, highlight_mask=scatter_mask)
         st.plotly_chart(scatter_fig, use_container_width=True)
 
-    # --- Matriz + distribuciones ---
+    # --- Matriz ABC-XYZ + distribuciones (resaltan dimensiones filtradas) ---
     col_matrix, col_sb, col_lifecycle = st.columns(3)
 
     with col_matrix:
-        matrix_fig = build_abc_xyz_matrix_figure(classification_df)
+        hl_abc = sel_abc if len(sel_abc) < len(all_abc) else None
+        hl_xyz = sel_xyz if len(sel_xyz) < len(all_xyz) else None
+        matrix_fig = build_abc_xyz_matrix_figure(classification_df, highlight_abc=hl_abc, highlight_xyz=hl_xyz)
         st.plotly_chart(matrix_fig, use_container_width=True)
 
     with col_sb:
+        hl_sb = sel_sb if len(sel_sb) < len(all_sb) else None
         sb_fig = build_distribution_bar_figure(
             classification_df, "sb_class", "Distribucion Syntetos-Boylan", SB_COLORS,
+            highlight_values=hl_sb,
         )
         st.plotly_chart(sb_fig, use_container_width=True)
 
     with col_lifecycle:
+        hl_lc = sel_lc if len(sel_lc) < len(all_lifecycle) else None
         lc_fig = build_distribution_bar_figure(
             classification_df, "lifecycle", "Ciclo de vida", LIFECYCLE_COLORS,
+            highlight_values=hl_lc,
         )
         st.plotly_chart(lc_fig, use_container_width=True)
 
-    # --- Tabla completa de clasificacion ---
-    st.write("Tabla de clasificacion completa")
+    # --- Tabla de clasificacion (filtrada) ---
+    table_label = f"**Tabla de clasificacion** — {n_filtered} de {total} SKUs" if has_active_filter else "**Tabla de clasificacion completa**"
+    st.markdown(table_label)
+
     display_columns = [
         "sku", "abc_class", "xyz_class", "abc_xyz", "sb_class",
         "adi", "cv2", "is_seasonal", "has_trend", "trend_direction",
         "lifecycle", "quality_score", "total_demand", "total_revenue",
         "mean_demand", "zero_pct", "outlier_count",
     ]
-    display_df = classification_df[[c for c in display_columns if c in classification_df.columns]]
+    display_df = filtered_df[[c for c in display_columns if c in filtered_df.columns]]
 
     browser_event = st.dataframe(
         display_df,
@@ -567,25 +664,13 @@ def render_classification_panoramic(service: PlanningService, classification_df:
             "lifecycle": st.column_config.TextColumn("Lifecycle", width="small"),
             "quality_score": st.column_config.NumberColumn("Quality", format="%.2f"),
             "total_demand": st.column_config.NumberColumn("Demanda total", format="%.0f"),
-            "total_revenue": st.column_config.NumberColumn("Revenue", format="%.0f"),
+            "total_revenue": st.column_config.NumberColumn(f"Revenue ({currency_code})", format="%.0f"),
             "mean_demand": st.column_config.NumberColumn("Media demanda", format="%.1f"),
             "zero_pct": st.column_config.NumberColumn("% Ceros", format="%.1%"),
             "outlier_count": st.column_config.NumberColumn("Outliers", format="%d"),
         },
         key="classification_table",
     )
-
-    csv_content = display_df.to_csv(index=False)
-    dl_col, _ = st.columns([1.2, 4.8])
-    with dl_col:
-        st.download_button(
-            "Descargar clasificacion CSV",
-            data=csv_content.encode("utf-8"),
-            file_name="classification.csv",
-            mime="text/csv",
-            key="classification_download",
-            use_container_width=True,
-        )
 
     # Detectar seleccion en tabla para navegar a detalle
     selected_rows = []
@@ -617,7 +702,6 @@ def _render_sku_section_operacional(service: PlanningService, selected_sku: str,
     if central_location and central_location in service.list_sku_locations(selected_sku):
         selectable_locations.append(central_location)
 
-    available_lines = ["Agregado sucursales", "Agregado total red"] + selectable_locations
     flow_chart_col, flow_control_col = st.columns([4.8, 1.4])
     with flow_control_col:
         st.markdown("**Configuracion flujo**")
@@ -638,11 +722,6 @@ def _render_sku_section_operacional(service: PlanningService, selected_sku: str,
             list(TEMPORALITY_WINDOWS.keys()),
             index=0,
             key="flow_temporality_selector",
-        )
-        selected_flow_lines = render_line_selector_box(
-            "Lineas",
-            available_lines,
-            "flow_line_selector",
         )
 
     inventory_chart_col, inventory_control_col = st.columns([4.8, 1.4])
@@ -665,11 +744,6 @@ def _render_sku_section_operacional(service: PlanningService, selected_sku: str,
             list(TEMPORALITY_WINDOWS.keys()),
             index=0,
             key="inventory_temporality_selector",
-        )
-        selected_inventory_lines = render_line_selector_box(
-            "Lineas",
-            available_lines,
-            "inventory_line_selector",
         )
 
     selected_flow_metric = FLOW_METRICS[selected_flow_metric_label]
@@ -695,40 +769,26 @@ def _render_sku_section_operacional(service: PlanningService, selected_sku: str,
     )
 
     with flow_chart_col:
-        if selected_flow_lines:
-            sales_figure = build_location_comparison_figure(
-                sales_comparison,
-                f"{selected_flow_metric_label} por sucursal ({sales_granularity}, {flow_temporality})",
-                selected_flow_lines,
-            )
-            st.plotly_chart(sales_figure, use_container_width=True)
-            sales_table_columns = ["date"] + [
-                line for line in selected_flow_lines if line in sales_comparison.columns
-            ]
-            render_copyable_dataframe(
-                sales_comparison.loc[:, sales_table_columns].tail(60),
-                "sku_flow_comparison",
-            )
-        else:
-            st.warning("Selecciona al menos una linea para el grafico de flujo.")
+        sales_figure = build_location_comparison_figure(
+            sales_comparison,
+            f"{selected_flow_metric_label} por sucursal ({sales_granularity}, {flow_temporality})",
+        )
+        st.plotly_chart(sales_figure, use_container_width=True)
+        render_copyable_dataframe(
+            sales_comparison.tail(60),
+            "sku_flow_comparison",
+        )
 
     with inventory_chart_col:
-        if selected_inventory_lines:
-            inventory_figure = build_location_comparison_figure(
-                inventory_comparison,
-                f"{selected_inventory_metric_label} por sucursal ({inventory_granularity}, {inventory_temporality})",
-                selected_inventory_lines,
-            )
-            st.plotly_chart(inventory_figure, use_container_width=True)
-            inventory_table_columns = ["date"] + [
-                line for line in selected_inventory_lines if line in inventory_comparison.columns
-            ]
-            render_copyable_dataframe(
-                inventory_comparison.loc[:, inventory_table_columns].tail(60),
-                "sku_inventory_comparison",
-            )
-        else:
-            st.warning("Selecciona al menos una linea para el grafico de stock.")
+        inventory_figure = build_location_comparison_figure(
+            inventory_comparison,
+            f"{selected_inventory_metric_label} por sucursal ({inventory_granularity}, {inventory_temporality})",
+        )
+        st.plotly_chart(inventory_figure, use_container_width=True)
+        render_copyable_dataframe(
+            inventory_comparison.tail(60),
+            "sku_inventory_comparison",
+        )
 
 
 def _render_sku_section_clasificacion(service: PlanningService, selected_sku: str, classification_df: pd.DataFrame | None):
@@ -806,20 +866,6 @@ def _render_sku_section_clasificacion(service: PlanningService, selected_sku: st
     render_copyable_dataframe(profile_display, f"classification_profile_{selected_sku}")
 
 
-def _render_sku_section_supply(service: PlanningService, selected_sku: str):
-    """Seccion de abastecimiento: recepciones de compra y transferencias internas."""
-    receipts = service.purchase_receipts_for_sku(selected_sku)
-    transfers = service.internal_transfers_for_sku(selected_sku)
-
-    detail_col_a, detail_col_b = st.columns(2)
-    with detail_col_a:
-        st.write("Recepciones de compra")
-        render_copyable_dataframe(receipts.tail(100), "purchase_receipts_detail")
-    with detail_col_b:
-        st.write("Transferencias internas")
-        render_copyable_dataframe(transfers.tail(100), "internal_transfers_detail")
-
-
 def render_sku_detail_unified(
     service: PlanningService,
     selected_sku: str,
@@ -837,18 +883,21 @@ def render_sku_detail_unified(
         return
 
     # --- Header: SKU + boton volver ---
-    header_col_a, header_col_b = st.columns([4, 1])
+    currency_code = service.currency_code()
+    header_col_a, header_col_b = st.columns([8.5, 1])
     with header_col_a:
         catalog = summary["catalog"]
         st.caption(f"`{selected_sku}` — {catalog.get('name', '')} | {catalog.get('category', '')} | {catalog.get('supplier', '')}")
     with header_col_b:
-        if st.button("Volver", key=back_callback_key):
+        if st.button("← Volver", key=back_callback_key, type="tertiary"):
             return "back"
 
     # --- KPIs operacionales (siempre visibles) ---
-    kpi_cols = st.columns(6)
+    kpi_cols = st.columns([1, 1.45, 1, 1, 1, 1])
     kpi_cols[0].metric("Ventas totales", f"{summary['sales_qty_total']:,}")
-    kpi_cols[1].metric("Revenue", f"${summary['sales_amount_total']:,.0f}")
+    with kpi_cols[1]:
+        st.caption(f"Revenue ({currency_code})")
+        st.markdown(f"#### {format_currency(summary['sales_amount_total'])}")
     kpi_cols[2].metric("Stock actual", f"{summary['last_on_hand_total']:,}")
     kpi_cols[3].metric("En orden", f"{summary['last_on_order_total']:,}")
     kpi_cols[4].metric("Locaciones", summary["active_locations"])
@@ -861,7 +910,7 @@ def render_sku_detail_unified(
     # --- Sub-menu interno ---
     sku_section = st.segmented_control(
         "Seccion",
-        options=["Operacional", "Clasificacion", "Abastecimiento"],
+        options=["Operacional", "Clasificacion"],
         default="Operacional",
         selection_mode="single",
         key="sku_detail_section",
@@ -869,8 +918,6 @@ def render_sku_detail_unified(
 
     if sku_section == "Clasificacion":
         _render_sku_section_clasificacion(service, selected_sku, classification_df)
-    elif sku_section == "Abastecimiento":
-        _render_sku_section_supply(service, selected_sku)
     else:
         _render_sku_section_operacional(service, selected_sku, summary)
 
@@ -926,7 +973,12 @@ def render_dataset_tab(service: PlanningService):
     metric_columns[3].metric("Filas stock", overview["table_rows"]["inventory_snapshot"])
     metric_columns[4].metric("Filas transfer.", overview["table_rows"]["internal_transfers"])
 
-    st.caption(f"Horizonte: {overview['date_range']['start']} a {overview['date_range']['end']}")
+    caption_parts = [f"Horizonte: {overview['date_range']['start']} a {overview['date_range']['end']}"]
+    if overview.get("profile"):
+        caption_parts.append(f"Perfil: {overview['profile']}")
+    if overview.get("currency"):
+        caption_parts.append(f"Moneda: {overview['currency']}")
+    st.caption(" | ".join(caption_parts))
     st.write("Tablas cargadas")
     render_copyable_dataframe(
         pd.DataFrame(
@@ -999,24 +1051,6 @@ def render_sku_browser(service: PlanningService) -> None:
         },
         key="sku_browser_table",
     )
-    browser_actions_col_a, browser_actions_col_b = st.columns([1.2, 4.8])
-    with browser_actions_col_a:
-        st.download_button(
-            "Descargar CSV",
-            data=browser_dataframe.to_csv(index=False).encode("utf-8"),
-            file_name="sku_browser.csv",
-            mime="text/csv",
-            key="sku_browser_download",
-            use_container_width=True,
-        )
-    with browser_actions_col_b:
-        with st.expander("Copiar contenido"):
-            st.text_area(
-                "CSV",
-                value=browser_dataframe.to_csv(index=False),
-                height=140,
-                key="sku_browser_copybox",
-            )
 
     selected_rows = []
     if hasattr(browser_event, "selection") and hasattr(browser_event.selection, "rows"):
