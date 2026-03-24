@@ -601,255 +601,8 @@ def render_classification_panoramic(service: PlanningService, classification_df:
         st.rerun()
 
 
-def render_classification_sku_detail(service: PlanningService, classification_df: pd.DataFrame, selected_sku: str):
-    """Vista de detalle de clasificacion para un SKU."""
-    header_col_a, header_col_b = st.columns([4, 1])
-    with header_col_a:
-        st.caption(f"Clasificacion detallada: `{selected_sku}`")
-    with header_col_b:
-        if st.button("Volver al panorama", key="back_to_classification_panoramic"):
-            st.session_state["classification_view"] = "Panorama"
-            st.rerun()
-
-    # Obtener perfil de clasificacion
-    sku_row = classification_df[classification_df["sku"] == selected_sku]
-    if sku_row.empty:
-        st.error("SKU no encontrado en la clasificacion.")
-        return
-
-    profile = sku_row.iloc[0]
-    granularity = profile["granularity"]
-
-    # --- KPIs del SKU ---
-    kpi_cols = st.columns(8)
-    kpi_cols[0].metric("Clase S-B", profile["sb_class"])
-    kpi_cols[1].metric("ABC", profile["abc_class"])
-    kpi_cols[2].metric("XYZ", profile["xyz_class"])
-    kpi_cols[3].metric("ADI", f"{profile['adi']:.2f}")
-    kpi_cols[4].metric("CV2", f"{profile['cv2']:.3f}")
-    kpi_cols[5].metric("Lifecycle", profile["lifecycle"])
-    kpi_cols[6].metric("Quality", f"{profile['quality_score']:.2f}")
-    kpi_cols[7].metric("Estacional", "Si" if profile["is_seasonal"] else "No")
-
-    if profile.get("quality_flags"):
-        flags = profile["quality_flags"] if isinstance(profile["quality_flags"], list) else []
-        if flags:
-            st.warning("Quality flags: " + ", ".join(flags))
-
-    # --- Serie temporal con outliers ---
-    series_df = service.sku_demand_series(selected_sku, granularity=granularity)
-
-    if not series_df.empty:
-        outlier_mask = detect_outliers(series_df["demand"], method="iqr")
-
-        demand_col, acf_col = st.columns(2)
-
-        with demand_col:
-            demand_fig = build_demand_with_outliers_figure(
-                series_df, outlier_mask,
-                f"Demanda {selected_sku} (granularidad {granularity})",
-            )
-            st.plotly_chart(demand_fig, use_container_width=True)
-
-        # --- ACF ---
-        with acf_col:
-            acf_data = service.sku_acf(selected_sku, granularity=granularity)
-            if acf_data["lags"]:
-                acf_fig = build_acf_figure(acf_data, f"Autocorrelacion (ACF) — {selected_sku}")
-                st.plotly_chart(acf_fig, use_container_width=True)
-
-        # --- Tabla de datos de la serie ---
-        st.write("Serie temporal de demanda")
-        series_display = series_df.copy()
-        series_display["is_outlier"] = outlier_mask.values
-        render_copyable_dataframe(series_display, f"demand_series_{selected_sku}")
-    else:
-        st.info("No hay datos de demanda para este SKU.")
-
-    # --- Perfil completo ---
-    st.write("Perfil de clasificacion completo")
-    profile_dict = profile.to_dict()
-    profile_display = pd.DataFrame([
-        {"Metrica": k, "Valor": str(v)} for k, v in profile_dict.items()
-    ])
-    render_copyable_dataframe(profile_display, f"classification_profile_{selected_sku}")
-
-
-def render_classification_tab(service: PlanningService):
-    """Tab principal de clasificacion de demanda."""
-    if "classification_view" not in st.session_state:
-        st.session_state["classification_view"] = "Panorama"
-
-    # Controles de granularidad
-    control_cols = st.columns([1.5, 4.5])
-    with control_cols[0]:
-        granularity_label = st.selectbox(
-            "Granularidad de clasificacion",
-            list(CLASSIFICATION_GRANULARITY_OPTIONS.keys()),
-            index=0,
-            key="classification_granularity",
-        )
-    granularity = CLASSIFICATION_GRANULARITY_OPTIONS[granularity_label]
-
-    # Cargar datos clasificados (cacheados)
-    classification_df = get_classification_data(service, granularity=granularity)
-
-    current_view = st.session_state["classification_view"]
-
-    if current_view == "Panorama":
-        render_classification_panoramic(service, classification_df)
-    else:
-        selected_sku = st.session_state.get("classification_selected_sku")
-        if not selected_sku:
-            st.session_state["classification_view"] = "Panorama"
-            st.rerun()
-        render_classification_sku_detail(service, classification_df, selected_sku)
-
-
-def render_dataset_tab(service: PlanningService):
-    overview = service.dataset_overview()
-    quality = service.dataset_health()
-
-    metric_columns = st.columns(5)
-    metric_columns[0].metric("SKUs", overview["sku_count"])
-    metric_columns[1].metric("Locaciones", overview["location_count"])
-    metric_columns[2].metric("Filas ventas", overview["table_rows"]["transactions"])
-    metric_columns[3].metric("Filas stock", overview["table_rows"]["inventory_snapshot"])
-    metric_columns[4].metric("Filas transfer.", overview["table_rows"]["internal_transfers"])
-
-    st.caption(f"Horizonte: {overview['date_range']['start']} a {overview['date_range']['end']}")
-    st.write("Tablas cargadas")
-    render_copyable_dataframe(
-        pd.DataFrame(
-            [{"table": table_name, "rows": rows} for table_name, rows in overview["table_rows"].items()]
-        ),
-        "dataset_table_rows",
-    )
-
-    st.write("Chequeos basicos")
-    render_copyable_dataframe(
-        pd.DataFrame(
-            [{"check": check_name, "value": value} for check_name, value in quality.items()]
-        ),
-        "dataset_quality_checks",
-    )
-
-
-def render_sku_browser(service: PlanningService) -> None:
-    filter_columns = st.columns([1.4, 1, 1])
-    with filter_columns[0]:
-        search_text = st.text_input("Buscar SKU", placeholder="SKU, nombre, categoria o proveedor")
-    with filter_columns[1]:
-        category_options = ["__all__"] + service.list_categories()
-        selected_category = st.selectbox(
-            "Categoria",
-            category_options,
-            format_func=lambda value: "Todas" if value == "__all__" else value,
-        )
-    with filter_columns[2]:
-        supplier_options = ["__all__"] + service.list_suppliers()
-        selected_supplier = st.selectbox(
-            "Proveedor",
-            supplier_options,
-            format_func=lambda value: "Todos" if value == "__all__" else value,
-        )
-
-    category_filter = None if selected_category == "__all__" else selected_category
-    supplier_filter = None if selected_supplier == "__all__" else selected_supplier
-    sku_options = service.list_skus(
-        search=search_text,
-        category=category_filter,
-        supplier=supplier_filter,
-        limit=None,
-    )
-
-    if not sku_options:
-        st.warning("No hay resultados para ese filtro.")
-        return
-
-    browser_dataframe = pd.DataFrame(sku_options).loc[
-        :,
-        ["sku", "name", "category", "supplier", "brand", "base_price", "moq"],
-    ]
-    st.caption(f"Resultados: {len(browser_dataframe):,} SKUs. Selecciona una fila para explorar el detalle.")
-    browser_event = st.dataframe(
-        browser_dataframe,
-        width="stretch",
-        hide_index=True,
-        height=320,
-        on_select="rerun",
-        selection_mode="single-row",
-        column_config={
-            "sku": st.column_config.TextColumn("SKU", width="small"),
-            "name": st.column_config.TextColumn("Producto", width="large"),
-            "category": st.column_config.TextColumn("Categoria", width="medium"),
-            "supplier": st.column_config.TextColumn("Proveedor", width="medium"),
-            "brand": st.column_config.TextColumn("Marca", width="small"),
-            "base_price": st.column_config.NumberColumn("Precio base", format="%.0f"),
-            "moq": st.column_config.NumberColumn("MOQ", format="%d"),
-        },
-        key="sku_browser_table",
-    )
-    browser_actions_col_a, browser_actions_col_b = st.columns([1.2, 4.8])
-    with browser_actions_col_a:
-        st.download_button(
-            "Descargar CSV",
-            data=browser_dataframe.to_csv(index=False).encode("utf-8"),
-            file_name="sku_browser.csv",
-            mime="text/csv",
-            key="sku_browser_download",
-            use_container_width=True,
-        )
-    with browser_actions_col_b:
-        with st.expander("Copiar contenido"):
-            st.text_area(
-                "CSV",
-                value=browser_dataframe.to_csv(index=False),
-                height=140,
-                key="sku_browser_copybox",
-            )
-
-    selected_rows = []
-    if hasattr(browser_event, "selection") and hasattr(browser_event.selection, "rows"):
-        selected_rows = list(browser_event.selection.rows)
-    elif isinstance(browser_event, dict):
-        selected_rows = browser_event.get("selection", {}).get("rows", [])
-
-    if selected_rows:
-        selected_sku = browser_dataframe.iloc[selected_rows[0]]["sku"]
-        st.session_state["selected_sku"] = selected_sku
-        st.session_state["sku_explorer_view"] = "Detalle SKU"
-        st.rerun()
-
-
-def render_sku_detail(service: PlanningService, selected_sku: str) -> None:
-    header_col_a, header_col_b = st.columns([4, 1])
-    with header_col_a:
-        st.caption(f"SKU seleccionado: `{selected_sku}`")
-    with header_col_b:
-        if st.button("Volver al listado", key="back_to_sku_browser"):
-            st.session_state["sku_explorer_view"] = "Listado"
-            st.rerun()
-
-    summary = service.sku_summary(selected_sku)
-    if summary is None:
-        st.error("No se pudo cargar el resumen del SKU.")
-        return
-
-    summary_columns = st.columns(6)
-    summary_columns[0].metric("Ventas", f"{summary['sales_qty_total']:,}")
-    summary_columns[1].metric("Ingresos", f"{summary['sales_amount_total']:,.0f}")
-    summary_columns[2].metric("Stock actual", f"{summary['last_on_hand_total']:,}")
-    summary_columns[3].metric("En orden", f"{summary['last_on_order_total']:,}")
-    summary_columns[4].metric("Locaciones activas", summary["active_locations"])
-    summary_columns[5].metric("Recibido central", f"{summary['purchase_receipt_qty_total']:,}")
-
-    st.write("Atributos del SKU")
-    render_copyable_dataframe(
-        pd.DataFrame([summary["catalog"]]),
-        "sku_catalog_summary",
-    )
-
+def _render_sku_section_operacional(service: PlanningService, selected_sku: str, summary: dict):
+    """Seccion operacional: flujo y stock por location."""
     central_location = summary.get("central_location")
     branch_locations = [
         location
@@ -977,6 +730,84 @@ def render_sku_detail(service: PlanningService, selected_sku: str) -> None:
         else:
             st.warning("Selecciona al menos una linea para el grafico de stock.")
 
+
+def _render_sku_section_clasificacion(service: PlanningService, selected_sku: str, classification_df: pd.DataFrame | None):
+    """Seccion de clasificacion: serie con outliers, ACF, perfil completo."""
+    # Obtener perfil de clasificacion
+    profile = None
+    granularity = None
+
+    if classification_df is not None:
+        sku_row = classification_df[classification_df["sku"] == selected_sku]
+        if not sku_row.empty:
+            profile = sku_row.iloc[0]
+            granularity = profile["granularity"]
+
+    if profile is None:
+        # Clasificar on-demand si no hay datos cacheados
+        result = service.classify_single_sku(selected_sku)
+        if result is None:
+            st.info("No hay datos de demanda para clasificar este SKU.")
+            return
+        profile = pd.Series(result)
+        granularity = profile["granularity"]
+
+    # KPIs de clasificacion
+    cls_cols = st.columns(8)
+    cls_cols[0].metric("Clase S-B", profile["sb_class"])
+    cls_cols[1].metric("ABC", profile.get("abc_class", "—"))
+    cls_cols[2].metric("XYZ", profile["xyz_class"])
+    cls_cols[3].metric("ADI", f"{profile['adi']:.2f}")
+    cls_cols[4].metric("CV2", f"{profile['cv2']:.3f}")
+    cls_cols[5].metric("Lifecycle", profile["lifecycle"])
+    cls_cols[6].metric("Quality", f"{profile['quality_score']:.2f}")
+    cls_cols[7].metric("Estacional", "Si" if profile["is_seasonal"] else "No")
+
+    quality_flags = profile.get("quality_flags")
+    if quality_flags:
+        flags = quality_flags if isinstance(quality_flags, list) else []
+        if flags:
+            st.warning("Quality flags: " + ", ".join(flags))
+
+    # Serie temporal con outliers + ACF
+    series_df = service.sku_demand_series(selected_sku, granularity=granularity)
+
+    if not series_df.empty:
+        outlier_mask = detect_outliers(series_df["demand"], method="iqr")
+
+        demand_col, acf_col = st.columns(2)
+
+        with demand_col:
+            demand_fig = build_demand_with_outliers_figure(
+                series_df, outlier_mask,
+                f"Demanda {selected_sku} (granularidad {granularity})",
+            )
+            st.plotly_chart(demand_fig, use_container_width=True)
+
+        with acf_col:
+            acf_data = service.sku_acf(selected_sku, granularity=granularity)
+            if acf_data["lags"]:
+                acf_fig = build_acf_figure(acf_data, f"Autocorrelacion (ACF) — {selected_sku}")
+                st.plotly_chart(acf_fig, use_container_width=True)
+
+        st.write("Serie temporal de demanda")
+        series_display = series_df.copy()
+        series_display["is_outlier"] = outlier_mask.values
+        render_copyable_dataframe(series_display, f"demand_series_{selected_sku}")
+    else:
+        st.info("No hay datos de demanda para este SKU.")
+
+    # Perfil completo
+    st.write("Perfil de clasificacion completo")
+    profile_dict = profile.to_dict() if isinstance(profile, pd.Series) else profile
+    profile_display = pd.DataFrame([
+        {"Metrica": k, "Valor": str(v)} for k, v in profile_dict.items()
+    ])
+    render_copyable_dataframe(profile_display, f"classification_profile_{selected_sku}")
+
+
+def _render_sku_section_supply(service: PlanningService, selected_sku: str):
+    """Seccion de abastecimiento: recepciones de compra y transferencias internas."""
     receipts = service.purchase_receipts_for_sku(selected_sku)
     transfers = service.internal_transfers_for_sku(selected_sku)
 
@@ -987,6 +818,217 @@ def render_sku_detail(service: PlanningService, selected_sku: str) -> None:
     with detail_col_b:
         st.write("Transferencias internas")
         render_copyable_dataframe(transfers.tail(100), "internal_transfers_detail")
+
+
+def render_sku_detail_unified(
+    service: PlanningService,
+    selected_sku: str,
+    back_callback_key: str,
+    classification_df: pd.DataFrame | None = None,
+):
+    """Vista unificada de detalle de un SKU.
+
+    Combina informacion operacional, de clasificacion y de abastecimiento
+    en una sola vista con sub-menu interno.
+    """
+    summary = service.sku_summary(selected_sku)
+    if summary is None:
+        st.error("No se pudo cargar el resumen del SKU.")
+        return
+
+    # --- Header: SKU + boton volver ---
+    header_col_a, header_col_b = st.columns([4, 1])
+    with header_col_a:
+        catalog = summary["catalog"]
+        st.caption(f"`{selected_sku}` — {catalog.get('name', '')} | {catalog.get('category', '')} | {catalog.get('supplier', '')}")
+    with header_col_b:
+        if st.button("Volver", key=back_callback_key):
+            return "back"
+
+    # --- KPIs operacionales (siempre visibles) ---
+    kpi_cols = st.columns(6)
+    kpi_cols[0].metric("Ventas totales", f"{summary['sales_qty_total']:,}")
+    kpi_cols[1].metric("Revenue", f"${summary['sales_amount_total']:,.0f}")
+    kpi_cols[2].metric("Stock actual", f"{summary['last_on_hand_total']:,}")
+    kpi_cols[3].metric("En orden", f"{summary['last_on_order_total']:,}")
+    kpi_cols[4].metric("Locaciones", summary["active_locations"])
+    kpi_cols[5].metric("Recibido central", f"{summary['purchase_receipt_qty_total']:,}")
+
+    # --- Atributos del SKU ---
+    with st.expander("Atributos del SKU"):
+        render_copyable_dataframe(pd.DataFrame([summary["catalog"]]), "sku_catalog_attrs")
+
+    # --- Sub-menu interno ---
+    sku_section = st.segmented_control(
+        "Seccion",
+        options=["Operacional", "Clasificacion", "Abastecimiento"],
+        default="Operacional",
+        selection_mode="single",
+        key="sku_detail_section",
+    )
+
+    if sku_section == "Clasificacion":
+        _render_sku_section_clasificacion(service, selected_sku, classification_df)
+    elif sku_section == "Abastecimiento":
+        _render_sku_section_supply(service, selected_sku)
+    else:
+        _render_sku_section_operacional(service, selected_sku, summary)
+
+    return None
+
+
+def render_classification_tab(service: PlanningService):
+    """Tab principal de clasificacion de demanda."""
+    if "classification_view" not in st.session_state:
+        st.session_state["classification_view"] = "Panorama"
+
+    # Controles de granularidad
+    control_cols = st.columns([1.5, 4.5])
+    with control_cols[0]:
+        granularity_label = st.selectbox(
+            "Granularidad de clasificacion",
+            list(CLASSIFICATION_GRANULARITY_OPTIONS.keys()),
+            index=0,
+            key="classification_granularity",
+        )
+    granularity = CLASSIFICATION_GRANULARITY_OPTIONS[granularity_label]
+
+    # Cargar datos clasificados (cacheados)
+    classification_df = get_classification_data(service, granularity=granularity)
+
+    current_view = st.session_state["classification_view"]
+
+    if current_view == "Panorama":
+        render_classification_panoramic(service, classification_df)
+    else:
+        selected_sku = st.session_state.get("classification_selected_sku")
+        if not selected_sku:
+            st.session_state["classification_view"] = "Panorama"
+            st.rerun()
+        result = render_sku_detail_unified(
+            service, selected_sku,
+            back_callback_key="back_to_classification_panoramic",
+            classification_df=classification_df,
+        )
+        if result == "back":
+            st.session_state["classification_view"] = "Panorama"
+            st.rerun()
+
+
+def render_dataset_tab(service: PlanningService):
+    overview = service.dataset_overview()
+    quality = service.dataset_health()
+
+    metric_columns = st.columns(5)
+    metric_columns[0].metric("SKUs", overview["sku_count"])
+    metric_columns[1].metric("Locaciones", overview["location_count"])
+    metric_columns[2].metric("Filas ventas", overview["table_rows"]["transactions"])
+    metric_columns[3].metric("Filas stock", overview["table_rows"]["inventory_snapshot"])
+    metric_columns[4].metric("Filas transfer.", overview["table_rows"]["internal_transfers"])
+
+    st.caption(f"Horizonte: {overview['date_range']['start']} a {overview['date_range']['end']}")
+    st.write("Tablas cargadas")
+    render_copyable_dataframe(
+        pd.DataFrame(
+            [{"table": table_name, "rows": rows} for table_name, rows in overview["table_rows"].items()]
+        ),
+        "dataset_table_rows",
+    )
+
+    st.write("Chequeos basicos")
+    render_copyable_dataframe(
+        pd.DataFrame(
+            [{"check": check_name, "value": value} for check_name, value in quality.items()]
+        ),
+        "dataset_quality_checks",
+    )
+
+
+def render_sku_browser(service: PlanningService) -> None:
+    filter_columns = st.columns([1.4, 1, 1])
+    with filter_columns[0]:
+        search_text = st.text_input("Buscar SKU", placeholder="SKU, nombre, categoria o proveedor")
+    with filter_columns[1]:
+        category_options = ["__all__"] + service.list_categories()
+        selected_category = st.selectbox(
+            "Categoria",
+            category_options,
+            format_func=lambda value: "Todas" if value == "__all__" else value,
+        )
+    with filter_columns[2]:
+        supplier_options = ["__all__"] + service.list_suppliers()
+        selected_supplier = st.selectbox(
+            "Proveedor",
+            supplier_options,
+            format_func=lambda value: "Todos" if value == "__all__" else value,
+        )
+
+    category_filter = None if selected_category == "__all__" else selected_category
+    supplier_filter = None if selected_supplier == "__all__" else selected_supplier
+    sku_options = service.list_skus(
+        search=search_text,
+        category=category_filter,
+        supplier=supplier_filter,
+        limit=None,
+    )
+
+    if not sku_options:
+        st.warning("No hay resultados para ese filtro.")
+        return
+
+    browser_dataframe = pd.DataFrame(sku_options).loc[
+        :,
+        ["sku", "name", "category", "supplier", "brand", "base_price", "moq"],
+    ]
+    st.caption(f"Resultados: {len(browser_dataframe):,} SKUs. Selecciona una fila para explorar el detalle.")
+    browser_event = st.dataframe(
+        browser_dataframe,
+        width="stretch",
+        hide_index=True,
+        height=320,
+        on_select="rerun",
+        selection_mode="single-row",
+        column_config={
+            "sku": st.column_config.TextColumn("SKU", width="small"),
+            "name": st.column_config.TextColumn("Producto", width="large"),
+            "category": st.column_config.TextColumn("Categoria", width="medium"),
+            "supplier": st.column_config.TextColumn("Proveedor", width="medium"),
+            "brand": st.column_config.TextColumn("Marca", width="small"),
+            "base_price": st.column_config.NumberColumn("Precio base", format="%.0f"),
+            "moq": st.column_config.NumberColumn("MOQ", format="%d"),
+        },
+        key="sku_browser_table",
+    )
+    browser_actions_col_a, browser_actions_col_b = st.columns([1.2, 4.8])
+    with browser_actions_col_a:
+        st.download_button(
+            "Descargar CSV",
+            data=browser_dataframe.to_csv(index=False).encode("utf-8"),
+            file_name="sku_browser.csv",
+            mime="text/csv",
+            key="sku_browser_download",
+            use_container_width=True,
+        )
+    with browser_actions_col_b:
+        with st.expander("Copiar contenido"):
+            st.text_area(
+                "CSV",
+                value=browser_dataframe.to_csv(index=False),
+                height=140,
+                key="sku_browser_copybox",
+            )
+
+    selected_rows = []
+    if hasattr(browser_event, "selection") and hasattr(browser_event.selection, "rows"):
+        selected_rows = list(browser_event.selection.rows)
+    elif isinstance(browser_event, dict):
+        selected_rows = browser_event.get("selection", {}).get("rows", [])
+
+    if selected_rows:
+        selected_sku = browser_dataframe.iloc[selected_rows[0]]["sku"]
+        st.session_state["selected_sku"] = selected_sku
+        st.session_state["sku_explorer_view"] = "Detalle SKU"
+        st.rerun()
 
 
 def render_sku_tab(service: PlanningService):
@@ -1005,7 +1047,13 @@ def render_sku_tab(service: PlanningService):
         st.session_state["sku_explorer_view"] = "Listado"
         st.rerun()
 
-    render_sku_detail(service, selected_sku)
+    result = render_sku_detail_unified(
+        service, selected_sku,
+        back_callback_key="back_to_sku_browser",
+    )
+    if result == "back":
+        st.session_state["sku_explorer_view"] = "Listado"
+        st.rerun()
 
 
 def main():
