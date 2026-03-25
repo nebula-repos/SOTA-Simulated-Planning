@@ -376,7 +376,16 @@ def _evaluate_sku(
 
     try:
         if sku_tx.empty:
-            raise ValueError("Sin transacciones")
+            # SKU sin transacciones → inactivo, no se genera forecast (no es un error)
+            row.update({
+                "status": "no_forecast",
+                "model_winner": None,
+                "mase": float("nan"), "wape": float("nan"),
+                "bias": float("nan"), "mae": float("nan"), "rmse": float("nan"),
+                "granularity": config.granularity, "h": config.h,
+                "season_length": None, "n_obs": 0, "error_msg": None,
+            })
+            return row
 
         demand_df = prepare_demand_series(sku_tx, granularity=config.granularity)
         if demand_df.empty:

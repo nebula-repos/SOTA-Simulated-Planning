@@ -58,6 +58,7 @@ La deuda no esta concentrada en una sola capa. Hoy hay cuatro frentes principale
 | D19 | Baja | Forecasting | Empate técnico en horse-race no detectado — ganador puede cambiar por diferencias de MASE < 0.02 | Pendiente |
 | D20 | Baja | Forecasting | `h` fijo para todo el catálogo — no derivado del lead time del proveedor por SKU | Pendiente |
 | D21 | Baja | Analitica | Notebook de análisis del sweep de parametrización (`03_param_sweep_analysis.ipynb`) no existe | Pendiente |
+| D22 | Media | Packaging | `planning_core/services.py` importa `forecasting.selector` directamente — el core tiene dependencia runtime de statsforecast aunque pyproject.toml la declare como extra `[forecast]` opcional | Pendiente |
 
 ## Detalle por item
 

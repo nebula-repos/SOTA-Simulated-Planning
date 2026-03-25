@@ -6,7 +6,10 @@ Alcance: `planning_core/forecasting/` — todos los archivos · `apps/viz/app.py
 Revisión exhaustiva de formulación, modelado, lógica de código y consistencia de interfaz.
 20 hallazgos Round 1 (17 corregidos, 3 tradeoffs de diseño).
 6 hallazgos adicionales Round 2 — todos corregidos.
-16 tests nuevos agregados (total suite: 51 tests, 51 passing).
+16 tests nuevos agregados en Round 2 (total suite al cierre Round 2: 51 tests).
+
+**Actualización 2026-03-25**: suite ampliada en Round 3 (benchmark adaptativo, backtest selector).
+Total suite actual: **82 tests, 82 passing**.
 
 ---
 
