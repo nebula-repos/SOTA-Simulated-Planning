@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 
 from planning_core.repository import CanonicalRepository
@@ -148,3 +149,50 @@ def sku_acf(
     if service.sku_summary(sku) is None:
         raise HTTPException(status_code=404, detail=f"SKU no encontrado: {sku}")
     return service.sku_acf(sku, location=location, granularity=granularity, max_lags=max_lags)
+
+
+# ------------------------------------------------------------------
+# Forecasting (Fase 2)
+# ------------------------------------------------------------------
+
+@app.get("/sku/{sku}/forecast")
+def sku_forecast(
+    sku: str,
+    granularity: Optional[str] = Query(
+        default=None,
+        description="Granularidad: M, W, D. None = mensual por defecto.",
+    ),
+    h: int = Query(default=6, ge=1, le=36, description="Horizonte de forecast en periodos."),
+    n_windows: int = Query(default=3, ge=2, le=10, description="Ventanas del backtest expanding-window."),
+    location: Optional[str] = Query(default=None, description="Location especifica (default: red completa)."),
+):
+    """Forecast automatico para un SKU.
+
+    Corre el horse-race de modelos (backtest expanding-window) y devuelve
+    el pronostico del modelo ganador junto con el resumen del backtest.
+
+    El campo ``forecast`` es una lista de registros con ``ds``, ``yhat`` y,
+    si el modelo los soporta, ``yhat_lo80`` / ``yhat_hi80``.
+    """
+    if service.sku_summary(sku) is None:
+        raise HTTPException(status_code=404, detail=f"SKU no encontrado: {sku}")
+
+    result = service.sku_forecast(
+        sku,
+        location=location,
+        granularity=granularity,
+        h=h,
+        n_windows=n_windows,
+    )
+
+    # Serializar el DataFrame de forecast a lista de registros JSON-friendly
+    output = dict(result)
+    output.pop("demand_series", None)  # campo interno — no exponer en API
+    if isinstance(output.get("forecast"), pd.DataFrame):
+        fc = output["forecast"].copy()
+        # Convertir Timestamps a strings ISO para serialización JSON
+        if "ds" in fc.columns:
+            fc["ds"] = fc["ds"].astype(str)
+        output["forecast"] = fc.to_dict(orient="records")
+
+    return output

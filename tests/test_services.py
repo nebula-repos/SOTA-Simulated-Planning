@@ -1,6 +1,7 @@
 import json
 
 import pandas as pd
+import pytest
 
 from planning_core.repository import CanonicalRepository
 from planning_core.services import PlanningService
@@ -104,3 +105,21 @@ def test_classification_default_is_monthly_and_includes_censoring(tmp_path):
     censor_info = service.sku_censored_mask("SKU-001", granularity="D")
     assert censor_info["summary"]["stockout_no_sale_periods"] > 0
     assert bool(censor_info["series"]["is_stockout_no_sale"].any()) is True
+
+
+def test_sku_forecast_includes_demand_series(tmp_path):
+    """sku_forecast debe incluir 'demand_series' en el resultado."""
+    _write_minimal_dataset(tmp_path)
+    service = PlanningService(CanonicalRepository(tmp_path))
+    result = service.sku_forecast("SKU-001", h=1, n_windows=1)
+    assert "demand_series" in result, "demand_series debe estar presente en el resultado"
+    assert isinstance(result["demand_series"], pd.DataFrame)
+    assert not result["demand_series"].empty
+
+
+def test_sku_forecast_no_data_for_unknown_sku(tmp_path):
+    """sku_forecast sobre SKU inexistente devuelve status='no_data'."""
+    _write_minimal_dataset(tmp_path)
+    service = PlanningService(CanonicalRepository(tmp_path))
+    result = service.sku_forecast("SKU-INEXISTENTE", h=1, n_windows=1)
+    assert result["status"] == "no_data"

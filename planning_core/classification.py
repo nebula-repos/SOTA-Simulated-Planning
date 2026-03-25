@@ -367,10 +367,10 @@ def test_seasonality(
             "method": "autocorrelation",
         }
 
-    # Autocorrelacion en el lag estacional
+    # Autocorrelacion en el lag estacional (estimador unbiased: denominador = n - lag)
     lagged = series[seasonal_period:] - mean
     original = series[:n - seasonal_period] - mean
-    acf_value = float(np.sum(lagged * original) / (n * var))
+    acf_value = float(np.sum(lagged * original) / ((n - seasonal_period) * var))
 
     return {
         "is_seasonal": abs(acf_value) >= threshold,

@@ -24,6 +24,7 @@ from statsforecast import StatsForecast
 from statsforecast.models import ADIDA, CrostonSBA
 
 from planning_core.forecasting.utils import (
+    FREQ_MAP,
     _normalize_forecast,
     get_season_length,
     to_nixtla_df,
@@ -86,7 +87,7 @@ def fit_predict_sba(
         model = CrostonSBA()
         model_name = MODEL_SBA
 
-    sf = StatsForecast(models=[model], freq=_get_freq(granularity), n_jobs=1)
+    sf = StatsForecast(models=[model], freq=FREQ_MAP.get(granularity, "MS"), n_jobs=1)
     sf.fit(nixtla_df)
     raw = sf.forecast(df=nixtla_df, h=h)
 
@@ -126,7 +127,7 @@ def fit_predict_adida(
     nixtla_df = to_nixtla_df(demand_df, unique_id=unique_id, target_col=target_col)
 
     model = ADIDA()
-    sf = StatsForecast(models=[model], freq=_get_freq(granularity), n_jobs=1)
+    sf = StatsForecast(models=[model], freq=FREQ_MAP.get(granularity, "MS"), n_jobs=1)
     sf.fit(nixtla_df)
     raw = sf.forecast(df=nixtla_df, h=h)
 
@@ -144,6 +145,3 @@ def fit_predict_adida(
     }
 
 
-def _get_freq(granularity: str) -> str:
-    _map = {"D": "D", "W": "W-MON", "M": "MS"}
-    return _map.get(granularity, "MS")

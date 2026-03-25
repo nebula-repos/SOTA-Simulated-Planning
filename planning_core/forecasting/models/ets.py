@@ -18,6 +18,7 @@ from statsforecast import StatsForecast
 from statsforecast.models import AutoETS
 
 from planning_core.forecasting.utils import (
+    FREQ_MAP,
     _normalize_forecast,
     get_season_length,
     to_nixtla_df,
@@ -84,7 +85,7 @@ def fit_predict_ets(
         )
 
     ets_model = AutoETS(season_length=season_length)
-    sf = StatsForecast(models=[ets_model], freq=_get_freq(granularity), n_jobs=1)
+    sf = StatsForecast(models=[ets_model], freq=FREQ_MAP.get(granularity, "MS"), n_jobs=1)
     sf.fit(nixtla_df)
     raw = sf.forecast(df=nixtla_df, h=h, level=level)
 
@@ -108,8 +109,3 @@ def fit_predict_ets(
 def get_ets_model_name(granularity: str) -> str:
     """Retorna el identificador del modelo ETS para la granularidad dada."""
     return MODEL_NAME
-
-
-def _get_freq(granularity: str) -> str:
-    _map = {"D": "D", "W": "W-MON", "M": "MS"}
-    return _map.get(granularity, "MS")

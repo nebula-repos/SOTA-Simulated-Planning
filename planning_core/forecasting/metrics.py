@@ -52,8 +52,9 @@ def compute_mase(
     """Mean Absolute Scaled Error.
 
     El denominador es el MAE de SeasonalNaive sobre el set de entrenamiento.
-    Si ``train_actual`` no se provee, se usa ``actual`` como proxy
-    (util en backtest donde el historico esta disponible como ``actual``).
+    Requiere ``train_actual`` con al menos ``season_length + 1`` observaciones;
+    si no se cumple (o si ``train_actual`` es None y ``actual`` es muy corto),
+    devuelve NaN — MASE no es calculable sin un baseline estacional válido.
 
     MASE < 1.0  → el modelo supera al baseline SeasonalNaive.
     MASE = 1.0  → igual al baseline.
@@ -68,8 +69,9 @@ def compute_mase(
     season_length : int
         m en la formula — normalmente 12 (mensual), 52 (semanal), 7 (diario).
     train_actual : array-like, optional
-        Serie completa de entrenamiento. Se usa para calcular el denominador
-        (MAE de naive estacional sobre entrenamiento). Si None, se usa ``actual``.
+        Serie de entrenamiento. Se usa para calcular el denominador
+        (MAE de naive estacional sobre entrenamiento). Si None, se usa ``actual``
+        como proxy — pero si ``len(actual) <= season_length``, devuelve NaN.
     """
     actual_arr = _to_array(actual)
     forecast_arr = _to_array(forecast)
@@ -81,11 +83,8 @@ def compute_mase(
     # Denominador: MAE naive estacional sobre entrenamiento
     base = _to_array(train_actual) if train_actual is not None else actual_arr
     if len(base) <= season_length:
-        # No hay suficientes datos para naive estacional — usar MAE sobre la misma serie
-        naive_errors = np.abs(np.diff(base))
-        if len(naive_errors) == 0:
-            return float("nan")
-        mae_naive = float(np.mean(naive_errors))
+        # No hay suficientes datos para el denominador de naive estacional — MASE no calculable
+        return float("nan")
     else:
         naive_errors = np.abs(base[season_length:] - base[:-season_length])
         mae_naive = float(np.mean(naive_errors))

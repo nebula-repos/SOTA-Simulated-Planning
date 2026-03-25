@@ -74,6 +74,21 @@ class TestComputeMase:
         result = compute_mase(actual, forecast, season_length=2)
         assert result == pytest.approx(0.0, abs=1e-9)
 
+    def test_returns_nan_when_no_train_and_actual_too_short(self):
+        """Sin train_actual, si len(actual) <= season_length → NaN (HIGH-02 boundary)."""
+        actual = np.array([10.0, 20.0])   # len=2
+        forecast = np.array([10.0, 20.0])
+        result = compute_mase(actual, forecast, season_length=2)  # len(base)=2 <= 2
+        assert math.isnan(result)
+
+    def test_returns_nan_when_train_too_short(self):
+        """Con train_actual de longitud <= season_length → NaN."""
+        actual = np.array([10.0, 20.0, 30.0])
+        forecast = np.array([10.0, 20.0, 30.0])
+        train = np.array([5.0, 10.0])  # len=2 <= season_length=3
+        result = compute_mase(actual, forecast, season_length=3, train_actual=train)
+        assert math.isnan(result)
+
 
 # ---------------------------------------------------------------------------
 # compute_wape

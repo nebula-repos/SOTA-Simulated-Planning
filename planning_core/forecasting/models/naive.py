@@ -18,6 +18,7 @@ from statsforecast import StatsForecast
 from statsforecast.models import HistoricAverage, SeasonalNaive
 
 from planning_core.forecasting.utils import (
+    FREQ_MAP,
     _normalize_forecast,
     get_season_length,
     to_nixtla_df,
@@ -75,7 +76,7 @@ def fit_predict_naive(
         model = HistoricAverage()
         model_name = "HistoricAverage"
 
-    sf = StatsForecast(models=[model], freq=_get_freq(granularity), n_jobs=1)
+    sf = StatsForecast(models=[model], freq=FREQ_MAP.get(granularity, "MS"), n_jobs=1)
     sf.fit(nixtla_df)
     raw = sf.forecast(df=nixtla_df, h=h, level=level)
 
@@ -97,6 +98,3 @@ def fit_predict_naive(
     }
 
 
-def _get_freq(granularity: str) -> str:
-    _map = {"D": "D", "W": "W-MON", "M": "MS"}
-    return _map.get(granularity, "MS")

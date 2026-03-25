@@ -11,6 +11,7 @@ from planning_core.classification import (
     select_granularity,
     treat_outliers,
 )
+from planning_core.forecasting.selector import select_and_forecast
 from planning_core.preprocessing import censored_summary, mark_censored_demand
 from planning_core.repository import CanonicalRepository
 from planning_core.validation import basic_health_report
@@ -522,6 +523,95 @@ class PlanningService:
         }
 
         return {"series": result_df, "censored_mask": censored, "summary": summary}
+
+    def sku_forecast(
+        self,
+        sku: str,
+        location: str | None = None,
+        granularity: str | None = None,
+        h: int = 3,
+        n_windows: int = 3,
+        outlier_method: str = "iqr",
+        treat_strategy: str = "winsorize",
+    ) -> dict:
+        """Selecciona el mejor modelo de forecast para un SKU y genera el pronostico.
+
+        Usa ``demand_clean`` (serie con outliers tratados) como input para
+        el backtest y el forecast final. El modelo ganador se elige por menor
+        MASE en el horse-race expanding-window.
+
+        Parameters
+        ----------
+        sku : str
+            Codigo del SKU.
+        location : str, optional
+            Si se provee, filtra la serie a esa sucursal.
+            Si es None, usa el agregado de red (clasificacion oficial).
+        granularity : str, optional
+            ``"D"``, ``"W"`` o ``"M"``. Si es None, usa la granularidad oficial.
+        h : int
+            Horizonte de pronostico en periodos.
+        n_windows : int
+            Ventanas del backtest (minimo 3 para MASE estable).
+        outlier_method : str
+            Metodo de deteccion de outliers antes de entrenar (``"iqr"`` por defecto).
+        treat_strategy : str
+            Estrategia de tratamiento de outliers (``"winsorize"`` por defecto).
+
+        Returns
+        -------
+        dict
+            ``{"status", "model", "mase", "forecast", "backtest", "season_length",
+               "granularity", "h"}``
+
+            ``forecast`` es un pd.DataFrame con ``[ds, yhat, yhat_lo80, yhat_hi80]``.
+            ``status`` puede ser: ``"ok"``, ``"no_forecast"``, ``"fallback"``, ``"error"``.
+        """
+        if granularity is None:
+            granularity = self.official_classification_granularity()
+
+        # Obtener perfil de clasificacion
+        profile = self.classify_single_sku(sku, location=location, granularity=granularity)
+        if profile is None:
+            return {
+                "status": "no_data",
+                "model": None,
+                "mase": float("nan"),
+                "forecast": pd.DataFrame(),
+                "backtest": {},
+                "season_length": 12,
+                "granularity": granularity,
+                "h": h,
+            }
+
+        # Serie limpia (outliers tratados) para modelado
+        clean_df = self.sku_clean_series(
+            sku,
+            location=location,
+            granularity=granularity,
+            outlier_method=outlier_method,
+            treat_strategy=treat_strategy,
+        )
+
+        # Preparar input para el selector: period + demand_clean renombrado a demand
+        if clean_df.empty or "demand_clean" not in clean_df.columns:
+            model_input = clean_df[["period", "demand"]].copy()
+        else:
+            model_input = clean_df[["period", "demand_clean"]].rename(
+                columns={"demand_clean": "demand"}
+            )
+
+        result = select_and_forecast(
+            profile=profile,
+            demand_df=model_input,
+            granularity=granularity,
+            h=h,
+            n_windows=n_windows,
+            unique_id=sku,
+        )
+        # Incluir la serie limpia usada para entrenar (evita re-carga en la UI)
+        result["demand_series"] = model_input
+        return result
 
     def classification_summary(self, granularity: str | None = None) -> dict:
         """Resumen agregado de la clasificacion del catalogo."""

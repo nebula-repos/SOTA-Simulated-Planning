@@ -208,3 +208,17 @@ class TestToNixtlaDf:
         result = to_nixtla_df(empty)
         assert result.empty
         assert list(result.columns) == ["unique_id", "ds", "y"]
+
+    def test_unsorted_input_is_sorted_by_ds(self):
+        """to_nixtla_df debe retornar filas ordenadas ascendentemente por ds."""
+        dates_asc = pd.date_range("2023-01-01", periods=6, freq="MS")
+        # Invertir el orden para simular input desordenado
+        demand_df = pd.DataFrame({
+            "period": dates_asc[::-1],
+            "demand": np.array([60.0, 50.0, 40.0, 30.0, 20.0, 10.0]),
+        })
+        result = to_nixtla_df(demand_df, unique_id="TEST")
+        ds_values = result["ds"].values
+        assert (ds_values[:-1] <= ds_values[1:]).all(), "ds no está en orden ascendente"
+        # El primer elemento debe ser el más antiguo
+        assert result["ds"].iloc[0] == pd.Timestamp("2023-01-01")

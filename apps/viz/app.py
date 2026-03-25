@@ -1,19 +1,30 @@
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 from planning_core.classification import compute_acf, detect_outliers, prepare_demand_series, select_granularity
+from planning_core.forecasting.backtest import backtest_summary
 from planning_core.repository import CanonicalRepository
 from planning_core.services import PlanningService
 
 
+# Frecuencias pandas para resample directo en la capa viz
 GRANULARITY_FREQUENCIES = {
     "Diaria": None,
-    "Semanal": "W-MON",
+    "Semanal": "W-MON",  # pandas usa W-MON (inicio lunes) para series semanales
     "Mensual": "MS",
+}
+
+# Claves de granularidad para la API de planning_core (distinto de las frecuencias pandas)
+GRANULARITY_PLANNING_KEYS = {
+    "Diaria": "D",
+    "Semanal": "W",   # planning_core convierte W -> W-MON internamente via FREQ_MAP
+    "Mensual": "M",
 }
 
 TEMPORALITY_WINDOWS = {
@@ -41,6 +52,17 @@ INVENTORY_METRICS = {
 @st.cache_resource
 def get_service() -> PlanningService:
     return PlanningService(CanonicalRepository())
+
+
+@st.cache_data(show_spinner=False)
+def _run_sku_forecast(_service: PlanningService, sku: str, granularity: str, h: int, n_windows: int) -> dict:
+    """Wrapper cacheado para sku_forecast.
+
+    El prefijo ``_`` en ``_service`` indica a Streamlit que no intente hashearlo.
+    El cache evita que Streamlit rerrun el horse-race completo cuando el usuario
+    navega entre secciones sin cambiar los parámetros de forecast.
+    """
+    return _service.sku_forecast(sku, granularity=granularity, h=h, n_windows=n_windows)
 
 
 def format_currency(value: float | int) -> str:
@@ -262,6 +284,7 @@ LIFECYCLE_COLORS = {
     "inactive": "#95a5a6",
 }
 
+# Opciones de granularidad para clasificacion — pasa claves planning_core (no pandas freq)
 CLASSIFICATION_GRANULARITY_OPTIONS = {
     "Mensual (Oficial)": "M",
     "Automatica": None,
@@ -806,8 +829,7 @@ def _render_sku_section_operacional(service: PlanningService, selected_sku: str,
 
     stockout_points = None
     if selected_flow_metric == "sales_qty" and not sales_comparison.empty:
-        granularity_map = {"Diaria": "D", "Semanal": "W", "Mensual": "M"}
-        censor_info = service.sku_censored_mask(selected_sku, granularity=granularity_map[sales_granularity])
+        censor_info = service.sku_censored_mask(selected_sku, granularity=GRANULARITY_PLANNING_KEYS[sales_granularity])
         stockout_series = (
             censor_info["series"]
             .rename(columns={"period": "date"})
@@ -938,6 +960,114 @@ def _render_sku_section_clasificacion(service: PlanningService, selected_sku: st
     render_copyable_dataframe(profile_display, f"classification_profile_{selected_sku}")
 
 
+def _render_sku_section_forecast(service: PlanningService, selected_sku: str):
+    """Seccion de forecast: selector automatico + visualizacion del pronostico."""
+    ctrl_cols = st.columns([1.5, 1, 1, 3.5])
+    with ctrl_cols[0]:
+        granularity_label = st.selectbox(
+            "Granularidad",
+            list(GRANULARITY_PLANNING_KEYS.keys()),
+            index=2,  # Mensual por defecto
+            key="forecast_granularity",
+        )
+    with ctrl_cols[1]:
+        h = st.number_input("Horizonte (h)", min_value=1, max_value=36, value=6, key="forecast_h")
+    with ctrl_cols[2]:
+        n_windows = st.number_input("Ventanas backtest", min_value=2, max_value=10, value=3, key="forecast_n_windows")
+
+    granularity = GRANULARITY_PLANNING_KEYS[granularity_label]
+
+    with st.spinner("Corriendo horse-race de modelos..."):
+        result = _run_sku_forecast(service, selected_sku, granularity, int(h), int(n_windows))
+
+    status = result.get("status", "error")
+
+    if status == "no_forecast":
+        st.info("Este SKU está clasificado como inactivo: no se genera forecast.")
+        return
+
+    if status == "no_data":
+        st.warning("No hay transacciones registradas para este SKU: no se puede generar forecast.")
+        return
+
+    if status == "error":
+        st.error(f"Error al generar el forecast: {result.get('error', 'desconocido')}")
+        return
+
+    # --- KPIs del resultado ---
+    kpi_cols = st.columns(4)
+    kpi_cols[0].metric("Estado", status)
+    kpi_cols[1].metric("Modelo ganador", result.get("model") or "—")
+    mase_val = result.get("mase")
+    mase_str = f"{mase_val:.3f}" if (mase_val is not None and not math.isnan(mase_val)) else "N/A"
+    kpi_cols[2].metric("MASE", mase_str)
+    kpi_cols[3].metric("Horizonte", f"{result.get('h', h)} periodos")
+
+    if status == "fallback":
+        st.caption("El backtest no pudo evaluar los modelos (serie corta o todos fallaron). Se usó el baseline como fallback.")
+
+    # --- Grafico: historico + forecast + intervalo de confianza ---
+    forecast_df = result.get("forecast")
+    if forecast_df is not None and not forecast_df.empty:
+        # Usar la serie limpia ya incluida en el resultado (evita segunda carga de datos)
+        demand_series = result.get("demand_series")
+        if demand_series is not None and not demand_series.empty:
+            hist = demand_series.rename(columns={"period": "ds", "demand": "y"})
+        else:
+            hist = pd.DataFrame(columns=["ds", "y"])
+
+        title_mase = f"MASE={mase_str}"
+        fig = go.Figure()
+        if not hist.empty:
+            fig.add_trace(go.Scatter(
+                x=hist["ds"], y=hist["y"],
+                name="Demanda histórica (limpia)",
+                line=dict(color="#2980b9"),
+            ))
+        fig.add_trace(go.Scatter(
+            x=forecast_df["ds"], y=forecast_df["yhat"],
+            name=f"Forecast ({result.get('model', '?')})",
+            line=dict(color="#e74c3c", dash="dash"),
+            mode="lines+markers",
+        ))
+        if "yhat_lo80" in forecast_df.columns and "yhat_hi80" in forecast_df.columns:
+            fig.add_trace(go.Scatter(
+                x=list(forecast_df["ds"]) + list(forecast_df["ds"][::-1]),
+                y=list(forecast_df["yhat_hi80"]) + list(forecast_df["yhat_lo80"][::-1]),
+                fill="toself",
+                fillcolor="rgba(231,76,60,0.12)",
+                line=dict(color="rgba(0,0,0,0)"),
+                name="IC 80%",
+                hoverinfo="skip",
+            ))
+
+        fig.update_layout(
+            title=f"{selected_sku} — {result.get('model', '?')}  ({title_mase})",
+            xaxis_title="Periodo",
+            yaxis_title="Demanda",
+            template="plotly_white",
+            height=420,
+            margin=dict(l=20, r=20, t=60, b=20),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Tabla de forecast
+        st.write("Pronostico por periodo")
+        fc_display = forecast_df.copy()
+        fc_display["ds"] = fc_display["ds"].astype(str)
+        render_copyable_dataframe(fc_display, f"forecast_{selected_sku}")
+
+    # --- Resumen del backtest (horse-race) ---
+    backtest_data = result.get("backtest")
+    if backtest_data:
+        st.write("Comparacion de modelos (backtest)")
+        summary_df = backtest_summary(backtest_data)
+        render_copyable_dataframe(
+            summary_df[["model", "mase", "wape", "bias", "n_windows", "status"]],
+            f"backtest_summary_{selected_sku}",
+        )
+
+
 def render_sku_detail_unified(
     service: PlanningService,
     selected_sku: str,
@@ -982,7 +1112,7 @@ def render_sku_detail_unified(
     # --- Sub-menu interno ---
     sku_section = st.segmented_control(
         "Seccion",
-        options=["Operacional", "Clasificacion"],
+        options=["Operacional", "Clasificacion", "Forecast"],
         default="Operacional",
         selection_mode="single",
         key="sku_detail_section",
@@ -990,6 +1120,8 @@ def render_sku_detail_unified(
 
     if sku_section == "Clasificacion":
         _render_sku_section_clasificacion(service, selected_sku, classification_df)
+    elif sku_section == "Forecast":
+        _render_sku_section_forecast(service, selected_sku)
     else:
         _render_sku_section_operacional(service, selected_sku, summary)
 

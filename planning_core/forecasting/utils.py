@@ -62,7 +62,7 @@ def to_nixtla_df(
             "y": demand_df[target_col].astype(float).values,
         }
     )
-    return nixtla_df.dropna(subset=["y"]).reset_index(drop=True)
+    return nixtla_df.dropna(subset=["y"]).sort_values("ds").reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
