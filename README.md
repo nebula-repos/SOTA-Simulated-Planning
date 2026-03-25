@@ -16,61 +16,83 @@ El objetivo es construir un modulo que clasifique automaticamente las series de 
 
 ## Estado actual
 
-El repo ya no esta solo en `Fase 0`.
-
-Hoy combina:
-
-- un generador de dataset canonico operacional
-- una capa reusable `planning_core`
-- clasificacion de demanda operativa
-- preprocesamiento basico para forecasting
-- wrappers iniciales de modelos de forecast
-- una UI exploratoria y una API liviana
-
-La parte mas madura sigue siendo la simulacion y el modelo canonico. La clasificacion, el preprocessing y el pipeline de forecasting (backtest + selector + integracion en `planning_core`) estan operativos. Lo que sigue es la exposicion del forecast en API/UI y el motor de recomendacion de compra.
+Fases 0-3 del pipeline de forecasting completadas. El repo es un sistema funcional end-to-end de demand planning: desde la generacion de datos hasta el forecast por SKU con evaluacion batch de todo el catalogo.
 
 ### Que existe hoy
 
 | Componente | Descripcion | Estado |
 |---|---|---|
-| Generador de transacciones | Series diarias con 10 patrones de demanda | Funcional |
-| Configuracion multi-perfil | Industrial (oleohidraulica) y Retail (supermercado) | Funcional |
-| Modelo de datos (7 tablas) | Catalogo, transacciones, snapshots inventario, transferencias internas, OC, lineas OC, recepciones | Funcional |
+| Generador de datos | Series diarias con 10 patrones de demanda, multi-perfil | Funcional |
+| Modelo de datos (7 tablas) | Catalogo, transacciones, snapshots inventario, OC, recepciones, transferencias | Funcional |
 | `planning_core` | Repository, servicios, agregaciones y health checks basicos | Funcional |
-| Clasificacion de demanda | Syntetos-Boylan, ABC-XYZ, estacionalidad, tendencia, outliers, quality score | Funcional |
-| Preprocessing | Limpieza de outliers y deteccion de demanda censurada | Funcional |
-| Forecasting base | Wrappers `SeasonalNaive`, `HistoricAverage`, `AutoETS`, `CrostonSBA`, `ADIDA`, metricas | Funcional |
-| Backtest + selector | `run_backtest` expanding-window, horse-race por MASE, `select_and_forecast` | Funcional |
-| Integracion forecast | `PlanningService.sku_forecast()` — seleccion automatica + pronostico por SKU | Funcional |
-| UI + API | Exploracion operacional, clasificacion y forecast por SKU | Funcional |
-| Documentacion de esquema | E/R y especificacion de compras | Documentado |
+| Clasificacion de demanda | Syntetos-Boylan, ABC-XYZ, estacionalidad, tendencia, outliers, quality score, censura | Funcional |
+| Preprocessing | Limpieza de outliers (IQR/Hampel) y deteccion de demanda censurada por stockout | Funcional |
+| Modelos de forecast | AutoETS, AutoARIMA, MSTL, CrostonSBA, ADIDA, SeasonalNaive, LightGBM | Funcional |
+| Backtest + selector | `run_backtest` expanding-window, horse-race por MASE adaptativo, `select_and_forecast` | Funcional |
+| MASE adaptativo | Benchmark correcto por tipo de producto: lag-1 (smooth), lag-12 (estacional), mean (intermittent) | Funcional |
+| Evaluacion de catalogo | `run_catalog_evaluation` — horse-race masivo en paralelo, checkpoints, resume | Funcional |
+| Comparacion de runs | `run_store`, `aggregator`, `comparator` — persistencia y analisis multi-run | Funcional |
+| `PlanningService.sku_forecast()` | Seleccion automatica de modelo + forecast por SKU | Funcional |
+| UI | Exploracion operacional, clasificacion, forecast con IC 80% y grafico de backtest horse-race | Funcional |
+| API | Endpoints REST para catalogo, clasificacion, timeseries y forecast por SKU | Funcional |
+| Tests | 82 tests unitarios e integracion, 100% passing | Funcional |
+| Experimentacion | `exp_02_catalog_eval.py` — evaluacion batch; `exp_03_param_sweep.py` — barrido h x n_windows | Funcional |
+| Notebooks | `02_catalog_evaluation.ipynb` — analisis post-evaluacion batch | Funcional |
+
+### Resultado del barrido de parametrizacion (2026-03-25)
+
+Se evaluo un grid de 6 configuraciones (h ∈ {3,6}, n_windows ∈ {3..6}) sobre el catalogo completo de 800 SKUs.
+**Config de produccion decidida: `h=3, n_windows=3`** — mejor MASE global (0.7475), menor fallback (4.6%), maxima cobertura.
+Ver `docs/forecasting_param_sweep_results.md` para el analisis completo.
 
 ### Que viene a continuacion
 
 - Motor de recomendacion de compra (Fase 4): politicas ROP/s-S/s-Q con forecast + lead time + MOQ
-- Motor de recomendacion de compra (Fase 4): politicas ROP/s-S/s-Q con forecast + lead time + MOQ
 - Prophet / NeuralProphet para estacionalidad compleja con calendarios (Fase 3.4)
-- Fortalecimiento de validaciones (`validation.py`) y cobertura de tests por capa
+- Metricas operacionales para intermittent/lumpy: Fill Rate, Cycle Service Level (D18)
+- Fortalecimiento de `validation.py` y cobertura de tests por capa (D08, D09)
 
 ## Estructura del repositorio
 
 ```
 SOTA-Simulated-Planning/
 ├── apps/
-│   ├── api/                     # API liviana para explorar el canonico
-│   ├── simulator/               # Configuracion y generador del dataset canonico
-│   └── viz/                     # Visualizadora basica con Streamlit
-├── planning_core/               # Capa reusable de consultas y validaciones
-├── pyproject.toml               # Dependencias por capa via extras
-├── requirements.txt             # Dependencias base del simulador/core
+│   ├── api/                     # API REST (FastAPI) para catalogo, clasificacion y forecast
+│   ├── simulator/               # Generador del dataset canonico
+│   └── viz/                     # UI exploratoria (Streamlit) — operacional + clasificacion + forecast
+├── planning_core/
+│   ├── classification.py        # Clasificador Syntetos-Boylan + ABC-XYZ
+│   ├── preprocessing.py         # Outliers + demanda censurada
+│   ├── services.py              # PlanningService — punto de entrada principal
+│   ├── repository.py            # Carga del dataset canonico
+│   ├── validation.py            # Health checks basicos
+│   └── forecasting/
+│       ├── metrics.py           # MASE adaptativo, WAPE, Bias, MAE, RMSE
+│       ├── backtest.py          # run_backtest expanding-window
+│       ├── selector.py          # select_and_forecast — horse-race completo
+│       ├── utils.py             # FREQ_MAP, to_nixtla_df
+│       ├── models/              # naive, ets, arima, mstl, sba, lgbm
+│       └── evaluation/          # catalog_runner, run_store, aggregator, comparator
+├── experiments/
+│   ├── exp_02_catalog_eval.py   # Evaluacion batch del catalogo completo
+│   └── exp_03_param_sweep.py    # Barrido de parametrizacion h x n_windows
+├── notebooks/
+│   └── 02_catalog_evaluation.ipynb  # Analisis post-evaluacion batch
+├── tests/                       # 82 tests unitarios e integracion
 ├── output/                      # Datos generados (no versionado)
+├── pyproject.toml               # Dependencias por capa via extras
 └── docs/
+    ├── forecasting_models_plan.md          # Estado del modulo de forecasting
+    ├── forecasting_param_sweep_results.md  # Resultados del barrido de parametrizacion
+    ├── forecasting_param_sweep_plan.md     # Diseno del experimento de sweep
+    ├── forecasting_benchmark_selection.md  # MASE adaptativo por tipo de producto
+    ├── forecasting_parametrizacion.md      # Guia de parametros h, n_windows, granularity
+    ├── technical_debt_register.md          # Backlog de deuda tecnica priorizada
+    ├── plan_backtest_chart_ui.md           # Plan del grafico de horse-race en la UI
     ├── business_logic_simulation.md
-    ├── currency_modeling.md
     ├── data_health_checks.md
-    ├── lightweight_monorepo_architecture.md
-    ├── output_er_model.md       # Modelo E/R de las tablas de salida
-    └── purchase_data_schema.md  # Especificacion del esquema de compras
+    ├── output_er_model.md
+    └── purchase_data_schema.md
 ```
 
 ## Generador de datos sinteticos
@@ -258,33 +280,42 @@ Ver [docs/output_er_model.md](docs/output_er_model.md) para el diagrama E/R comp
 - [x] Modelo de datos relacional (7 tablas)
 - [x] Documentacion de esquema E/R
 
-### Fase 1 - Clasificacion y preprocesamiento
+### Fase 1 - Clasificacion y preprocesamiento ✅ Completa
 - [x] Clasificador ADI-CV2 (Syntetos-Boylan) desde `transactions`
 - [x] Segmentacion ABC-XYZ calculada
 - [x] Test de estacionalidad por autocorrelacion
 - [x] Test de tendencia por Mann-Kendall
 - [x] Deteccion y tratamiento de outliers (`IQR`, `Hampel`)
-- [x] Quality score basico por serie
-- [x] Deteccion de demanda censurada
-- [ ] Integracion de censura en la clasificacion principal
-- [ ] Tests y validaciones mas profundas de la capa
+- [x] Quality score con penalizacion por censura
+- [x] Deteccion de demanda censurada (stockout detection via inventory snapshot)
+- [x] Integracion de censura como flags en la clasificacion (`has_censored_demand`, `quality_score`)
 
-### Fase 2 - Forecasting base
+### Fase 2 - Forecasting base ✅ Completa
 - [x] `AutoETS` wrapper (StatsForecast)
 - [x] `SeasonalNaive` / `HistoricAverage` baseline
-- [x] `CrostonSBA` / `ADIDA` wrappers
-- [x] Metricas de evaluacion (`MAE`, `RMSE`, `MASE`, `WAPE`, `Bias`)
-- [x] Framework de backtest expanding-window (`backtest.py`)
+- [x] `CrostonSBA` / `ADIDA` wrappers (demanda intermittent/lumpy)
+- [x] Metricas de evaluacion: `MASE` adaptativo (lag-1/lag-12/mean segun tipo), `WAPE`, `Bias`, `MAE`, `RMSE`
+- [x] Framework de backtest expanding-window (`backtest.py`) con `return_cv` para grafico UI
 - [x] Seleccion automatica de modelos horse-race (`selector.py`)
-- [x] Mapeo clasificacion → modelos candidatos
-- [x] Integracion del forecast a `planning_core` (`PlanningService.sku_forecast()`)
-- [x] Exposicion en API (`GET /sku/{sku}/forecast`) y UI (seccion Forecast en detalle de SKU)
+- [x] Mapeo clasificacion SB → modelos candidatos + benchmark correcto por tipo
+- [x] Integracion en `PlanningService.sku_forecast()`
+- [x] Exposicion en API (`GET /sku/{sku}/forecast`) y UI (Forecast + Backtest horse-race tabs)
 
-### Fase 3 - Forecasting avanzado
+### Fase 2.5 - Evaluacion de catalogo ✅ Completa
+- [x] `run_catalog_evaluation` — horse-race masivo en paralelo (`ProcessPoolExecutor`, fork context)
+- [x] Checkpoints y resume para corridas largas
+- [x] `run_store` — persistencia de runs en `output/eval_runs/` (parquet + metadata JSON)
+- [x] `aggregator` — metricas globales y por segmento (sb_class, abc_class, xyz, is_seasonal)
+- [x] `comparator` — comparacion multi-run wide, `find_winner_changes`
+- [x] `exp_02_catalog_eval.py` — evaluacion batch del catalogo completo
+- [x] `exp_03_param_sweep.py` — barrido de 6 configuraciones h × n_windows
+- [x] Resultado del sweep documentado; config de produccion fijada: `h=3, n_windows=3`
+
+### Fase 3 - Forecasting avanzado ✅ Parcialmente completa
 - [x] AutoARIMA / SARIMA automatico (`models/arima.py`)
 - [x] MSTL — descomposicion STL + AutoETS para series estacionales (`models/mstl.py`)
 - [x] LightGBM con features temporales via MLForecast (`models/lgbm.py`, camino separado)
-- [ ] Prophet / NeuralProphet para estacionalidad compleja con calendarios
+- [ ] Prophet / NeuralProphet para estacionalidad compleja con calendarios (Fase 3.4)
 
 ### Fase 4 - Recomendacion de compra
 - [ ] Politicas de reposicion (ROP, s-S, s-Q)
