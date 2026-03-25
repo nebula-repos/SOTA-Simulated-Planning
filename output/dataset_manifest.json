@@ -13,6 +13,30 @@
   ],
   "central_supply_mode": true,
   "central_location": "CD Santiago",
+  "location_model": {
+    "all_locations": [
+      "Santiago",
+      "Antofagasta",
+      "Copiap\u00f3",
+      "Concepci\u00f3n",
+      "Lima",
+      "CD Santiago"
+    ],
+    "branch_locations": [
+      "Santiago",
+      "Antofagasta",
+      "Copiap\u00f3",
+      "Concepci\u00f3n",
+      "Lima"
+    ],
+    "central_location": "CD Santiago",
+    "central_supply_mode": true,
+    "central_node_sales_mode": true
+  },
+  "classification": {
+    "scope": "network_aggregate",
+    "default_granularity": "M"
+  },
   "table_rows": {
     "product_catalog": 800,
     "transactions": 682997,

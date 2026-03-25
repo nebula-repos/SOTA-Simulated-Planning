@@ -34,9 +34,6 @@ SYNTETOS_BOYLAN_THRESHOLDS = {
 LOGNORMAL_SIGMA_FACTOR = 0.7
 NORMAL_NOISE_FLOOR = 0.1
 
-# Probabilidad de registrar días de stockout en transacciones
-STOCKOUT_RECORD_PROBABILITY = 0.3
-
 
 # ============================================================
 # PERFIL: INDUSTRIAL (Oleohidráulica - Talleres Lucas)
@@ -293,14 +290,6 @@ _INDUSTRIAL = {
     "spike_multiplier": (3.0, 15.0),
     "spike_discount_range": (0.03, 0.12),
 
-    # Stockouts
-    "stockouts_per_abc": {
-        "A": (0, 1),
-        "B": (0, 3),
-        "C": (1, 15),
-    },
-    "stockout_duration": (3, 21),
-
     # Umbral ADI para intermitencia
     "adi_threshold_for_continuous": 1.15,
 
@@ -527,14 +516,6 @@ _RETAIL = {
     "spike_multiplier": (1.5, 4.0),
     "spike_discount_range": (0.10, 0.30),
 
-    # Stockouts
-    "stockouts_per_abc": {
-        "A": (0, 2),
-        "B": (0, 5),
-        "C": (0, 10),
-    },
-    "stockout_duration": (2, 14),
-
     # Umbral ADI para intermitencia
     "adi_threshold_for_continuous": 1.1,
 
@@ -594,9 +575,6 @@ SPIKE_PARAMS = _active["spike_params"]
 SPIKE_DURATION = _active["spike_duration"]
 SPIKE_MULTIPLIER = _active["spike_multiplier"]
 SPIKE_DISCOUNT_RANGE = _active["spike_discount_range"]
-
-STOCKOUTS_PER_ABC = _active["stockouts_per_abc"]
-STOCKOUT_DURATION = _active["stockout_duration"]
 
 ADI_THRESHOLD_FOR_CONTINUOUS = _active["adi_threshold_for_continuous"]
 

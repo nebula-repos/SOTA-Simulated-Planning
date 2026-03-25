@@ -27,7 +27,7 @@ Hoy combina:
 - wrappers iniciales de modelos de forecast
 - una UI exploratoria y una API liviana
 
-La parte mas madura sigue siendo la simulacion y el modelo canonico. La clasificacion ya esta implementada y expuesta; forecasting existe de forma parcial como libreria interna, pero aun no esta integrado end-to-end ni tiene backtest/selector.
+La parte mas madura sigue siendo la simulacion y el modelo canonico. La clasificacion, el preprocessing y el pipeline de forecasting (backtest + selector + integracion en `planning_core`) estan operativos. Lo que sigue es la exposicion del forecast en API/UI y el motor de recomendacion de compra.
 
 ### Que existe hoy
 
@@ -39,17 +39,18 @@ La parte mas madura sigue siendo la simulacion y el modelo canonico. La clasific
 | `planning_core` | Repository, servicios, agregaciones y health checks basicos | Funcional |
 | Clasificacion de demanda | Syntetos-Boylan, ABC-XYZ, estacionalidad, tendencia, outliers, quality score | Funcional |
 | Preprocessing | Limpieza de outliers y deteccion de demanda censurada | Funcional |
-| Forecasting base | Wrappers `SeasonalNaive`, `HistoricAverage`, `AutoETS`, `CrostonSBA`, `ADIDA`, metricas | Parcial |
-| UI + API | Exploracion operacional y clasificacion | Funcional |
+| Forecasting base | Wrappers `SeasonalNaive`, `HistoricAverage`, `AutoETS`, `CrostonSBA`, `ADIDA`, metricas | Funcional |
+| Backtest + selector | `run_backtest` expanding-window, horse-race por MASE, `select_and_forecast` | Funcional |
+| Integracion forecast | `PlanningService.sku_forecast()` — seleccion automatica + pronostico por SKU | Funcional |
+| UI + API | Exploracion operacional, clasificacion y forecast por SKU | Funcional |
 | Documentacion de esquema | E/R y especificacion de compras | Documentado |
 
 ### Que viene a continuacion
 
-- Integracion formal del forecasting a `planning_core`, API y UI
-- Seleccion automatica de modelos via backtest
-- Selector clasificacion -> modelos candidatos
-- Motor de recomendacion de compra
-- Fortalecimiento de validaciones y tests por capa
+- Motor de recomendacion de compra (Fase 4): politicas ROP/s-S/s-Q con forecast + lead time + MOQ
+- Motor de recomendacion de compra (Fase 4): politicas ROP/s-S/s-Q con forecast + lead time + MOQ
+- Prophet / NeuralProphet para estacionalidad compleja con calendarios (Fase 3.4)
+- Fortalecimiento de validaciones (`validation.py`) y cobertura de tests por capa
 
 ## Estructura del repositorio
 
@@ -273,15 +274,17 @@ Ver [docs/output_er_model.md](docs/output_er_model.md) para el diagrama E/R comp
 - [x] `SeasonalNaive` / `HistoricAverage` baseline
 - [x] `CrostonSBA` / `ADIDA` wrappers
 - [x] Metricas de evaluacion (`MAE`, `RMSE`, `MASE`, `WAPE`, `Bias`)
-- [ ] Framework de backtest (expanding window)
-- [ ] Integracion del forecast a `planning_core`
+- [x] Framework de backtest expanding-window (`backtest.py`)
+- [x] Seleccion automatica de modelos horse-race (`selector.py`)
+- [x] Mapeo clasificacion → modelos candidatos
+- [x] Integracion del forecast a `planning_core` (`PlanningService.sku_forecast()`)
+- [x] Exposicion en API (`GET /sku/{sku}/forecast`) y UI (seccion Forecast en detalle de SKU)
 
 ### Fase 3 - Forecasting avanzado
-- [ ] ARIMA / SARIMA automatico
-- [ ] Prophet para series con estacionalidad compleja
-- [ ] XGBoost / LightGBM con features temporales
-- [ ] Seleccion automatica de modelos (horse-race)
-- [ ] Mapeo clasificacion -> modelos candidatos
+- [x] AutoARIMA / SARIMA automatico (`models/arima.py`)
+- [x] MSTL — descomposicion STL + AutoETS para series estacionales (`models/mstl.py`)
+- [x] LightGBM con features temporales via MLForecast (`models/lgbm.py`, camino separado)
+- [ ] Prophet / NeuralProphet para estacionalidad compleja con calendarios
 
 ### Fase 4 - Recomendacion de compra
 - [ ] Politicas de reposicion (ROP, s-S, s-Q)

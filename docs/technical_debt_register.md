@@ -35,24 +35,24 @@ La deuda no esta concentrada en una sola capa. Hoy hay cuatro frentes principale
 
 ## Inventario priorizado
 
-| ID | Prioridad | Tipo | Resumen |
-|---|---|---|---|
-| D01 | Alta | Documental | `README.md` no refleja el estado real del repo |
-| D02 | Alta | Documental | Documentacion de forecasting y metricas quedo desfasada respecto al codigo |
-| D03 | Alta | Semantica | El nodo central y las locations no estan modelados explicitamente como entidad/configuracion |
-| D04 | Alta | Semantica | La clasificacion masiva depende de una granularidad global que altera fuertemente los resultados |
-| D05 | Alta | Semantica | La clasificacion usa demanda atendida y no incorpora censura por stockout en el pipeline principal |
-| D06 | Alta | Integracion | El modulo de forecasting existe pero no esta integrado a `planning_core`, API ni UI |
-| D07 | Alta | Integracion | Faltan `backtest.py` y `selector.py`, aunque son piezas centrales del roadmap declarado |
-| D08 | Alta | Validacion | `planning_core/validation.py` cubre solo chequeos basicos y esta muy por debajo de `docs/data_health_checks.md` |
-| D09 | Alta | Testing | No hay tests para simulador, repository, services, clasificacion, preprocessing, API o UI |
-| D10 | Media | Semantica | Inconsistencia de frecuencias semanales (`W` vs `W-MON`) entre capas |
-| D11 | Media | Semantica | `central_location()` se infiere heuristica y no desde un contrato explicito |
-| D12 | Media | Configuracion | Hay parametros del simulador definidos pero no usados |
-| D13 | Media | Modelo | El esquema permite OCs multi-linea, pero el generador siempre produce 1 linea por OC |
-| D14 | Media | Performance | `classify_catalog()` recomputa sobre todo el catalogo y en API no hay cache |
-| D15 | Media | Producto | No existe capa formal para resultados derivados persistidos |
-| D16 | Baja | Operacion | No hay estructura de `notebooks/`, `experiments/` o `scripts/` para trabajo reproducible de analitica |
+| ID | Prioridad | Tipo | Resumen | Estado |
+|---|---|---|---|---|
+| D01 | Alta | Documental | `README.md` no refleja el estado real del repo | **Resuelto** |
+| D02 | Alta | Documental | Documentacion de forecasting y metricas quedo desfasada respecto al codigo | **Resuelto** |
+| D03 | Alta | Semantica | El nodo central y las locations no estan modelados explicitamente como entidad/configuracion | **Resuelto** |
+| D04 | Alta | Semantica | La clasificacion masiva depende de una granularidad global que altera fuertemente los resultados | **Resuelto en codigo** (pendiente re-ejecutar output/) |
+| D05 | Alta | Semantica | La clasificacion usa demanda atendida y no incorpora censura por stockout en el pipeline principal | **Resuelto** |
+| D06 | Alta | Integracion | El modulo de forecasting existe pero no esta integrado a `planning_core`, API ni UI | **Resuelto** — `sku_forecast()` + endpoint API + seccion UI |
+| D07 | Alta | Integracion | Faltan `backtest.py` y `selector.py`, aunque son piezas centrales del roadmap declarado | **Resuelto** — ambos implementados |
+| D08 | Alta | Validacion | `planning_core/validation.py` cubre solo chequeos basicos y esta muy por debajo de `docs/data_health_checks.md` | Pendiente |
+| D09 | Alta | Testing | No hay tests para simulador, repository, services, clasificacion, preprocessing, API o UI | Pendiente (parcial: test_services.py existe) |
+| D10 | Media | Semantica | Inconsistencia de frecuencias semanales (`W` vs `W-MON`) entre capas | **Resuelto** — `GRANULARITY_PLANNING_KEYS` centraliza convencion en app.py |
+| D11 | Media | Semantica | `central_location()` se infiere heuristica y no desde un contrato explicito | **Resuelto** |
+| D12 | Media | Configuracion | Hay parametros del simulador definidos pero no usados | **Resuelto** |
+| D13 | Media | Modelo | El esquema permite OCs multi-linea, pero el generador siempre produce 1 linea por OC | **Cerrado** (simplificacion deliberada) |
+| D14 | Media | Performance | `classify_catalog()` recomputa sobre todo el catalogo y en API no hay cache | Pendiente |
+| D15 | Media | Producto | No existe capa formal para resultados derivados persistidos | Pendiente |
+| D16 | Baja | Operacion | No hay estructura de `notebooks/`, `experiments/` o `scripts/` para trabajo reproducible de analitica | **Resuelto** |
 
 ## Detalle por item
 
@@ -88,69 +88,33 @@ La deuda no esta concentrada en una sola capa. Hoy hay cuatro frentes principale
 
 ### D02. Documentacion de forecasting y metricas desfasada
 
-**Tipo**: documental  
+**Tipo**: documental
 **Prioridad**: alta
+**Estado**: ✅ Resuelto — 2026-03-24
 
-**Evidencia**
-
-- [docs/forecasting_models_plan.md](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/docs/forecasting_models_plan.md) sigue marcando `planning_core/forecasting/` como "`por implementar`".
-- [docs/models/evaluation_metrics.md](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/docs/models/evaluation_metrics.md) marca `planning_core/forecasting/metrics.py` como "`por implementar`".
-- En codigo ya existen:
-  - [planning_core/forecasting/metrics.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/forecasting/metrics.py)
-  - [planning_core/forecasting/models/naive.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/forecasting/models/naive.py)
-  - [planning_core/forecasting/models/ets.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/forecasting/models/ets.py)
-  - [planning_core/forecasting/models/sba.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/forecasting/models/sba.py)
-
-**Impacto**
-
-- falsa percepcion de ausencia total de forecasting
-- dificulta priorizar lo que realmente falta: integracion, backtest y selector
-
-**Accion sugerida**
-
-- actualizar los docs de forecasting para marcar:
-  - implementado
-  - parcialmente implementado
-  - pendiente
+`docs/forecasting_models_plan.md` y `docs/models/evaluation_metrics.md` actualizados para reflejar:
+- lo que ya esta implementado (modelos, metricas, backtest, selector, integracion en services)
+- lo que queda pendiente (API endpoint, UI de forecast, Fase 3.1-3.3)
 
 ### D03. Nodo central y universo de locations no estan modelados explicitamente
 
-**Tipo**: semantica/modelado  
+**Tipo**: semantica/modelado
 **Prioridad**: alta
+**Estado**: ✅ Resuelto — 2026-03-24
 
-**Evidencia**
+El manifest persistido en `output/dataset_manifest.json` contiene la clave `location_model` con:
 
-- El dataset real tiene 6 locations efectivas, incluyendo `CD Santiago`.
-- El manifest en [output/dataset_manifest.json](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/output/dataset_manifest.json) lista solo las 5 sucursales del perfil y deja al central fuera de `locations`.
-- La semantica del nodo central esta repartida entre:
-  - [apps/simulator/config.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/apps/simulator/config.py)
-  - [docs/business_logic_simulation.md](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/docs/business_logic_simulation.md)
-  - inferencia en [planning_core/services.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/services.py)
+```json
+"location_model": {
+  "all_locations": ["Santiago", "Antofagasta", "Copiapó", "Concepción", "Lima", "CD Santiago"],
+  "branch_locations": ["Santiago", "Antofagasta", "Copiapó", "Concepción", "Lima"],
+  "central_location": "CD Santiago",
+  "central_supply_mode": true,
+  "central_node_sales_mode": true
+}
+```
 
-**Impacto**
-
-- el contrato de locations es ambiguo
-- UI/API deben inferir comportamiento del nodo central indirectamente
-- complica cualquier futura generalizacion a multiempresa o red multiroles
-
-**Accion sugerida**
-
-- definir una representacion explicita de locations/nodos en metadata o tabla maestra
-- distinguir:
-  - location list operativa completa
-  - central location
-  - capabilities por nodo
-
-**Decision actual**
-
-- para este repo se resuelve primero con metadata explicita en `dataset_manifest.json`
-- una tabla maestra de locations queda para una etapa posterior
-
-**Estado**
-
-- implementado en codigo/generador
-- pendiente regenerar `output/` para persistir el manifest nuevo en el dataset actual
-- pendiente revisar visualmente y validar que el manifest regenerado refleje correctamente `all_locations`, `branch_locations`, `central_location` y `classification`
+`PlanningService.location_model()` lee este contrato explicito. La heuristica en `central_location()` queda como fallback defensivo pero no se invoca con el manifest actual.
 
 ### D04. La clasificacion masiva depende de granularidad global y distorsiona resultados
 
@@ -198,88 +162,38 @@ La deuda no esta concentrada en una sola capa. Hoy hay cuatro frentes principale
 
 ### D05. El pipeline principal clasifica demanda atendida sin incorporar censura
 
-**Tipo**: semantica/forecasting  
+**Tipo**: semantica/forecasting
 **Prioridad**: alta
+**Estado**: ✅ Resuelto — 2026-03-24
 
-**Evidencia**
-
-- [planning_core/preprocessing.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/preprocessing.py) implementa deteccion de demanda censurada.
-- [planning_core/services.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/services.py) expone `sku_censored_mask()`.
-- Pero `classify_catalog()` y `classify_single_sku()` no usan esa informacion.
-
-**Impacto**
-
-- series con stockout pueden quedar mal clasificadas
-- cualquier futuro forecast entrenado sobre `transactions` puede subestimar demanda estructuralmente
-
-**Accion sugerida**
-
-- definir si la clasificacion debe operar sobre:
-  - demanda observada
-  - demanda observada con flags de censura
-  - o una serie ajustada
-
-**Decision pendiente**
-
-- resuelta para esta etapa:
-  - clasificar sobre demanda observada
-  - calcular censura por separado
-  - exponer flags/resumen de censura
-  - penalizar `quality_score`
-  - dejar cualquier reconstruccion de demanda para una fase posterior de forecasting
-
-**Estado**
-
-- implementado en codigo, UI y servicios
-- pendiente regenerar dataset y hacer validacion final sobre el `output/` persistido
-- pendiente revisar visualmente en la UI que los marcadores de `sin venta por stockout` se comporten como se espera
+Decision tomada e implementada:
+- clasificacion opera sobre demanda observada (sin reconstruccion)
+- `mark_censored_demand()` y `censored_summary()` calculan censura por separado
+- `classify_catalog()` y `classify_single_sku()` augmentan el resultado con flags de censura via `_augment_catalog_classification_with_censoring()`
+- `quality_score` penaliza periodos censurados
+- `sku_censored_mask()` expuesto en servicios y UI
+- reconstruccion de demanda queda para fase posterior de forecasting
 
 ### D06. El modulo de forecasting existe pero no esta integrado al flujo principal
 
-**Tipo**: integracion/producto  
+**Tipo**: integracion/producto
 **Prioridad**: alta
+**Estado**: ✅ Resuelto — 2026-03-24
 
-**Evidencia**
+Integración completa en tres capas:
 
-- Existen wrappers funcionales en [planning_core/forecasting/models/](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/forecasting/models).
-- No hay uso de esos modelos en:
-  - [planning_core/services.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/services.py)
-  - [apps/api/main.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/apps/api/main.py)
-  - [apps/viz/app.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/apps/viz/app.py)
-
-**Impacto**
-
-- forecasting existe solo como libreria interna + tests
-- no hay capacidad visible end-to-end
-
-**Accion sugerida**
-
-- definir una primera interfaz oficial de forecast en `planning_core`
-- luego exponerla en API/UI
+1. `PlanningService.sku_forecast()` en `planning_core/services.py` — horse-race + forecast final
+2. `GET /sku/{sku}/forecast` en `apps/api/main.py` — parámetros `granularity`, `h`, `n_windows`, `location`
+3. Seccion **Forecast** en detalle de SKU (`apps/viz/app.py`) — controles interactivos, gráfico histórico + forecast con IC 80%, tabla de forecast, resumen del horse-race
 
 ### D07. Faltan `backtest.py` y `selector.py`
 
-**Tipo**: integracion/arquitectura  
+**Tipo**: integracion/arquitectura
 **Prioridad**: alta
+**Estado**: ✅ Resuelto — 2026-03-24
 
-**Evidencia**
-
-- [docs/forecasting_models_plan.md](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/docs/forecasting_models_plan.md) los define como piezas centrales.
-- El arbol real de [planning_core/forecasting/](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/forecasting) no contiene esos modulos.
-
-**Impacto**
-
-- no existe seleccion empirica de modelos
-- tampoco hay criterio sistematico para elegir el forecast productivo por SKU
-
-**Accion sugerida**
-
-- implementar primero `backtest.py`
-- despues `selector.py`
-
-**Dependencia**
-
-- D04 y D05 deberian resolverse o al menos quedar fijados conceptualmente antes
+- `planning_core/forecasting/backtest.py`: `run_backtest()` expanding-window con minimo de 3 ventanas, `backtest_summary()`
+- `planning_core/forecasting/selector.py`: `select_and_forecast()` — candidatos por clasificacion SB, horse-race por MASE, forecast final con modelo ganador
 
 ### D08. `validation.py` esta muy por debajo del framework documentado
 
@@ -342,82 +256,43 @@ La deuda no esta concentrada en una sola capa. Hoy hay cuatro frentes principale
 
 ### D10. Inconsistencia de frecuencia semanal entre capas
 
-**Tipo**: semantica  
+**Tipo**: semantica
 **Prioridad**: media
+**Estado**: ✅ Resuelto — 2026-03-24
 
-**Evidencia**
-
-- [planning_core/classification.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/classification.py) usa `W-MON`.
-- [apps/viz/app.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/apps/viz/app.py) agrega semanal con `W`.
-
-**Impacto**
-
-- mismas series pueden verse etiquetadas o agrupadas distinto segun capa
-- complica comparaciones entre UI y analitica
-
-**Accion sugerida**
-
-- normalizar una sola convencion semanal en todo el repo
+Se creo `GRANULARITY_PLANNING_KEYS` en `apps/viz/app.py` como constante top-level que mapea nombres de display a claves de la API de `planning_core` (`"W"`). Se eliminó el dict inline duplicado que existia en la funcion de censura. Se agrego comentario explicando la diferencia:
+- `GRANULARITY_FREQUENCIES`: pandas resample strings directos (`"W-MON"`)
+- `GRANULARITY_PLANNING_KEYS`: claves internas de planning_core (`"W"` → `"W-MON"` via `FREQ_MAP`)
 
 ### D11. `central_location()` usa inferencia heuristica
 
-**Tipo**: semantica/servicios  
+**Tipo**: semantica/servicios
 **Prioridad**: media
+**Estado**: ✅ Resuelto por D03 — 2026-03-24
 
-**Evidencia**
-
-- [planning_core/services.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/services.py) infiere el nodo central desde `purchase_orders.destination_location` o `internal_transfers.source_location`.
-
-**Impacto**
-
-- funciona para el dataset actual, pero es fragil si aparecen modelos mixtos
-- mezcla deduccion de negocio con lectura operativa
-
-**Accion sugerida**
-
-- leer el central desde manifest o metadata explicita
+`central_location()` lee primero `location_model.central_location` del manifest. Como el manifest ya tiene este campo explicito, la heuristica (inferencia desde `purchase_orders` o `internal_transfers`) nunca se invoca en condiciones normales. El codigo de fallback permanece como salvaguarda defensiva.
 
 ### D12. Parametros del simulador definidos pero no usados
 
-**Tipo**: configuracion  
+**Tipo**: configuracion
 **Prioridad**: media
+**Estado**: ✅ Resuelto — 2026-03-24
 
-**Evidencia**
+Eliminados de `apps/simulator/config.py`:
+- `STOCKOUT_RECORD_PROBABILITY = 0.3` (constante top-level huerfana)
+- `"stockouts_per_abc"` en `_INDUSTRIAL` y `_RETAIL`
+- `"stockout_duration"` en `_INDUSTRIAL` y `_RETAIL`
+- `STOCKOUTS_PER_ABC` y `STOCKOUT_DURATION` (exports de esas claves)
 
-- En [apps/simulator/config.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/apps/simulator/config.py) existen:
-  - `STOCKOUT_RECORD_PROBABILITY`
-  - `stockouts_per_abc`
-  - `stockout_duration`
-- No aparecen en la logica efectiva de [apps/simulator/generate_canonical_dataset.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/apps/simulator/generate_canonical_dataset.py).
-
-**Impacto**
-
-- configuracion engañosa
-- sugiere capacidades de simulacion que no estan activas
-
-**Accion sugerida**
-
-- o implementarlos
-- o eliminarlos/documentarlos como descartados
+Los stockouts en el simulador son emergentes (el stock llega a cero por demanda), no programados. Esta decision queda documentada como deliberada. 35/35 tests pasan tras la limpieza.
 
 ### D13. El modelo permite OCs multi-linea pero el generador no las produce
 
-**Tipo**: modelo/simulacion  
+**Tipo**: modelo/simulacion
 **Prioridad**: media
+**Estado**: ✅ Cerrado como simplificacion deliberada — 2026-03-24
 
-**Evidencia**
-
-- [docs/output_er_model.md](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/docs/output_er_model.md) explicita que el modelo permite varias lineas por OC.
-- [apps/simulator/generate_canonical_dataset.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/apps/simulator/generate_canonical_dataset.py) genera `po_line_id = f"{po_id}-L01"` y 1 SKU por OC.
-
-**Impacto**
-
-- el esquema relacional es mas rico que los escenarios realmente cubiertos por el simulador
-- no se ejercitan casos multi-linea en servicios ni validaciones
-
-**Accion sugerida**
-
-- decidir si se mantiene como simplificacion deliberada o se enriquece el generador
+El generador produce 1 SKU por OC (`po_line_id = f"{po_id}-L01"`) de forma intencional. El modelo E/R soporta multi-linea para compatibilidad futura con datos reales, pero el simulador no requiere esa complejidad para los casos de uso actuales (forecasting + clasificacion por SKU). Las OCs multi-linea quedan para una fase de integracion con datos reales de ERP.
 
 ### D14. `classify_catalog()` tiene costo relevante y la API no cachea
 
@@ -484,34 +359,34 @@ La deuda no esta concentrada en una sola capa. Hoy hay cuatro frentes principale
 
 ### Bloque 1. Alinear realidad del repo
 
-1. `D01`
-2. `D02`
-3. `D03`
+1. ✅ `D01` — resuelto 2026-03-24
+2. ✅ `D02` — resuelto 2026-03-24
+3. ✅ `D03` — resuelto 2026-03-24
 
 ### Bloque 2. Fijar semantica antes de crecer
 
-4. `D04`
-5. `D05`
-6. `D10`
-7. `D11`
+4. ✅ `D04` — resuelto 2026-03-24
+5. ✅ `D05` — resuelto 2026-03-24
+6. ✅ `D10` — resuelto 2026-03-24
+7. ✅ `D11` — resuelto por D03, 2026-03-24
 
 ### Bloque 3. Cerrar huecos estructurales
 
-8. `D08`
-9. `D09`
-10. `D12`
-11. `D13`
+8. ~~`D08`~~ — pendiente (validation.py)
+9. ~~`D09`~~ — pendiente (tests por capa)
+10. ✅ `D12` — resuelto 2026-03-24
+11. ✅ `D13` — cerrado como simplificacion deliberada 2026-03-24
 
 ### Bloque 4. Habilitar forecast productizable
 
-12. `D06`
-13. `D07`
-14. `D14`
-15. `D15`
+12. ✅ `D06` — resuelto (parcial: falta API + UI) 2026-03-24
+13. ✅ `D07` — resuelto 2026-03-24
+14. ~~`D14`~~ — pendiente (cache API)
+15. ~~`D15`~~ — pendiente (artefactos derivados)
 
 ### Bloque 5. Mejoras operativas
 
-16. `D16`
+16. ✅ `D16` — resuelto 2026-03-24 (creados `notebooks/` y `experiments/`)
 
 ## Preguntas de diseño que conviene responder antes de corregir deuda fuerte
 
