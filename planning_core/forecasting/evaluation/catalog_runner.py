@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import math
+import multiprocessing
 import os
 import random
 import shutil
@@ -303,7 +304,9 @@ def _run_parallel(
     completed = 0
     t0 = time.time()
 
-    with ProcessPoolExecutor(max_workers=effective_jobs) as executor:
+    # fork evita re-importar el módulo principal en cada worker (problema de spawn en macOS)
+    _ctx = multiprocessing.get_context("fork")
+    with ProcessPoolExecutor(max_workers=effective_jobs, mp_context=_ctx) as executor:
         futures = {executor.submit(_parallel_task, task): task[0] for task in tasks}
 
         for fut in as_completed(futures):
