@@ -54,6 +54,10 @@ CONFIG = EvalConfig(
     random_seed = 42,
 )
 
+N_JOBS           = 4     # 1 = secuencial | -1 = todos los CPUs
+CHECKPOINT_EVERY = 50    # guardar progreso cada N SKUs (modo secuencial)
+RESUME           = False # True = continuar desde checkpoint existente
+
 BASE_DIR = "output/eval_runs"
 
 # ---------------------------------------------------------------------------
@@ -61,7 +65,14 @@ BASE_DIR = "output/eval_runs"
 repo    = CanonicalRepository()
 service = PlanningService(repo)
 
-result = run_catalog_evaluation(service, CONFIG, verbose=True)
+result = run_catalog_evaluation(
+    service,
+    CONFIG,
+    verbose=True,
+    n_jobs=N_JOBS,
+    checkpoint_every=CHECKPOINT_EVERY,
+    resume=RESUME,
+)
 
 # Persistir
 run_dir = run_store.save_run(result, BASE_DIR)
