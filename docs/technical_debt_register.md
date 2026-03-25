@@ -53,6 +53,11 @@ La deuda no esta concentrada en una sola capa. Hoy hay cuatro frentes principale
 | D14 | Media | Performance | `classify_catalog()` recomputa sobre todo el catalogo y en API no hay cache | Pendiente |
 | D15 | Media | Producto | No existe capa formal para resultados derivados persistidos | Pendiente |
 | D16 | Baja | Operacion | No hay estructura de `notebooks/`, `experiments/` o `scripts/` para trabajo reproducible de analitica | **Resuelto** |
+| D17 | Baja | Forecasting | Parametrización única (h, n_windows) para todo el catálogo — no diferenciada por segmento | Decisión tomada: h=3/w=3 global. Ver D17 |
+| D18 | Media | Forecasting | MASE > 1 para intermittent/lumpy — métricas operacionales (Fill Rate, CSL) no implementadas | Pendiente |
+| D19 | Baja | Forecasting | Empate técnico en horse-race no detectado — ganador puede cambiar por diferencias de MASE < 0.02 | Pendiente |
+| D20 | Baja | Forecasting | `h` fijo para todo el catálogo — no derivado del lead time del proveedor por SKU | Pendiente |
+| D21 | Baja | Analitica | Notebook de análisis del sweep de parametrización (`03_param_sweep_analysis.ipynb`) no existe | Pendiente |
 
 ## Detalle por item
 
@@ -387,6 +392,14 @@ El generador produce 1 SKU por OC (`po_line_id = f"{po_id}-L01"`) de forma inten
 ### Bloque 5. Mejoras operativas
 
 16. ✅ `D16` — resuelto 2026-03-24 (creados `notebooks/` y `experiments/`)
+
+### Bloque 6. Forecasting — mejoras post-experimentación (2026-03-25)
+
+17. `D17` — Decisión tomada: `h=3, n_windows=3` global. Ver `docs/forecasting_param_sweep_results.md`
+18. `D18` — pendiente (métricas operacionales intermittent/lumpy)
+19. `D19` — pendiente (detección de empate técnico en horse-race)
+20. `D20` — pendiente (h derivado del lead time por SKU)
+21. `D21` — pendiente (notebook de análisis del sweep)
 
 ## Preguntas de diseño que conviene responder antes de corregir deuda fuerte
 

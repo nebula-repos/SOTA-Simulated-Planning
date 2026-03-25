@@ -46,6 +46,8 @@ def run_backtest(
     unique_id: str = "SKU",
     target_col: str = "demand",
     level: list[int] | None = None,
+    naive_type: str = "seasonal",
+    return_cv: bool = False,
 ) -> dict[str, dict]:
     """Corre backtest expanding-window para una lista de modelos sobre una serie.
 
@@ -74,6 +76,10 @@ def run_backtest(
         Columna de la variable objetivo en ``demand_df``.
     level : list[int], optional
         Niveles de confianza a calcular. Por defecto ninguno (solo punto central).
+    naive_type : str
+        Tipo de naive de referencia para el denominador del MASE.
+        ``"seasonal"`` (lag-m), ``"lag1"`` (random walk) o ``"mean"``
+        (desviacion respecto a la media). Ver ``compute_mase`` para detalle.
 
     Returns
     -------
@@ -128,7 +134,10 @@ def run_backtest(
             level=level or [],
         )
 
-    results: dict[str, dict] = {}
+    if return_cv:
+        results: dict[str, dict] = {"__cv_df__": cv_df}
+    else:
+        results: dict[str, dict] = {}
     for model_name in model_names:
         if model_name not in cv_df.columns:
             results[model_name] = {
@@ -145,7 +154,7 @@ def run_backtest(
             train_y = nixtla_df.loc[train_mask, "y"].values
             actual = window_df["y"].values
             forecast = window_df[model_name].clip(lower=0).values
-            m = compute_all_metrics(actual, forecast, season_length=season_length, train_actual=train_y)
+            m = compute_all_metrics(actual, forecast, season_length=season_length, train_actual=train_y, naive_type=naive_type)
             metrics_by_window.append(m)
 
         # Promediar metricas sobre ventanas (ignorando NaN)

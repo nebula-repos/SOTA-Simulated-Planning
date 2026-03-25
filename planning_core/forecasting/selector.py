@@ -128,6 +128,7 @@ def select_and_forecast(
     unique_id: str | None = None,
     target_col: str = "demand",
     use_lgbm: bool = True,
+    return_cv: bool = False,
 ) -> dict:
     """Selecciona el mejor modelo para un SKU y genera el forecast.
 
@@ -201,6 +202,7 @@ def select_and_forecast(
 
     # 2. Candidatos estadisticos segun clasificacion
     model_instances, model_names = get_model_candidates(sb_class, season_length, is_seasonal)
+    naive_type = _get_naive_type(sb_class, is_seasonal)
 
     # 3. Horse-race estadistico via StatsForecast
     with warnings.catch_warnings():
@@ -214,7 +216,11 @@ def select_and_forecast(
             n_windows=n_windows,
             unique_id=uid,
             target_col=target_col,
+            naive_type=naive_type,
+            return_cv=return_cv,
         )
+
+    cv_df = backtest_results.pop("__cv_df__", None)
 
     # 4. Horse-race LightGBM (camino separado, solo para series no intermitentes)
     if use_lgbm and sb_class not in _INTERMITTENT_CLASSES:
@@ -324,7 +330,7 @@ def select_and_forecast(
             "h": h,
         }
 
-    return {
+    result = {
         "status": status,
         "model": best_model,
         "mase": best_mase,
@@ -334,11 +340,28 @@ def select_and_forecast(
         "granularity": granularity,
         "h": h,
     }
+    if cv_df is not None:
+        result["cv_df"] = cv_df
+    return result
 
 
 # ---------------------------------------------------------------------------
 # Helpers internos
 # ---------------------------------------------------------------------------
+
+def _get_naive_type(sb_class: str, is_seasonal: bool) -> str:
+    """Determina el tipo de benchmark correcto para MASE según la clasificación del SKU.
+
+    - intermittent / lumpy  → "mean"     (lag-1/lag-12 son inestables con muchos ceros)
+    - smooth / erratic estacional → "seasonal" (lag-12 es el benchmark relevante)
+    - smooth / erratic no estacional → "lag1" (random walk, benchmark más honesto)
+    """
+    if sb_class in _INTERMITTENT_CLASSES:
+        return "mean"
+    if is_seasonal:
+        return "seasonal"
+    return "lag1"
+
 
 def _pick_winner(backtest_results: dict[str, dict]) -> tuple[str | None, float]:
     """Retorna el nombre y MASE del modelo con menor MASE en el backtest.

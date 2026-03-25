@@ -534,6 +534,7 @@ class PlanningService:
         outlier_method: str = "iqr",
         treat_strategy: str = "winsorize",
         use_lgbm: bool = True,
+        return_cv: bool = False,
     ) -> dict:
         """Selecciona el mejor modelo de forecast para un SKU y genera el pronostico.
 
@@ -610,6 +611,7 @@ class PlanningService:
             n_windows=n_windows,
             unique_id=sku,
             use_lgbm=use_lgbm,
+            return_cv=return_cv,
         )
         # Incluir la serie limpia usada para entrenar (evita re-carga en la UI)
         result["demand_series"] = model_input

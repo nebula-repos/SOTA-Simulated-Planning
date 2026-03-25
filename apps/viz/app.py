@@ -62,7 +62,84 @@ def _run_sku_forecast(_service: PlanningService, sku: str, granularity: str, h: 
     El cache evita que Streamlit rerrun el horse-race completo cuando el usuario
     navega entre secciones sin cambiar los parámetros de forecast.
     """
-    return _service.sku_forecast(sku, granularity=granularity, h=h, n_windows=n_windows)
+    return _service.sku_forecast(sku, granularity=granularity, h=h, n_windows=n_windows, return_cv=True)
+
+
+def build_backtest_figure(
+    cv_df: pd.DataFrame,
+    hist_df: pd.DataFrame,
+    winner_model: str,
+    backtest_metrics: dict,
+    sku: str,
+) -> go.Figure:
+    """Gráfico del horse-race de backtest: demanda histórica + predicciones por modelo por ventana."""
+    COLORS = {
+        "AutoETS": "#e67e22",
+        "AutoARIMA": "#27ae60",
+        "SeasonalNaive": "#8e44ad",
+        "MSTL": "#2980b9",
+        "CrostonSBA": "#c0392b",
+        "ADIDA": "#16a085",
+        "LightGBM": "#f39c12",
+    }
+
+    fig = go.Figure()
+    cutoffs = sorted(cv_df["cutoff"].unique())
+    first_cutoff = cutoffs[0]
+
+    # Histórico hasta el primer cutoff
+    pre = hist_df[hist_df["ds"] <= first_cutoff]
+    fig.add_trace(go.Scatter(
+        x=pre["ds"], y=pre["y"],
+        name="Histórico",
+        line=dict(color="#2980b9", width=2),
+    ))
+
+    # Demanda real en cada ventana de backtest
+    for i, cutoff in enumerate(cutoffs):
+        window = cv_df[cv_df["cutoff"] == cutoff]
+        fig.add_trace(go.Scatter(
+            x=window["ds"], y=window["y"],
+            name="Real (backtest)" if i == 0 else None,
+            showlegend=(i == 0),
+            line=dict(color="#00FF7F", width=3),
+            mode="lines+markers",
+            marker=dict(size=7, color="#00FF7F", line=dict(color="#000000", width=1)),
+        ))
+        fig.add_vline(x=str(cutoff), line_dash="dot", line_color="gray", opacity=0.4)
+
+    # Predicciones por modelo
+    model_cols = [c for c in cv_df.columns if c not in ("unique_id", "ds", "cutoff", "y")]
+    for model in model_cols:
+        mase = backtest_metrics.get(model, {}).get("mase", float("nan"))
+        label = f"{model}  MASE={mase:.3f}" if not math.isnan(mase) else model
+        is_winner = (model == winner_model)
+        color = COLORS.get(model, "#999999")
+
+        for i, cutoff in enumerate(cutoffs):
+            window = cv_df[cv_df["cutoff"] == cutoff]
+            fig.add_trace(go.Scatter(
+                x=window["ds"], y=window[model].clip(lower=0),
+                name=label if i == 0 else None,
+                showlegend=(i == 0),
+                line=dict(
+                    color=color,
+                    width=3 if is_winner else 1.5,
+                    dash="solid" if is_winner else "dash",
+                ),
+                opacity=1.0 if is_winner else 0.65,
+            ))
+
+    fig.update_layout(
+        title=f"{sku} — Backtest horse-race  (ganador: {winner_model})",
+        xaxis_title="Período",
+        yaxis_title="Demanda",
+        template="plotly_white",
+        height=440,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        margin=dict(l=20, r=20, t=100, b=20),
+    )
+    return fig
 
 
 def format_currency(value: float | int) -> str:
@@ -1006,66 +1083,80 @@ def _render_sku_section_forecast(service: PlanningService, selected_sku: str):
     if status == "fallback":
         st.caption("El backtest no pudo evaluar los modelos (serie corta o todos fallaron). Se usó el baseline como fallback.")
 
-    # --- Grafico: historico + forecast + intervalo de confianza ---
+    # --- Tabs: Forecast | Backtest horse-race ---
     forecast_df = result.get("forecast")
-    if forecast_df is not None and not forecast_df.empty:
-        # Usar la serie limpia ya incluida en el resultado (evita segunda carga de datos)
-        demand_series = result.get("demand_series")
-        if demand_series is not None and not demand_series.empty:
-            hist = demand_series.rename(columns={"period": "ds", "demand": "y"})
+    demand_series = result.get("demand_series")
+    hist = (
+        demand_series.rename(columns={"period": "ds", "demand": "y"})
+        if demand_series is not None and not demand_series.empty
+        else pd.DataFrame(columns=["ds", "y"])
+    )
+
+    tab_fc, tab_bt = st.tabs(["Forecast", "Backtest horse-race"])
+
+    with tab_fc:
+        if forecast_df is not None and not forecast_df.empty:
+            title_mase = f"MASE={mase_str}"
+            fig = go.Figure()
+            if not hist.empty:
+                fig.add_trace(go.Scatter(
+                    x=hist["ds"], y=hist["y"],
+                    name="Demanda histórica (limpia)",
+                    line=dict(color="#2980b9"),
+                ))
+            fig.add_trace(go.Scatter(
+                x=forecast_df["ds"], y=forecast_df["yhat"],
+                name=f"Forecast ({result.get('model', '?')})",
+                line=dict(color="#e74c3c", dash="dash"),
+                mode="lines+markers",
+            ))
+            if "yhat_lo80" in forecast_df.columns and "yhat_hi80" in forecast_df.columns:
+                fig.add_trace(go.Scatter(
+                    x=list(forecast_df["ds"]) + list(forecast_df["ds"][::-1]),
+                    y=list(forecast_df["yhat_hi80"]) + list(forecast_df["yhat_lo80"][::-1]),
+                    fill="toself",
+                    fillcolor="rgba(231,76,60,0.12)",
+                    line=dict(color="rgba(0,0,0,0)"),
+                    name="IC 80%",
+                    hoverinfo="skip",
+                ))
+            fig.update_layout(
+                title=f"{selected_sku} — {result.get('model', '?')}  ({title_mase})",
+                xaxis_title="Periodo",
+                yaxis_title="Demanda",
+                template="plotly_white",
+                height=420,
+                margin=dict(l=20, r=20, t=60, b=20),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+            st.write("Pronostico por periodo")
+            fc_display = forecast_df.copy()
+            fc_display["ds"] = fc_display["ds"].astype(str)
+            render_copyable_dataframe(fc_display, f"forecast_{selected_sku}")
+
+    with tab_bt:
+        cv_df = result.get("cv_df")
+        if cv_df is not None and not cv_df.empty:
+            bt_fig = build_backtest_figure(
+                cv_df=cv_df,
+                hist_df=hist,
+                winner_model=result.get("model", ""),
+                backtest_metrics=result.get("backtest", {}),
+                sku=selected_sku,
+            )
+            st.plotly_chart(bt_fig, use_container_width=True)
         else:
-            hist = pd.DataFrame(columns=["ds", "y"])
+            st.info("No hay datos de backtest disponibles (serie muy corta o SKU en fallback).")
 
-        title_mase = f"MASE={mase_str}"
-        fig = go.Figure()
-        if not hist.empty:
-            fig.add_trace(go.Scatter(
-                x=hist["ds"], y=hist["y"],
-                name="Demanda histórica (limpia)",
-                line=dict(color="#2980b9"),
-            ))
-        fig.add_trace(go.Scatter(
-            x=forecast_df["ds"], y=forecast_df["yhat"],
-            name=f"Forecast ({result.get('model', '?')})",
-            line=dict(color="#e74c3c", dash="dash"),
-            mode="lines+markers",
-        ))
-        if "yhat_lo80" in forecast_df.columns and "yhat_hi80" in forecast_df.columns:
-            fig.add_trace(go.Scatter(
-                x=list(forecast_df["ds"]) + list(forecast_df["ds"][::-1]),
-                y=list(forecast_df["yhat_hi80"]) + list(forecast_df["yhat_lo80"][::-1]),
-                fill="toself",
-                fillcolor="rgba(231,76,60,0.12)",
-                line=dict(color="rgba(0,0,0,0)"),
-                name="IC 80%",
-                hoverinfo="skip",
-            ))
-
-        fig.update_layout(
-            title=f"{selected_sku} — {result.get('model', '?')}  ({title_mase})",
-            xaxis_title="Periodo",
-            yaxis_title="Demanda",
-            template="plotly_white",
-            height=420,
-            margin=dict(l=20, r=20, t=60, b=20),
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Tabla de forecast
-        st.write("Pronostico por periodo")
-        fc_display = forecast_df.copy()
-        fc_display["ds"] = fc_display["ds"].astype(str)
-        render_copyable_dataframe(fc_display, f"forecast_{selected_sku}")
-
-    # --- Resumen del backtest (horse-race) ---
-    backtest_data = result.get("backtest")
-    if backtest_data:
-        st.write("Comparacion de modelos (backtest)")
-        summary_df = backtest_summary(backtest_data)
-        render_copyable_dataframe(
-            summary_df[["model", "mase", "wape", "bias", "n_windows", "status"]],
-            f"backtest_summary_{selected_sku}",
-        )
+        backtest_data = result.get("backtest")
+        if backtest_data:
+            st.write("Comparacion de modelos (backtest)")
+            summary_df = backtest_summary(backtest_data)
+            render_copyable_dataframe(
+                summary_df[["model", "mase", "wape", "bias", "n_windows", "status"]],
+                f"backtest_summary_{selected_sku}",
+            )
 
 
 def render_sku_detail_unified(

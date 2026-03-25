@@ -54,7 +54,7 @@ CONFIG = EvalConfig(
     random_seed = 42,
 )
 
-N_JOBS           = 4     # 1 = secuencial | -1 = todos los CPUs
+N_JOBS           = 8     # 1 = secuencial | -1 = todos los CPUs
 CHECKPOINT_EVERY = 50    # guardar progreso cada N SKUs (modo secuencial)
 RESUME           = False # True = continuar desde checkpoint existente
 

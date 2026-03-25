@@ -48,15 +48,24 @@ def compute_mase(
     forecast: pd.Series | np.ndarray,
     season_length: int = 12,
     train_actual: pd.Series | np.ndarray | None = None,
+    naive_type: str = "seasonal",
 ) -> float:
     """Mean Absolute Scaled Error.
 
-    El denominador es el MAE de SeasonalNaive sobre el set de entrenamiento.
-    Requiere ``train_actual`` con al menos ``season_length + 1`` observaciones;
-    si no se cumple (o si ``train_actual`` es None y ``actual`` es muy corto),
-    devuelve NaN — MASE no es calculable sin un baseline estacional válido.
+    El denominador es el MAE de un modelo naive de referencia calculado sobre
+    el set de entrenamiento. El tipo de naive se controla con ``naive_type``:
 
-    MASE < 1.0  → el modelo supera al baseline SeasonalNaive.
+    - ``"seasonal"`` (default): naive estacional lag-m. Correcto para SKUs con
+      estacionalidad detectada (``is_seasonal=True``).
+      Requiere ``len(train) > season_length``.
+    - ``"lag1"``: naive lag-1 (random walk). Correcto para SKUs smooth/erratic
+      **sin** estacionalidad — benchmark más exigente que lag-12 en series planas.
+      Requiere ``len(train) > 1``.
+    - ``"mean"``: desviación absoluta respecto a la media histórica. Correcto para
+      SKUs intermittent/lumpy donde lag-1 y lag-12 devuelven frecuentemente 0.
+      Requiere ``len(train) >= 1``.
+
+    MASE < 1.0  → el modelo supera al baseline.
     MASE = 1.0  → igual al baseline.
     MASE > 1.0  → peor que el baseline.
 
@@ -67,28 +76,39 @@ def compute_mase(
     forecast : array-like
         Valores pronosticados para los mismos h periodos.
     season_length : int
-        m en la formula — normalmente 12 (mensual), 52 (semanal), 7 (diario).
+        Longitud estacional — solo usada cuando ``naive_type="seasonal"``.
     train_actual : array-like, optional
-        Serie de entrenamiento. Se usa para calcular el denominador
-        (MAE de naive estacional sobre entrenamiento). Si None, se usa ``actual``
-        como proxy — pero si ``len(actual) <= season_length``, devuelve NaN.
+        Serie de entrenamiento para calcular el denominador. Si None, se usa
+        ``actual`` como proxy.
+    naive_type : str
+        Tipo de naive de referencia: ``"seasonal"``, ``"lag1"`` o ``"mean"``.
     """
     actual_arr = _to_array(actual)
     forecast_arr = _to_array(forecast)
     _check_lengths(actual_arr, forecast_arr)
 
-    # Errores absolutos del modelo
-    mae_model = np.mean(np.abs(actual_arr - forecast_arr))
+    mae_model = float(np.mean(np.abs(actual_arr - forecast_arr)))
 
-    # Denominador: MAE naive estacional sobre entrenamiento
     base = _to_array(train_actual) if train_actual is not None else actual_arr
-    if len(base) <= season_length:
-        # No hay suficientes datos para el denominador de naive estacional — MASE no calculable
-        return float("nan")
-    else:
-        naive_errors = np.abs(base[season_length:] - base[:-season_length])
-        mae_naive = float(np.mean(naive_errors))
 
+    if naive_type == "seasonal":
+        if len(base) <= season_length:
+            return float("nan")
+        naive_errors = np.abs(base[season_length:] - base[:-season_length])
+    elif naive_type == "lag1":
+        if len(base) <= 1:
+            return float("nan")
+        naive_errors = np.abs(base[1:] - base[:-1])
+    elif naive_type == "mean":
+        if len(base) == 0:
+            return float("nan")
+        naive_errors = np.abs(base - base.mean())
+    else:
+        raise ValueError(
+            f"naive_type desconocido: {naive_type!r}. Usar 'seasonal', 'lag1' o 'mean'."
+        )
+
+    mae_naive = float(np.mean(naive_errors))
     if mae_naive == 0:
         return float("nan")
 
@@ -170,18 +190,29 @@ def compute_all_metrics(
     forecast: pd.Series | np.ndarray,
     season_length: int = 12,
     train_actual: pd.Series | np.ndarray | None = None,
+    naive_type: str = "seasonal",
 ) -> dict[str, float]:
     """Calcula todas las metricas de una vez.
+
+    Parameters
+    ----------
+    naive_type : str
+        Tipo de naive de referencia para MASE: ``"seasonal"``, ``"lag1"`` o ``"mean"``.
+        Ver ``compute_mase`` para detalle.
 
     Returns
     -------
     dict
         Claves: ``mase``, ``wape``, ``bias``, ``mae``, ``rmse``.
-        Los valores pueden ser ``float("nan")`` si la metrica no es
-        calculable (ej: denominador cero).
+        Los valores pueden ser ``float("nan")`` si la metrica no es calculable.
     """
     return {
-        "mase": compute_mase(actual, forecast, season_length=season_length, train_actual=train_actual),
+        "mase": compute_mase(
+            actual, forecast,
+            season_length=season_length,
+            train_actual=train_actual,
+            naive_type=naive_type,
+        ),
         "wape": compute_wape(actual, forecast),
         "bias": compute_bias(actual, forecast),
         "mae": compute_mae(actual, forecast),

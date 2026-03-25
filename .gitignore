@@ -1,6 +1,7 @@
 # Output data
 output/*.csv
 output/*.parquet
+/output
 
 # Python
 __pycache__/
