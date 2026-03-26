@@ -13,6 +13,7 @@ from planning_core.classification import (
 )
 from planning_core.forecasting.selector import select_and_forecast
 from planning_core.inventory.params import get_sku_params
+from planning_core.inventory.safety_stock import compute_sku_safety_stock
 from planning_core.inventory.service_level import get_csl_target
 from planning_core.preprocessing import censored_summary, mark_censored_demand
 from planning_core.repository import CanonicalRepository
@@ -789,3 +790,50 @@ class PlanningService:
         manifest = self.repository.load_manifest()
         params = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
         return params.to_dict()
+
+    def sku_safety_stock(
+        self,
+        sku: str,
+        abc_class: str | None = None,
+        granularity: str | None = None,
+        simple_safety_pct: float = 0.5,
+    ) -> dict:
+        """Calcula safety stock y ROP para un SKU.
+
+        Parameters
+        ----------
+        sku : str
+            Identificador del SKU.
+        abc_class : str or None
+            Clase ABC del SKU. Si no se provee, se deriva de ``classify_single_sku()``.
+        granularity : str or None
+            Granularidad de la serie de demanda. Si no se provee, usa la oficial.
+        simple_safety_pct : float
+            Fracción del LT demand usada como SS para clase C. Default 0.5.
+
+        Returns
+        -------
+        dict
+            Campos de ``SafetyStockResult.to_dict()``:
+            ``sku, granularity, mean_demand_daily, sigma_demand_daily,
+            safety_stock, reorder_point, coverage_ss_days, ss_method, n_periods``.
+        """
+        if granularity is None:
+            granularity = self.official_classification_granularity()
+
+        if abc_class is None:
+            profile = self.classify_single_sku(sku, granularity=granularity)
+            abc_class = profile.get("abc_class") if profile else None
+
+        catalog = self.repository.load_table("product_catalog")
+        row = catalog.loc[catalog["sku"] == sku]
+        supplier = row["supplier"].iloc[0] if not row.empty else None
+        manifest = self.repository.load_manifest()
+
+        params = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
+        demand_series = self.sku_demand_series(sku, granularity=granularity)
+
+        result = compute_sku_safety_stock(
+            params, demand_series, granularity=granularity, simple_safety_pct=simple_safety_pct
+        )
+        return result.to_dict()

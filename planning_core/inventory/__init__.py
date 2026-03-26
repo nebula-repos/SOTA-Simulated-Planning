@@ -6,6 +6,8 @@ params
     Datos maestros de inventario por SKU: lead time, review period, carrying cost.
 service_level
     Política de nivel de servicio (CSL) por segmento ABC y factor z.
+safety_stock
+    Cálculo de safety stock (SS) y punto de reorden (ROP).
 """
 
 from planning_core.inventory.params import (
@@ -21,6 +23,13 @@ from planning_core.inventory.service_level import (
     get_service_level_config,
     get_z_factor,
 )
+from planning_core.inventory.safety_stock import (
+    SafetyStockResult,
+    compute_demand_stats,
+    compute_safety_stock,
+    compute_rop,
+    compute_sku_safety_stock,
+)
 
 __all__ = [
     "InventoryParams",
@@ -32,4 +41,9 @@ __all__ = [
     "get_csl_target",
     "get_service_level_config",
     "get_z_factor",
+    "SafetyStockResult",
+    "compute_demand_stats",
+    "compute_safety_stock",
+    "compute_rop",
+    "compute_sku_safety_stock",
 ]

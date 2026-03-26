@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from urllib.parse import urlencode
 
 import numpy as np
 import pandas as pd
@@ -51,13 +52,84 @@ INVENTORY_METRICS = {
 
 XYZ_COLORS = {"X": "#5b8a72", "Y": "#c58b39", "Z": "#b05d4f"}
 
+APP_NAV_ITEMS = {
+    "dashboard": {
+        "label": "Dashboard",
+        "icon": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13V10.5"/><path d="M9.5 20v-5h5v5"/></svg>',
+    },
+    "catalogo": {
+        "label": "Catálogo",
+        "icon": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5 12 4l8 3.5-8 3.5-8-3.5Z"/><path d="M4 7.5V16l8 4 8-4V7.5"/><path d="M12 11v9"/></svg>',
+    },
+    "clasificacion": {
+        "label": "Clasificación",
+        "icon": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 12 17 7"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>',
+    },
+    "alertas": {
+        "label": "Alertas",
+        "icon": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 21 20H3L12 4Z"/><path d="M12 9v4.5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>',
+    },
+    "escenarios": {
+        "label": "Escenarios",
+        "icon": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="M12 3v18"/><path d="M4 7.5 12 12l8-4.5"/></svg>',
+    },
+}
 
-def inject_app_styles() -> None:
-    st.markdown(
+
+def inject_app_styles(sidebar_compact: bool = False) -> None:
+    sidebar_state_css = """
+        :root {
+            --sidebar-current-w: var(--sidebar-expanded-w);
+        }
+
+        [data-testid="stSidebar"] {
+            min-width: var(--sidebar-current-w) !important;
+            max-width: var(--sidebar-current-w) !important;
+        }
+
+        [data-testid="stSidebar"] > div:first-child {
+            width: var(--sidebar-current-w) !important;
+            min-width: var(--sidebar-current-w) !important;
+            padding-top: 4.2rem;
+        }
+    """
+
+    if sidebar_compact:
+        sidebar_state_css = """
+        :root {
+            --sidebar-current-w: var(--sidebar-collapsed-w);
+        }
+
+        [data-testid="stSidebar"] {
+            min-width: var(--sidebar-current-w) !important;
+            max-width: var(--sidebar-current-w) !important;
+        }
+
+        [data-testid="stSidebar"] > div:first-child {
+            width: var(--sidebar-current-w) !important;
+            min-width: var(--sidebar-current-w) !important;
+            padding-top: 4.2rem;
+        }
+
+        [data-testid="stSidebar"] .sota-sidebar-copy,
+        [data-testid="stSidebar"] .sota-sidebar-meta,
+        [data-testid="stSidebar"] hr {
+            display: none !important;
+        }
+
+        div[role="radiogroup"][aria-orientation="vertical"] label {
+            justify-content: center;
+            padding-inline: 0.2rem;
+        }
         """
+
+    css = """
         <style>
         :root {
             --appbar-h: 4.65rem;
+            --content-gutter: 1.7rem;
+            --sidebar-expanded-w: 15.75rem;
+            --sidebar-collapsed-w: 4.9rem;
             --bg: #f6f1e7;
             --surface: rgba(255, 252, 247, 0.90);
             --surface-strong: #fffdf9;
@@ -65,6 +137,8 @@ def inject_app_styles() -> None:
             --text: #2c241b;
             --muted: #6b5c48;
         }
+
+        __SIDEBAR_STATE_CSS__
 
         [data-testid="stAppViewContainer"] {
             background:
@@ -76,22 +150,12 @@ def inject_app_styles() -> None:
         }
 
         [data-testid="stHeader"] {
-            background: transparent;
-            border-bottom: none;
-            height: var(--appbar-h);
-            z-index: 996;
+            display: none !important;
+            height: 0 !important;
         }
 
         [data-testid="stToolbar"] {
-            position: fixed;
-            top: 0.78rem;
-            right: 1rem;
-            background: rgba(255, 252, 247, 0.72);
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            backdrop-filter: blur(8px);
-            margin-top: 0;
-            z-index: 1004;
+            display: none !important;
         }
 
         [data-testid="stSidebar"] {
@@ -105,55 +169,10 @@ def inject_app_styles() -> None:
 
         .main .block-container {
             max-width: 1480px;
-            padding-top: calc(var(--appbar-h) + 0.55rem);
+            padding-top: 5.55rem;
+            padding-left: var(--content-gutter);
+            padding-right: var(--content-gutter);
             padding-bottom: 2.25rem;
-        }
-
-        [data-testid="stSidebar"] > div:first-child {
-            padding-top: calc(var(--appbar-h) + 0.35rem);
-        }
-
-        [data-testid="stSidebar"][aria-expanded="false"] {
-            min-width: 4.85rem !important;
-            max-width: 4.85rem !important;
-        }
-
-        [data-testid="stSidebar"][aria-expanded="false"] > div:first-child {
-            width: 4.85rem !important;
-            min-width: 4.85rem !important;
-            margin-left: 0 !important;
-            transform: none !important;
-        }
-
-        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="stSidebarNav"],
-        [data-testid="stSidebar"][aria-expanded="false"] .stMarkdown,
-        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="stCaptionContainer"] {
-            overflow: hidden;
-        }
-
-        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="stMarkdownContainer"] p,
-        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="stMarkdownContainer"] h2,
-        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="stCaptionContainer"] {
-            display: none;
-        }
-
-        [data-testid="stSidebar"][aria-expanded="false"] div[role="radiogroup"] label {
-            justify-content: center;
-            padding: 0.42rem 0.35rem;
-        }
-
-        [data-testid="stSidebar"][aria-expanded="false"] div[role="radiogroup"] label p {
-            width: 1.4em;
-            min-width: 1.4em;
-            overflow: hidden;
-            white-space: nowrap;
-            text-overflow: clip;
-            font-size: 1.05rem;
-            margin: 0 auto;
-        }
-
-        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="collapsedControl"] {
-            right: 0.8rem;
         }
 
         div[data-testid="stMetric"] {
@@ -199,47 +218,45 @@ def inject_app_styles() -> None:
         }
 
         div[data-testid="stSpinner"] {
+            position: fixed;
+            inset: 0;
             display: flex;
             justify-content: center;
-            margin: 1.15rem auto 1.4rem auto;
+            align-items: center;
+            margin: 0;
+            padding: 0;
+            background: rgba(246, 241, 231, 0.34);
+            backdrop-filter: blur(2px);
+            z-index: 1400;
         }
 
         div[data-testid="stSpinner"] > div {
             position: relative;
             display: flex;
+            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            gap: 0.95rem;
-            width: min(42rem, 92vw);
-            background: linear-gradient(180deg, rgba(255, 253, 249, 0.98) 0%, rgba(249, 242, 232, 0.96) 100%);
-            border: 1px solid rgba(107, 92, 72, 0.12);
-            border-radius: 24px;
-            padding: 1rem 1.25rem;
-            box-shadow: 0 18px 42px rgba(83, 66, 45, 0.10);
+            gap: 0.7rem;
+            width: 10.5rem;
+            min-height: 10.5rem;
+            background: rgba(255, 252, 247, 0.94);
+            border: 1px solid rgba(107, 92, 72, 0.10);
+            border-radius: 26px;
+            padding: 1.1rem;
+            box-shadow: 0 18px 34px rgba(83, 66, 45, 0.08);
         }
 
         div[data-testid="stSpinner"] > div::before {
             content: "";
             flex: 0 0 auto;
-            width: 1.45rem;
-            height: 1.45rem;
+            width: 3.2rem;
+            height: 3.2rem;
             border-radius: 999px;
-            border: 3px solid rgba(109, 127, 97, 0.18);
+            border: 4px solid rgba(109, 127, 97, 0.14);
             border-top-color: #6d7f61;
-            border-right-color: #8aa07b;
-            animation: sota-spin 0.9s linear infinite;
-        }
-
-        div[data-testid="stSpinner"] > div::after {
-            content: "";
-            position: absolute;
-            left: 1.2rem;
-            right: 1.2rem;
-            bottom: 0.45rem;
-            height: 0.22rem;
-            border-radius: 999px;
-            background: linear-gradient(90deg, rgba(109, 127, 97, 0) 0%, rgba(109, 127, 97, 0.58) 50%, rgba(109, 127, 97, 0) 100%);
-            animation: sota-pulse 1.6s ease-in-out infinite;
-            opacity: 0.75;
+            border-right-color: #7f9570;
+            box-shadow: inset 0 0 0 1px rgba(255, 252, 247, 0.65);
+            animation: sota-spin 0.82s linear infinite;
         }
 
         div[data-testid="stSpinner"] svg {
@@ -248,9 +265,12 @@ def inject_app_styles() -> None:
 
         div[data-testid="stSpinner"] p {
             margin: 0 !important;
-            font-size: 1.08rem !important;
-            font-weight: 650 !important;
+            font-size: 0.84rem !important;
+            font-weight: 700 !important;
             letter-spacing: -0.01em;
+            color: var(--muted) !important;
+            text-align: center;
+            max-width: 8rem;
         }
 
         div[data-testid="stSpinner"] * {
@@ -260,11 +280,6 @@ def inject_app_styles() -> None:
         @keyframes sota-spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
-        }
-
-        @keyframes sota-pulse {
-            0%, 100% { opacity: 0.35; transform: scaleX(0.86); }
-            50% { opacity: 0.8; transform: scaleX(1); }
         }
 
         button[kind],
@@ -278,35 +293,58 @@ def inject_app_styles() -> None:
             color: var(--text);
         }
 
-        div[role="radiogroup"] label {
-            background: rgba(255, 252, 247, 0.72);
-            border: 1px solid rgba(107, 92, 72, 0.10);
-            border-radius: 12px;
-            padding: 0.3rem 0.45rem;
+        div[role="radiogroup"][aria-orientation="vertical"] label {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 14px;
+            padding: 0.42rem 0.55rem;
+            transition: background 0.18s ease, border-color 0.18s ease;
         }
 
-        div[role="radiogroup"] label:hover {
-            background: rgba(255, 252, 247, 0.96);
+        div[role="radiogroup"][aria-orientation="vertical"] label:hover {
+            background: rgba(255, 252, 247, 0.78);
         }
 
-        [data-testid="stSegmentedControl"] {
-            background: rgba(255, 252, 247, 0.74);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 0.25rem;
-            width: 100%;
+        div[role="radiogroup"][aria-orientation="vertical"] label:has(input:checked) {
+            background: rgba(109, 127, 97, 0.10);
+            border-color: rgba(109, 127, 97, 0.22);
         }
 
-        [data-testid="stSegmentedControl"] button {
+        div[role="radiogroup"][aria-orientation="vertical"] label > div:first-child {
+            display: none;
+        }
+
+        div[role="radiogroup"][aria-orientation="horizontal"] {
+            gap: 1.35rem;
+            border-bottom: 1px solid rgba(107, 92, 72, 0.16);
+            padding-bottom: 0.1rem;
+            margin-bottom: 0.85rem;
+        }
+
+        div[role="radiogroup"][aria-orientation="horizontal"] label {
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            padding: 0 0 0.62rem 0;
+            margin: 0;
+        }
+
+        div[role="radiogroup"][aria-orientation="horizontal"] label > div:first-child {
+            display: none;
+        }
+
+        div[role="radiogroup"][aria-orientation="horizontal"] label p {
+            color: var(--muted) !important;
+            font-size: 1rem;
+            font-weight: 650;
+        }
+
+        div[role="radiogroup"][aria-orientation="horizontal"] label:has(input:checked) {
+            border-bottom: 2px solid #6d7f61;
+        }
+
+        div[role="radiogroup"][aria-orientation="horizontal"] label:has(input:checked) p {
             color: var(--text) !important;
-            border-radius: 14px !important;
-            flex: 1 1 0;
-            min-height: 3rem;
-        }
-
-        [data-testid="stSegmentedControl"] button[aria-pressed="true"] {
-            background: #6d7f61 !important;
-            color: #fff !important;
         }
 
         [data-baseweb="tab-list"] {
@@ -336,25 +374,87 @@ def inject_app_styles() -> None:
 
         .sota-appbar {
             position: fixed;
-            top: 0.38rem;
-            left: 1rem;
-            right: 1rem;
-            z-index: 1002;
-            pointer-events: none;
+            top: 0.7rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(1480px, calc(100vw - (2 * var(--content-gutter))));
+            z-index: 998;
         }
 
         .sota-appbar-inner {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 1rem;
-            min-height: 3.58rem;
-            background: rgba(255, 252, 247, 0.76);
+            gap: 1.25rem;
+            min-height: 3.5rem;
+            background: rgba(255, 252, 247, 0.84);
             border: 1px solid var(--border);
             border-radius: 20px;
-            padding: 0.72rem 6rem 0.72rem 1rem;
+            padding: 0.68rem 1rem;
             backdrop-filter: blur(12px);
-            box-shadow: 0 12px 36px rgba(83, 66, 45, 0.08);
+            box-shadow: 0 10px 28px rgba(83, 66, 45, 0.06);
+        }
+
+        .sota-appbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            min-width: 0;
+        }
+
+        .sota-appbar-mark {
+            width: 0.78rem;
+            height: 0.78rem;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #6d7f61 0%, #8ea27f 100%);
+            box-shadow: 0 0 0 6px rgba(109, 127, 97, 0.12);
+            flex: 0 0 auto;
+        }
+
+        .sota-appbar-links {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            flex-wrap: wrap;
+        }
+
+        .sota-appbar-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            height: 2.35rem;
+            padding: 0 0.8rem;
+            border-radius: 999px;
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.92rem;
+            font-weight: 650;
+            transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+        }
+
+        .sota-appbar-link:hover {
+            background: rgba(109, 127, 97, 0.08);
+            color: var(--text);
+        }
+
+        .sota-appbar-link.is-active {
+            background: rgba(109, 127, 97, 0.12);
+            color: var(--text);
+            border: 1px solid rgba(109, 127, 97, 0.16);
+        }
+
+        .sota-appbar-icon {
+            width: 0.9rem;
+            height: 0.9rem;
+            display: inline-flex;
+            color: currentColor;
+            opacity: 0.9;
+        }
+
+        .sota-appbar-icon svg {
+            width: 100%;
+            height: 100%;
+            display: block;
         }
 
         .sota-appbar-copy {
@@ -389,6 +489,11 @@ def inject_app_styles() -> None:
             font-weight: 700;
             padding: 0.38rem 0.72rem;
             white-space: nowrap;
+        }
+
+        .sota-sidebar-copy,
+        .sota-sidebar-meta {
+            color: var(--muted);
         }
 
         .sota-sidebar-chip {
@@ -501,13 +606,11 @@ def inject_app_styles() -> None:
 
         @media (max-width: 920px) {
             .sota-appbar {
-                left: 0.75rem;
-                right: 0.75rem;
+                width: calc(100vw - 1rem);
             }
 
             .sota-appbar-inner {
-                padding-left: 0.85rem;
-                padding-right: 4.6rem;
+                padding-inline: 0.85rem;
             }
 
             .sota-appbar-pill {
@@ -515,9 +618,8 @@ def inject_app_styles() -> None:
             }
         }
         </style>
-        """,
-        unsafe_allow_html=True,
-    )
+        """
+    st.markdown(css.replace("__SIDEBAR_STATE_CSS__", sidebar_state_css), unsafe_allow_html=True)
 
 
 def _escape_html(value: object) -> str:
@@ -542,21 +644,45 @@ def render_centered_hero(kicker: str, title: str, copy: str) -> None:
     )
 
 
-def render_app_header() -> None:
+def render_app_header(current_view: str) -> None:
+    nav_links = []
+    for key, item in APP_NAV_ITEMS.items():
+        active_class = " is-active" if key == current_view else ""
+        href = f"?{urlencode({'view': key})}"
+        nav_links.append(
+            '<a class="sota-appbar-link'
+            f'{active_class}" href="{href}">'
+            f'<span class="sota-appbar-icon">{item["icon"]}</span>'
+            f'<span>{_escape_html(item["label"])}</span>'
+            '</a>'
+        )
+
     st.markdown(
         (
             '<div class="sota-appbar">'
             '<div class="sota-appbar-inner">'
+            '<div class="sota-appbar-brand">'
+            '<span class="sota-appbar-mark"></span>'
             '<div class="sota-appbar-copy">'
             '<div class="sota-appbar-title">SOTA Planning Viz</div>'
             '<div class="sota-appbar-subtitle">Operación, clasificación y forecast sobre el canónico experimental.</div>'
             '</div>'
+            '</div>'
+            f'<div class="sota-appbar-links">{"".join(nav_links)}</div>'
             '<div class="sota-appbar-pill">planning_core lab</div>'
             '</div>'
             '</div>'
         ),
         unsafe_allow_html=True,
     )
+
+
+def render_sidebar_toggle_fab() -> None:
+    compact = st.session_state.get("sidebar_compact", False)
+    label = "▸" if compact else "◂"
+    if st.button(label, key="sidebar_toggle_fab", help="Mostrar u ocultar navegación"):
+        st.session_state["sidebar_compact"] = not compact
+        st.rerun()
 
 
 @st.cache_resource
@@ -575,7 +701,7 @@ def _run_sku_forecast(_service: PlanningService, sku: str, granularity: str, h: 
     return _service.sku_forecast(sku, granularity=granularity, h=h, n_windows=n_windows, return_cv=True)
 
 
-@st.cache_data(ttl=600, show_spinner="Construyendo dashboard...")
+@st.cache_data(ttl=600, show_spinner="Cargando")
 def get_dashboard_data(_service: PlanningService) -> dict:
     transactions = _service.repository.load_table("transactions")
     inventory = _service.repository.load_table("inventory_snapshot")
@@ -854,7 +980,6 @@ def aggregate_timeseries(dataframe: pd.DataFrame, granularity: str) -> pd.DataFr
                 "on_order_qty": "last",
             }
         )
-        .fillna(0)
         .reset_index()
     )
 
@@ -866,6 +991,7 @@ def aggregate_timeseries(dataframe: pd.DataFrame, granularity: str) -> pd.DataFr
         "on_hand_qty",
         "on_order_qty",
     ]
+    aggregated[integer_columns + ["sales_amount"]] = aggregated[integer_columns + ["sales_amount"]].fillna(0)
     aggregated[integer_columns] = aggregated[integer_columns].astype(int)
     aggregated["sales_amount"] = aggregated["sales_amount"].astype(float)
     return aggregated
@@ -912,7 +1038,9 @@ def build_location_comparison_frame(
     if comparison_frame is None:
         return pd.DataFrame(columns=["date", "Agregado sucursales", "Agregado total red"])
 
-    comparison_frame = comparison_frame.sort_values("date").fillna(0).reset_index(drop=True)
+    comparison_frame = comparison_frame.sort_values("date").reset_index(drop=True)
+    value_columns = [column for column in comparison_frame.columns if column != "date"]
+    comparison_frame[value_columns] = comparison_frame[value_columns].fillna(0)
     comparison_frame[active_locations] = comparison_frame[active_locations].astype(float)
     aggregate_columns = [location for location in aggregate_locations if location in active_locations]
     if aggregate_columns:
@@ -1093,7 +1221,7 @@ CLASSIFICATION_GRANULARITY_OPTIONS = {
 }
 
 
-@st.cache_data(ttl=600, show_spinner="Preparando clasificacion oficial...")
+@st.cache_data(ttl=600, show_spinner="Clasificando")
 def get_classification_data(_service: PlanningService, granularity: str | None = None) -> pd.DataFrame:
     return _service.classify_catalog(granularity=granularity)
 
@@ -1698,7 +1826,7 @@ def _render_sku_section_operacional(service: PlanningService, selected_sku: str,
         stockout_points = (
             sales_comparison[["date", "Agregado total red"]]
             .merge(stockout_series, on="date", how="left")
-            .loc[lambda df: df["is_stockout_no_sale"].fillna(False)]
+            .loc[lambda df: df["is_stockout_no_sale"].eq(True)]
             .rename(columns={"Agregado total red": "y"})
             .loc[:, ["date", "y"]]
         )
@@ -1836,7 +1964,7 @@ def _render_sku_section_forecast(service: PlanningService, selected_sku: str):
 
     granularity = GRANULARITY_PLANNING_KEYS[granularity_label]
 
-    with st.spinner("Corriendo horse-race de modelos..."):
+    with st.spinner("Calculando"):
         result = _run_sku_forecast(service, selected_sku, granularity, int(h), int(n_windows))
 
     status = result.get("status", "error")
@@ -1944,8 +2072,12 @@ def _render_sku_section_forecast(service: PlanningService, selected_sku: str):
         if backtest_data:
             st.write("Comparacion de modelos (backtest)")
             summary_df = backtest_summary(backtest_data)
+            summary_df = summary_df.reindex(
+                columns=["model", "mase", "wape", "rmse", "bias", "n_windows", "status"],
+                fill_value=np.nan,
+            )
             render_copyable_dataframe(
-                summary_df[["model", "mase", "wape", "rmse", "bias", "n_windows", "status"]],
+                summary_df,
                 f"backtest_summary_{selected_sku}",
             )
 
@@ -1993,19 +2125,26 @@ def render_sku_detail_unified(
         render_copyable_dataframe(pd.DataFrame([summary["catalog"]]), "sku_catalog_attrs")
 
     # --- Sub-menu interno ---
-    sku_section = st.segmented_control(
+    section_options = {
+        "resumen": "Resumen",
+        "operacion": "Operación",
+        "clasificacion": "Clasificación",
+        "forecast": "Forecast",
+    }
+    sku_section = st.radio(
         "Sección del producto",
-        options=["Resumen", "Operación", "Clasificación", "Forecast"],
-        default="Resumen",
-        selection_mode="single",
+        options=list(section_options.keys()),
+        format_func=lambda value: section_options[value],
+        horizontal=True,
         key="sku_detail_section",
+        label_visibility="visible",
     )
 
-    if sku_section == "Resumen":
+    if sku_section == "resumen":
         _render_sku_section_resumen(service, selected_sku, summary, profile)
-    elif sku_section == "Clasificación":
+    elif sku_section == "clasificacion":
         _render_sku_section_clasificacion(service, selected_sku, classification_df)
-    elif sku_section == "Forecast":
+    elif sku_section == "forecast":
         _render_sku_section_forecast(service, selected_sku)
     else:
         _render_sku_section_operacional(service, selected_sku, summary)
@@ -2348,37 +2487,49 @@ def render_future_view(title: str, description: str):
 
 def render_sidebar_navigation(service: PlanningService) -> str:
     overview = service.dataset_overview()
-    nav_options = {
-        "dashboard": "🏠 Dashboard",
-        "catalogo": "📦 Catálogo",
-        "clasificacion": "🧭 Clasificación",
-        "alertas": "🚨 Alertas",
-        "escenarios": "🧪 Escenarios",
+    compact = st.session_state.get("sidebar_compact", False)
+    nav_options_full = {
+        "dashboard": "◫ Dashboard",
+        "catalogo": "◻ Catalogo",
+        "clasificacion": "◎ Clasificacion",
+        "alertas": "◇ Alertas",
+        "escenarios": "△ Escenarios",
     }
+    nav_options_compact = {
+        "dashboard": "◫",
+        "catalogo": "◻",
+        "clasificacion": "◎",
+        "alertas": "◇",
+        "escenarios": "△",
+    }
+    nav_options = nav_options_compact if compact else nav_options_full
 
     with st.sidebar:
+        if not compact:
+            st.markdown('<div class="sota-sidebar-copy">Navegacion principal</div>', unsafe_allow_html=True)
         selected_key = st.radio(
             "Navegación",
             list(nav_options.keys()),
             format_func=lambda value: nav_options[value],
             key="active_view_sidebar",
         )
-        st.markdown("---")
-        st.markdown("**Dataset activo**")
-        st.caption(
-            f"{overview.get('profile', 'dataset')} | {overview.get('currency', '—')} | "
-            f"{overview['sku_count']} SKUs | {overview['location_count']} locaciones"
-        )
-        if overview.get("central_location"):
-            st.caption(f"Nodo central: {overview['central_location']}")
-
-        active_sku = st.session_state.get("selected_sku") or st.session_state.get("classification_selected_sku")
-        if active_sku:
-            st.markdown("**SKU activo**")
-            st.markdown(
-                f'<span class="sota-sidebar-chip">{_escape_html(active_sku)}</span>',
-                unsafe_allow_html=True,
+        if not compact:
+            st.markdown("---")
+            st.markdown('<div class="sota-sidebar-meta"><strong>Dataset activo</strong></div>', unsafe_allow_html=True)
+            st.caption(
+                f"{overview.get('profile', 'dataset')} | {overview.get('currency', '—')} | "
+                f"{overview['sku_count']} SKUs | {overview['location_count']} locaciones"
             )
+            if overview.get("central_location"):
+                st.caption(f"Nodo central: {overview['central_location']}")
+
+            active_sku = st.session_state.get("selected_sku") or st.session_state.get("classification_selected_sku")
+            if active_sku:
+                st.markdown('<div class="sota-sidebar-meta"><strong>SKU activo</strong></div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<span class="sota-sidebar-chip">{_escape_html(active_sku)}</span>',
+                    unsafe_allow_html=True,
+                )
 
     return selected_key
 
@@ -2387,10 +2538,16 @@ def main():
     st.set_page_config(page_title="SOTA Planning Viz", page_icon=":bar_chart:", layout="wide")
     service = get_service()
     inject_app_styles()
-    render_app_header()
+
+    current_view = st.query_params.get("view", "dashboard")
+    if isinstance(current_view, list):
+        current_view = current_view[0] if current_view else "dashboard"
+    if current_view not in APP_NAV_ITEMS:
+        current_view = "dashboard"
+
+    render_app_header(current_view)
 
     official_classification_df = get_classification_data(service, granularity="M")
-    current_view = render_sidebar_navigation(service)
 
     if current_view == "dashboard":
         render_dashboard_tab(service, official_classification_df)

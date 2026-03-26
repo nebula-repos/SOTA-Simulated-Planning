@@ -71,7 +71,7 @@ CSL_DEFAULTS: dict[str, float] = {
 #   C → "simple_pct_lt" : regla simple (% de la demanda durante lead time)
 _SS_METHOD_BY_ABC: dict[str, str] = {
     "A": "extended",
-    "B": "standard",
+    "B": "extended",       # σ_LT calculado desde purchase history → usarlo siempre
     "C": "simple_pct_lt",
 }
 

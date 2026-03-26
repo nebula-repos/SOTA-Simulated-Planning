@@ -3,7 +3,8 @@
 Cubre:
 - service_level: csl_to_z, get_csl_target, get_z_factor, get_service_level_config
 - params: compute_supplier_lead_times, get_sku_params, InventoryParams
-- PlanningService: service_level_config, sku_inventory_params
+- safety_stock: compute_demand_stats, compute_safety_stock, compute_rop, compute_sku_safety_stock
+- PlanningService: service_level_config, sku_inventory_params, sku_safety_stock
 """
 
 from __future__ import annotations
@@ -27,6 +28,13 @@ from planning_core.inventory.params import (
     InventoryParams,
     compute_supplier_lead_times,
     get_sku_params,
+)
+from planning_core.inventory.safety_stock import (
+    SafetyStockResult,
+    compute_demand_stats,
+    compute_safety_stock,
+    compute_rop,
+    compute_sku_safety_stock,
 )
 
 
@@ -193,9 +201,9 @@ class TestServiceLevelConfig:
         assert hasattr(config, "ss_method")
 
     def test_ss_method_by_abc(self):
-        """Método de SS según tabla 8.4: A→extended, B→standard, C→simple_pct_lt."""
+        """Método de SS según diseño: A→extended, B→extended, C→simple_pct_lt."""
         assert get_service_level_config("A").ss_method == "extended"
-        assert get_service_level_config("B").ss_method == "standard"
+        assert get_service_level_config("B").ss_method == "extended"
         assert get_service_level_config("C").ss_method == "simple_pct_lt"
 
     def test_none_abc_returns_valid_config(self):
@@ -375,7 +383,7 @@ class TestGetSkuParams:
     def test_ss_method_by_abc(self):
         repo = _make_fake_repo(["Prov"])
         assert get_sku_params("SKU", "A", "Prov", repo).ss_method == "extended"
-        assert get_sku_params("SKU", "B", "Prov", repo).ss_method == "standard"
+        assert get_sku_params("SKU", "B", "Prov", repo).ss_method == "extended"
         assert get_sku_params("SKU", "C", "Prov", repo).ss_method == "simple_pct_lt"
 
 
@@ -439,3 +447,409 @@ class TestPlanningServiceInventory:
         lt_suppliers = set(lt_df["supplier"].tolist())
         missing = catalog_suppliers - lt_suppliers
         assert len(missing) == 0, f"Proveedores sin lead time: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# Helpers para tests de safety stock
+# ---------------------------------------------------------------------------
+
+def _make_demand_df(values: list[float], granularity: str = "M") -> pd.DataFrame:
+    """Crea un DataFrame de demanda sintético para los tests."""
+    n = len(values)
+    if granularity == "M":
+        periods = pd.date_range("2023-01-01", periods=n, freq="MS")
+    elif granularity == "W":
+        periods = pd.date_range("2023-01-02", periods=n, freq="W-MON")
+    else:
+        periods = pd.date_range("2023-01-01", periods=n, freq="D")
+    return pd.DataFrame({"period": periods, "demand": values})
+
+
+def _make_params(
+    lead_time_days: float = 30.0,
+    sigma_lt_days: float = 5.0,
+    review_period_days: float = 14.0,
+    z_factor: float = 1.65,
+    ss_method: str = "extended",
+    sku: str = "SKU-TEST",
+) -> InventoryParams:
+    return InventoryParams(
+        sku=sku,
+        lead_time_days=lead_time_days,
+        sigma_lt_days=sigma_lt_days,
+        review_period_days=review_period_days,
+        carrying_cost_rate=0.25,
+        abc_class="A",
+        csl_target=0.95,
+        z_factor=z_factor,
+        ss_method=ss_method,
+    )
+
+
+# ===========================================================================
+# TestComputeDemandStats
+# ===========================================================================
+
+class TestComputeDemandStats:
+    def test_monthly_mean_correct(self):
+        """mean_daily = mean_period / 30.4375 para granularidad mensual."""
+        demand = [100.0, 200.0, 300.0, 400.0]
+        df = _make_demand_df(demand)
+        mean_daily, _, n = compute_demand_stats(df, granularity="M")
+        expected_mean = 250.0 / (365.25 / 12)
+        assert mean_daily == pytest.approx(expected_mean, rel=1e-4)
+        assert n == 4
+
+    def test_monthly_sigma_correct(self):
+        """sigma_daily = std_period / sqrt(30.4375)."""
+        import math as _math
+        demand = [100.0, 200.0, 300.0, 400.0]
+        df = _make_demand_df(demand)
+        _, sigma_daily, _ = compute_demand_stats(df, granularity="M")
+        days = 365.25 / 12
+        std_period = float(np.std(demand, ddof=1))
+        expected_sigma = std_period / _math.sqrt(days)
+        assert sigma_daily == pytest.approx(expected_sigma, rel=1e-4)
+
+    def test_weekly_converts_to_daily(self):
+        """Para granularidad W: mean_daily = mean_period / 7."""
+        demand = [70.0, 140.0, 210.0, 280.0]
+        df = _make_demand_df(demand, granularity="W")
+        mean_daily, sigma_daily, n = compute_demand_stats(df, granularity="W")
+        assert mean_daily == pytest.approx(175.0 / 7.0, rel=1e-4)
+        assert n == 4
+
+    def test_daily_granularity_no_scaling(self):
+        """Para granularidad D: mean_daily == mean_period."""
+        demand = [5.0, 10.0, 15.0, 20.0]
+        df = _make_demand_df(demand, granularity="D")
+        mean_daily, _, _ = compute_demand_stats(df, granularity="D")
+        assert mean_daily == pytest.approx(12.5, rel=1e-4)
+
+    def test_empty_series_returns_zeros_with_warning(self):
+        df = pd.DataFrame({"demand": []})
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            mean, sigma, n = compute_demand_stats(df)
+        assert mean == 0.0
+        assert sigma == 0.0
+        assert n == 0
+        assert len(w) >= 1
+
+    def test_short_series_warns_and_returns_zeros(self):
+        """n < 3 → warning + retorna (0, 0, n)."""
+        df = _make_demand_df([100.0, 200.0])
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            mean, sigma, n = compute_demand_stats(df)
+        assert mean == 0.0
+        assert sigma == 0.0
+        assert n == 2
+        assert len(w) >= 1
+
+    def test_all_zeros_returns_zero_sigma(self):
+        """Serie con demanda cero → sigma=0, sin excepción."""
+        df = _make_demand_df([0.0, 0.0, 0.0, 0.0])
+        mean_daily, sigma_daily, n = compute_demand_stats(df)
+        assert mean_daily == 0.0
+        assert sigma_daily == 0.0
+        assert n == 4
+
+    def test_missing_demand_column_warns(self):
+        """DataFrame sin columna 'demand' → warning + retorna (0, 0, 0)."""
+        df = pd.DataFrame({"period": pd.date_range("2023-01", periods=3, freq="MS"), "qty": [1, 2, 3]})
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            mean, sigma, n = compute_demand_stats(df)
+        assert mean == 0.0
+        assert n == 0
+        assert len(w) >= 1
+
+
+# ===========================================================================
+# TestComputeSafetyStock
+# ===========================================================================
+
+class TestComputeSafetyStock:
+    def test_extended_formula_correct(self):
+        """SS = z × √((LT+R)·σ_d² + d̄²·σ_LT²) para método extended."""
+        import math as _math
+        params = _make_params(lead_time_days=30.0, sigma_lt_days=5.0,
+                              review_period_days=14.0, z_factor=1.65)
+        mean_daily = 10.0   # 10 unidades/día
+        sigma_daily = 3.0   # σ_d = 3 unidades/día
+
+        exposure = 30.0 + 14.0
+        var_d = exposure * (sigma_daily ** 2)
+        var_lt = (mean_daily ** 2) * (5.0 ** 2)
+        expected_ss = 1.65 * _math.sqrt(var_d + var_lt)
+
+        ss = compute_safety_stock(params, mean_daily, sigma_daily)
+        assert ss == pytest.approx(expected_ss, rel=1e-6)
+
+    def test_extended_with_zero_sigma_lt_equals_classic(self):
+        """Con σ_LT=0 la fórmula extendida se reduce a z·σ_d·√exposure."""
+        import math as _math
+        params = _make_params(lead_time_days=30.0, sigma_lt_days=0.0,
+                              review_period_days=14.0, z_factor=1.65)
+        mean_daily = 10.0
+        sigma_daily = 3.0
+        exposure = 44.0
+        expected_ss = 1.65 * sigma_daily * _math.sqrt(exposure)
+
+        ss = compute_safety_stock(params, mean_daily, sigma_daily)
+        assert ss == pytest.approx(expected_ss, rel=1e-6)
+
+    def test_simple_pct_lt(self):
+        """SS = pct × d̄_daily × lead_time_days para método simple_pct_lt."""
+        params = _make_params(lead_time_days=30.0, ss_method="simple_pct_lt")
+        mean_daily = 5.0
+        expected_ss = 0.5 * 5.0 * 30.0
+
+        ss = compute_safety_stock(params, mean_daily, 2.0, simple_safety_pct=0.5)
+        assert ss == pytest.approx(expected_ss, rel=1e-6)
+
+    def test_simple_pct_custom(self):
+        """simple_safety_pct configurable."""
+        params = _make_params(lead_time_days=20.0, ss_method="simple_pct_lt")
+        ss = compute_safety_stock(params, mean_demand_daily=4.0,
+                                  sigma_demand_daily=1.0, simple_safety_pct=0.75)
+        assert ss == pytest.approx(0.75 * 4.0 * 20.0, rel=1e-6)
+
+    def test_ss_nonnegative(self):
+        """SS siempre >= 0."""
+        params = _make_params()
+        assert compute_safety_stock(params, 0.0, 0.0) >= 0.0
+        assert compute_safety_stock(params, -1.0, 0.0) >= 0.0
+
+    def test_zero_demand_zero_ss_extended(self):
+        """Demanda cero → SS=0 sin excepción (sin varianza ni media)."""
+        params = _make_params(sigma_lt_days=5.0)
+        ss = compute_safety_stock(params, mean_demand_daily=0.0, sigma_demand_daily=0.0)
+        assert ss == pytest.approx(0.0, abs=1e-9)
+
+    def test_higher_z_higher_ss(self):
+        """Mayor z_factor → mayor SS."""
+        p_low = _make_params(z_factor=1.28)
+        p_high = _make_params(z_factor=2.33)
+        mean, sigma = 10.0, 3.0
+        ss_low = compute_safety_stock(p_low, mean, sigma)
+        ss_high = compute_safety_stock(p_high, mean, sigma)
+        assert ss_high > ss_low
+
+    def test_higher_sigma_lt_higher_ss(self):
+        """Mayor σ_LT → mayor SS en fórmula extended."""
+        p_low = _make_params(sigma_lt_days=0.0)
+        p_high = _make_params(sigma_lt_days=10.0)
+        mean, sigma = 10.0, 3.0
+        ss_low = compute_safety_stock(p_low, mean, sigma)
+        ss_high = compute_safety_stock(p_high, mean, sigma)
+        assert ss_high > ss_low
+
+    def test_unknown_method_warns_and_uses_extended(self):
+        """Método desconocido → warning + usa extended como fallback."""
+        import warnings
+        params = _make_params(ss_method="unknown_method")
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            ss = compute_safety_stock(params, 10.0, 3.0)
+        assert ss > 0
+        assert len(w) >= 1
+
+
+# ===========================================================================
+# TestComputeRop
+# ===========================================================================
+
+class TestComputeRop:
+    def test_basic_formula(self):
+        """ROP = mean_daily × lead_time_days + SS."""
+        mean_daily = 5.0
+        lt = 20.0
+        ss = 30.0
+        assert compute_rop(mean_daily, lt, ss) == pytest.approx(5.0 * 20.0 + 30.0)
+
+    def test_rop_ge_ss(self):
+        """ROP siempre >= SS (porque DDLT >= 0)."""
+        mean = 8.0
+        lt = 15.0
+        ss = 40.0
+        rop = compute_rop(mean, lt, ss)
+        assert rop >= ss
+
+    def test_rop_nonnegative(self):
+        """ROP siempre >= 0."""
+        assert compute_rop(0.0, 0.0, 0.0) >= 0.0
+        assert compute_rop(0.0, 10.0, 0.0) >= 0.0
+
+    def test_zero_ss_rop_equals_ddlt(self):
+        """Con SS=0, ROP = mean_daily × LT (DDLT)."""
+        mean = 3.0
+        lt = 25.0
+        assert compute_rop(mean, lt, 0.0) == pytest.approx(3.0 * 25.0)
+
+
+# ===========================================================================
+# TestComputeSkuSafetyStock
+# ===========================================================================
+
+class TestComputeSkuSafetyStock:
+    def test_returns_safety_stock_result(self):
+        params = _make_params()
+        df = _make_demand_df([100.0, 120.0, 80.0, 110.0, 90.0])
+        result = compute_sku_safety_stock(params, df)
+        assert isinstance(result, SafetyStockResult)
+
+    def test_all_fields_finite_with_valid_series(self):
+        params = _make_params()
+        df = _make_demand_df([100.0, 120.0, 80.0, 110.0, 90.0])
+        result = compute_sku_safety_stock(params, df)
+        assert not math.isnan(result.safety_stock)
+        assert not math.isnan(result.reorder_point)
+        assert not math.isnan(result.mean_demand_daily)
+        assert not math.isnan(result.sigma_demand_daily)
+        assert not math.isnan(result.coverage_ss_days)
+
+    def test_safety_stock_nonnegative(self):
+        params = _make_params()
+        df = _make_demand_df([50.0, 60.0, 70.0, 80.0, 90.0])
+        result = compute_sku_safety_stock(params, df)
+        assert result.safety_stock >= 0.0
+
+    def test_rop_ge_safety_stock(self):
+        """ROP = DDLT + SS → siempre >= SS."""
+        params = _make_params()
+        df = _make_demand_df([50.0, 60.0, 70.0, 80.0, 90.0])
+        result = compute_sku_safety_stock(params, df)
+        assert result.reorder_point >= result.safety_stock
+
+    def test_sigma_lt_increases_ss(self):
+        """Con mayor σ_LT → SS mayor."""
+        df = _make_demand_df([100.0, 120.0, 80.0, 110.0, 90.0])
+        p_low = _make_params(sigma_lt_days=0.0)
+        p_high = _make_params(sigma_lt_days=15.0)
+        ss_low = compute_sku_safety_stock(p_low, df).safety_stock
+        ss_high = compute_sku_safety_stock(p_high, df).safety_stock
+        assert ss_high > ss_low
+
+    def test_coverage_ss_days_correct(self):
+        """coverage_ss_days = SS / mean_daily."""
+        params = _make_params(sigma_lt_days=0.0)
+        df = _make_demand_df([100.0, 100.0, 100.0, 100.0, 100.0])
+        result = compute_sku_safety_stock(params, df)
+        if result.mean_demand_daily > 0:
+            expected = result.safety_stock / result.mean_demand_daily
+            assert result.coverage_ss_days == pytest.approx(expected, rel=1e-6)
+
+    def test_coverage_ss_days_zero_when_no_demand(self):
+        """coverage_ss_days = 0 cuando mean_daily = 0."""
+        params = _make_params(ss_method="simple_pct_lt")
+        df = _make_demand_df([0.0, 0.0, 0.0, 0.0])
+        result = compute_sku_safety_stock(params, df)
+        assert result.coverage_ss_days == 0.0
+
+    def test_ss_method_propagated(self):
+        params = _make_params(ss_method="simple_pct_lt")
+        df = _make_demand_df([50.0, 60.0, 70.0, 80.0])
+        result = compute_sku_safety_stock(params, df)
+        assert result.ss_method == "simple_pct_lt"
+
+    def test_n_periods_matches_series_length(self):
+        params = _make_params()
+        df = _make_demand_df([10.0, 20.0, 30.0, 40.0, 50.0])
+        result = compute_sku_safety_stock(params, df)
+        assert result.n_periods == 5
+
+    def test_sku_propagated(self):
+        params = _make_params(sku="MY-SKU")
+        df = _make_demand_df([10.0, 20.0, 30.0, 40.0])
+        result = compute_sku_safety_stock(params, df)
+        assert result.sku == "MY-SKU"
+
+    def test_to_dict_has_all_fields(self):
+        params = _make_params()
+        df = _make_demand_df([100.0, 120.0, 80.0, 110.0, 90.0])
+        d = compute_sku_safety_stock(params, df).to_dict()
+        for field in ("sku", "granularity", "mean_demand_daily", "sigma_demand_daily",
+                      "safety_stock", "reorder_point", "coverage_ss_days",
+                      "ss_method", "n_periods"):
+            assert field in d, f"Falta campo en to_dict(): {field}"
+
+    def test_short_series_returns_zero_ss(self):
+        """Serie < 3 períodos → SS=0 (stats retornan ceros)."""
+        params = _make_params()
+        df = _make_demand_df([100.0, 200.0])
+        import warnings
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            result = compute_sku_safety_stock(params, df)
+        assert result.safety_stock == 0.0
+
+
+# ===========================================================================
+# TestPlanningServiceSafetyStock (integración con datos reales)
+# ===========================================================================
+
+@pytest.mark.skipif(not _HAS_REAL_DATA, reason="Datos reales no disponibles")
+class TestPlanningServiceSafetyStock:
+    def test_sku_safety_stock_returns_dict(self):
+        catalog = _repo.load_table("product_catalog")
+        sku = catalog["sku"].iloc[0]
+        result = _svc.sku_safety_stock(sku, abc_class="A")
+        assert isinstance(result, dict)
+
+    def test_safety_stock_has_all_fields(self):
+        catalog = _repo.load_table("product_catalog")
+        sku = catalog["sku"].iloc[0]
+        result = _svc.sku_safety_stock(sku, abc_class="B")
+        for field in ("sku", "granularity", "mean_demand_daily", "sigma_demand_daily",
+                      "safety_stock", "reorder_point", "coverage_ss_days",
+                      "ss_method", "n_periods"):
+            assert field in result, f"Falta campo: {field}"
+
+    def test_safety_stock_nonneg_for_active_sku(self):
+        """safety_stock >= 0 para cualquier SKU activo."""
+        df = _svc.classify_catalog()
+        active_skus = df[df["abc_class"].notna()]["sku"].head(5).tolist()
+        for sku in active_skus:
+            result = _svc.sku_safety_stock(sku)
+            assert result["safety_stock"] >= 0.0, f"SS negativo para {sku}"
+
+    def test_rop_ge_ss_for_active_sku(self):
+        """ROP >= SS para cualquier SKU activo."""
+        df = _svc.classify_catalog()
+        active_skus = df[df["abc_class"].notna()]["sku"].head(5).tolist()
+        for sku in active_skus:
+            result = _svc.sku_safety_stock(sku)
+            assert result["reorder_point"] >= result["safety_stock"], (
+                f"ROP < SS para {sku}: ROP={result['reorder_point']}, SS={result['safety_stock']}"
+            )
+
+    def test_abc_class_inferred_when_not_provided(self):
+        """Si no se provee abc_class, se deriva de classify_single_sku."""
+        df = _svc.classify_catalog()
+        active_skus = df[df["abc_class"].notna()]["sku"].head(1).tolist()
+        if active_skus:
+            sku = active_skus[0]
+            result = _svc.sku_safety_stock(sku)
+            assert isinstance(result, dict)
+            assert result["safety_stock"] >= 0.0
+
+    def test_ss_method_extended_for_class_a(self):
+        """SKU clase A debe usar método 'extended'."""
+        df = _svc.classify_catalog()
+        a_skus = df[df["abc_class"] == "A"]["sku"].head(1).tolist()
+        if a_skus:
+            result = _svc.sku_safety_stock(a_skus[0], abc_class="A")
+            assert result["ss_method"] == "extended"
+
+    def test_ss_method_simple_for_class_c(self):
+        """SKU clase C debe usar método 'simple_pct_lt'."""
+        df = _svc.classify_catalog()
+        c_skus = df[df["abc_class"] == "C"]["sku"].head(1).tolist()
+        if c_skus:
+            result = _svc.sku_safety_stock(c_skus[0], abc_class="C")
+            assert result["ss_method"] == "simple_pct_lt"
