@@ -135,9 +135,16 @@ def find_winner_changes(
     result_a = run_store.load_run(run_id_a, base_dir)
     result_b = run_store.load_run(run_id_b, base_dir)
 
+    _VALID = {"ok", "fallback"}
     cols = ["sku", "sb_class", "abc_class", "model_winner", "mase", "status"]
     a = result_a.sku_results[[c for c in cols if c in result_a.sku_results.columns]].copy()
     b = result_b.sku_results[[c for c in cols if c in result_b.sku_results.columns]].copy()
+
+    # Solo comparar SKUs con forecast válido en ambos runs (excluye error/no_forecast)
+    if "status" in a.columns:
+        a = a[a["status"].isin(_VALID)]
+    if "status" in b.columns:
+        b = b[b["status"].isin(_VALID)]
 
     merged = a.merge(b, on="sku", suffixes=("_a", "_b"), how="inner")
     # Usar fillna para que None == None y NaN == NaN en la comparación

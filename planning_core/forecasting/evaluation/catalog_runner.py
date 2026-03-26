@@ -20,6 +20,15 @@ Paralelización
 - ``resume=True``: continúa desde el último checkpoint si existe en
   ``checkpoint_dir``.
 
+Estados posibles por SKU
+------------------------
+- ``"ok"``: modelo seleccionado y forecast generado correctamente.
+- ``"fallback"``: serie muy corta para backtest — usa SeasonalNaive o HistoricAverage.
+- ``"no_forecast"``: SKU inactivo (sin transacciones) — no se genera forecast, no es error.
+- ``"error"``: excepción inesperada en ``_evaluate_sku``.
+- ``"series_too_short"``: backtest imposible por datos insuficientes (contabilizado en n_error).
+- ``"model_column_missing"``: columna de modelo ausente en cv_df (contabilizado en n_error).
+
 Uso típico
 ----------
 >>> from planning_core.forecasting.evaluation import EvalConfig, run_catalog_evaluation
@@ -205,6 +214,10 @@ def run_catalog_evaluation(
     elapsed_total = round(time.time() - t0, 1)
     status_counts = sku_results["status"].value_counts()
 
+    # Estados conocidos de selector/backtest que se agrupan en n_error
+    _KNOWN_ERROR_STATUSES = {"error", "series_too_short", "model_column_missing"}
+    n_error = int(sum(status_counts.get(s, 0) for s in _KNOWN_ERROR_STATUSES))
+
     result = CatalogEvalResult(
         config=config,
         run_id=run_id,
@@ -213,7 +226,7 @@ def run_catalog_evaluation(
         n_ok=int(status_counts.get("ok", 0)),
         n_fallback=int(status_counts.get("fallback", 0)),
         n_no_forecast=int(status_counts.get("no_forecast", 0)),
-        n_error=int(status_counts.get("error", 0)),
+        n_error=n_error,
     )
 
     if verbose:

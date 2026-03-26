@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import pandas as pd
 
 # ---------------------------------------------------------------------------
@@ -62,7 +64,16 @@ def to_nixtla_df(
             "y": demand_df[target_col].astype(float).values,
         }
     )
-    return nixtla_df.dropna(subset=["y"]).sort_values("ds").reset_index(drop=True)
+    before = len(nixtla_df)
+    nixtla_df = nixtla_df.dropna(subset=["y"]).sort_values("ds").reset_index(drop=True)
+    dropped = before - len(nixtla_df)
+    if dropped > 0:
+        warnings.warn(
+            f"to_nixtla_df: se eliminaron {dropped} filas con NaN en '{target_col}' "
+            f"para unique_id={unique_id!r}.",
+            stacklevel=2,
+        )
+    return nixtla_df
 
 
 # ---------------------------------------------------------------------------

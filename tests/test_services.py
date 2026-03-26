@@ -118,8 +118,10 @@ def test_sku_forecast_includes_demand_series(tmp_path):
 
 
 def test_sku_forecast_no_data_for_unknown_sku(tmp_path):
-    """sku_forecast sobre SKU inexistente devuelve status='no_data'."""
+    """sku_forecast sobre SKU inexistente devuelve status='no_forecast' (inactive)."""
     _write_minimal_dataset(tmp_path)
     service = PlanningService(CanonicalRepository(tmp_path))
     result = service.sku_forecast("SKU-INEXISTENTE", h=1, n_windows=1)
-    assert result["status"] == "no_data"
+    # classify_single_sku devuelve perfil inactive en lugar de None,
+    # por lo que el flujo llega a select_and_forecast que retorna "no_forecast".
+    assert result["status"] == "no_forecast"

@@ -171,6 +171,9 @@ def compute_adi_cv2(demand: pd.Series) -> dict[str, float]:
     if mean_positive == 0:
         return {"adi": adi, "cv2": 0.0}
 
+    # Con n_positive == 1 no es posible estimar varianza; se usa cv2 = 0 por defecto.
+    # Esto clasifica el SKU como "intermittent" (ADI alto, cv2 bajo), que es el
+    # lado conservador correcto: no hay suficiente información para asumir lumpy.
     cv2 = positive_demand.var(ddof=1) / (mean_positive ** 2) if n_positive > 1 else 0.0
 
     return {"adi": float(adi), "cv2": float(cv2)}
@@ -410,7 +413,7 @@ def compute_acf(demand: pd.Series, max_lags: int = 40) -> np.ndarray:
     centered = series - mean
 
     for lag in range(1, max_lags + 1):
-        acf[lag] = np.sum(centered[:n - lag] * centered[lag:]) / (n * var)
+        acf[lag] = np.sum(centered[:n - lag] * centered[lag:]) / ((n - lag) * var)
 
     return acf
 

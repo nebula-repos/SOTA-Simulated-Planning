@@ -192,6 +192,7 @@ def run_backtest_lgbm(
     n_windows: int = 3,
     unique_id: str = "SKU",
     target_col: str = "demand",
+    naive_type: str = "seasonal",
 ) -> dict:
     """Backtest expanding-window para LightGBM via MLForecast.
 
@@ -212,6 +213,9 @@ def run_backtest_lgbm(
         Identificador de la serie.
     target_col : str
         Columna objetivo.
+    naive_type : str
+        Tipo de benchmark naive para MASE: ``"seasonal"``, ``"lag1"`` o ``"mean"``.
+        Debe coincidir con el que usa ``run_backtest()`` para el mismo SKU.
 
     Returns
     -------
@@ -277,7 +281,7 @@ def run_backtest_lgbm(
         train_y = nixtla_df.loc[train_mask, "y"].values
         actual = window_df["y"].values
         forecast = window_df[model_col].clip(lower=0).values
-        m = compute_all_metrics(actual, forecast, season_length=season_length, train_actual=train_y)
+        m = compute_all_metrics(actual, forecast, season_length=season_length, train_actual=train_y, naive_type=naive_type)
         metrics_by_window.append(m)
 
     # Promediar sobre ventanas

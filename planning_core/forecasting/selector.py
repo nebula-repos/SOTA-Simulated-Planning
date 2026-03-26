@@ -38,6 +38,7 @@ Uso tipico
 
 from __future__ import annotations
 
+import math
 import warnings
 from typing import Any
 
@@ -234,10 +235,15 @@ def select_and_forecast(
                     n_windows=n_windows,
                     unique_id=uid,
                     target_col=target_col,
+                    naive_type=naive_type,
                 )
                 backtest_results.update(lgbm_results)
-            except Exception:
-                pass  # LightGBM falla silenciosamente — los candidatos estadisticos siguen
+            except Exception as _lgbm_exc:
+                warnings.warn(
+                    f"LightGBM backtest falló para {uid!r}: {_lgbm_exc}. "
+                    "Continuando con candidatos estadísticos.",
+                    stacklevel=2,
+                )
 
     # 5. Elegir ganador (menor MASE sobre todos los candidatos)
     best_model, best_mase = _pick_winner(backtest_results)
@@ -376,7 +382,7 @@ def _pick_winner(backtest_results: dict[str, dict]) -> tuple[str | None, float]:
         if metrics.get("status") != "ok":
             continue
         mase = metrics.get("mase", float("nan"))
-        if mase != mase:  # isnan check sin import math
+        if math.isnan(mase):
             continue
         if best_name is None or mase < best_mase:
             best_name = model_name

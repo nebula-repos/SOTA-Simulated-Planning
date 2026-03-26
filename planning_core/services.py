@@ -389,7 +389,20 @@ class PlanningService:
             sku_inv = sku_inv[sku_inv["location"] == location]
 
         if sku_tx.empty:
-            return None
+            granularity_out = granularity or self.official_classification_granularity()
+            return {
+                "sku": sku,
+                "sb_class": "inactive",
+                "abc_class": None,
+                "xyz_class": None,
+                "abc_xyz": None,
+                "is_seasonal": False,
+                "has_trend": False,
+                "quality_score": 0.0,
+                "quality_flags": ["sin_transacciones"],
+                "granularity": granularity_out,
+                "classification_scope": self.classification_scope() if location is None else "location",
+            }
 
         if granularity is None:
             granularity = self.official_classification_granularity() if location is None else select_granularity(sku_tx)

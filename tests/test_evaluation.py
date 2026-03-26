@@ -264,3 +264,57 @@ class TestComparator:
         run_store.save_run(r, tmp_path)
         changes = comparator.find_winner_changes(r.run_id, r.run_id, tmp_path)
         assert changes.empty
+
+    def test_find_winner_changes_excludes_non_ok_statuses(self, tmp_path):
+        """SKUs con status error o no_forecast no deben aparecer en los cambios."""
+        rng = np.random.default_rng(0)
+
+        def _make_with_mixed_statuses(run_name: str, flip_model: bool) -> CatalogEvalResult:
+            rows = [
+                # SKU válido que cambia de modelo
+                {"sku": "SKU-OK", "sb_class": "smooth", "abc_class": "A",
+                 "status": "ok", "model_winner": "AutoARIMA" if flip_model else "AutoETS",
+                 "mase": 0.7, "wape": 0.2, "bias": 0.0, "mae": 5.0, "rmse": 6.0,
+                 "granularity": "M", "h": 3, "season_length": 12, "n_obs": 36,
+                 "error_msg": None, "xyz_class": "X", "abc_xyz": "AX",
+                 "is_seasonal": True, "lifecycle": "mature", "quality_score": 0.9,
+                 "has_censored_demand": False, "total_periods": 36},
+                # SKU inactivo — no debe aparecer como "cambio"
+                {"sku": "SKU-INACTIVE", "sb_class": "inactive", "abc_class": None,
+                 "status": "no_forecast", "model_winner": None,
+                 "mase": float("nan"), "wape": float("nan"), "bias": float("nan"),
+                 "mae": float("nan"), "rmse": float("nan"),
+                 "granularity": "M", "h": 3, "season_length": None, "n_obs": 0,
+                 "error_msg": None, "xyz_class": None, "abc_xyz": None,
+                 "is_seasonal": False, "lifecycle": "inactive", "quality_score": 0.0,
+                 "has_censored_demand": False, "total_periods": 0},
+                # SKU con error — no debe aparecer como "cambio"
+                {"sku": "SKU-ERROR", "sb_class": "smooth", "abc_class": "B",
+                 "status": "error", "model_winner": None,
+                 "mase": float("nan"), "wape": float("nan"), "bias": float("nan"),
+                 "mae": float("nan"), "rmse": float("nan"),
+                 "granularity": "M", "h": 3, "season_length": 12, "n_obs": 10,
+                 "error_msg": "algo falló", "xyz_class": "Y", "abc_xyz": "BY",
+                 "is_seasonal": False, "lifecycle": "mature", "quality_score": 0.5,
+                 "has_censored_demand": False, "total_periods": 10},
+            ]
+            df = pd.DataFrame(rows)
+            config = EvalConfig(run_name=run_name)
+            return CatalogEvalResult(
+                config=config, run_id=f"20260101_000000_{run_name}",
+                sku_results=df, elapsed_seconds=1.0,
+                n_ok=1, n_fallback=0, n_no_forecast=1, n_error=1,
+            )
+
+        r_a = _make_with_mixed_statuses("runA", flip_model=False)
+        r_b = _make_with_mixed_statuses("runB", flip_model=True)
+        run_store.save_run(r_a, tmp_path)
+        run_store.save_run(r_b, tmp_path)
+
+        changes = comparator.find_winner_changes(r_a.run_id, r_b.run_id, tmp_path)
+
+        # Solo SKU-OK debe aparecer (cambió de AutoETS a AutoARIMA)
+        assert not changes.empty
+        assert set(changes["sku"].tolist()) == {"SKU-OK"}
+        assert "SKU-INACTIVE" not in changes["sku"].tolist()
+        assert "SKU-ERROR" not in changes["sku"].tolist()

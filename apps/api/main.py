@@ -118,10 +118,13 @@ def sku_classification(
     location: Optional[str] = Query(default=None, description="Location especifica (default: global)"),
     granularity: Optional[str] = Query(default=None, description="Granularidad: M, W, D. None = mensual oficial si no hay location; automatica si se consulta una location."),
 ):
-    """Clasificacion detallada de un SKU individual."""
+    """Clasificacion detallada de un SKU individual.
+
+    Retorna sb_class='inactive' para SKUs sin transacciones en lugar de 404.
+    """
     result = service.classify_single_sku(sku, location=location, granularity=granularity)
     if result is None:
-        raise HTTPException(status_code=404, detail=f"SKU sin transacciones: {sku}")
+        raise HTTPException(status_code=404, detail=f"SKU no encontrado en el catálogo: {sku}")
     return result
 
 
