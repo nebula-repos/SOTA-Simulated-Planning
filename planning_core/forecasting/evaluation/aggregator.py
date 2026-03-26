@@ -37,18 +37,19 @@ def compute_global_metrics(sku_results: pd.DataFrame) -> dict:
     mase  = valid["mase"].dropna()
 
     return {
-        "n_total":       total,
-        "n_ok":          int(status.get("ok", 0)),
-        "n_fallback":    int(status.get("fallback", 0)),
-        "n_no_forecast": int(status.get("no_forecast", 0)),
-        "n_error":       int(status.get("error", 0)),
-        "fallback_rate": round(int(status.get("fallback", 0)) / max(total, 1), 4),
-        "mase_median":   _safe_stat(mase, "median"),
-        "mase_mean":     _safe_stat(mase, "mean"),
-        "mase_p75":      _safe_stat(mase, 0.75),
-        "mase_p90":      _safe_stat(mase, 0.90),
-        "wape_median":   _safe_stat(valid["wape"].dropna(), "median"),
-        "bias_median":   _safe_stat(valid["bias"].dropna(), "median"),
+        "n_total":        total,
+        "n_ok":           int(status.get("ok", 0)),
+        "n_fallback":     int(status.get("fallback", 0)),
+        "n_no_forecast":  int(status.get("no_forecast", 0)),
+        "n_error":        int(status.get("error", 0)),
+        "fallback_rate":  round(int(status.get("fallback", 0)) / max(total, 1), 4),
+        "mase_median":    _safe_stat(mase, "median"),
+        "mase_mean":      _safe_stat(mase, "mean"),
+        "mase_p75":       _safe_stat(mase, 0.75),
+        "mase_p90":       _safe_stat(mase, 0.90),
+        "wmape_median":   _safe_stat(valid["wmape"].dropna(), "median"),
+        "rmsse_median":   _safe_stat(valid["rmsse"].dropna(), "median"),
+        "bias_median":    _safe_stat(valid["bias"].dropna(), "median"),
     }
 
 
@@ -108,7 +109,8 @@ def _segment_row(col: str, val, grp: pd.DataFrame) -> dict:
         "mase_mean":      _safe_stat(mase, "mean"),
         "mase_p75":       _safe_stat(mase, 0.75),
         "mase_p90":       _safe_stat(mase, 0.90),
-        "wape_median":    _safe_stat(valid["wape"].dropna(), "median"),
+        "wmape_median":   _safe_stat(valid["wmape"].dropna(), "median"),
+        "rmsse_median":   _safe_stat(valid["rmsse"].dropna(), "median"),
         "bias_median":    _safe_stat(valid["bias"].dropna(), "median"),
         "top_model":      top_model,
         "top_model_pct":  top_pct,

@@ -78,7 +78,7 @@ class TestRunBacktest:
             n_windows=3,
         )
         metrics = results["SeasonalNaive"]
-        for key in ("status", "mase", "wape", "bias", "mae", "rmse", "n_windows", "h"):
+        for key in ("status", "mase", "wmape", "rmsse", "bias", "mae", "rmse", "n_windows", "h"):
             assert key in metrics, f"Falta clave en resultado: {key}"
 
     def test_short_series_returns_series_too_short(self):

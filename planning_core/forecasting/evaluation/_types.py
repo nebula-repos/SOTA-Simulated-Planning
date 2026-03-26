@@ -70,6 +70,16 @@ class CatalogEvalResult:
         valid = self.sku_results[self.sku_results["status"].isin(["ok", "fallback"])]
         return float(valid["mase"].mean()) if not valid.empty else float("nan")
 
+    @property
+    def wmape_global_median(self) -> float:
+        valid = self.sku_results[self.sku_results["status"].isin(["ok", "fallback"])]
+        return float(valid["wmape"].median()) if not valid.empty else float("nan")
+
+    @property
+    def rmsse_global_median(self) -> float:
+        valid = self.sku_results[self.sku_results["status"].isin(["ok", "fallback"])]
+        return float(valid["rmsse"].median()) if not valid.empty else float("nan")
+
     def summary_dict(self) -> dict:
         """Resumen serializable para run_metadata.json."""
         return {
@@ -80,5 +90,7 @@ class CatalogEvalResult:
             "n_error": self.n_error,
             "mase_global_median": round(self.mase_global_median, 4),
             "mase_global_mean": round(self.mase_global_mean, 4),
+            "wmape_global_median": round(self.wmape_global_median, 4),
+            "rmsse_global_median": round(self.rmsse_global_median, 4),
             "elapsed_seconds": self.elapsed_seconds,
         }

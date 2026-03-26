@@ -258,7 +258,8 @@ def run_backtest_lgbm(
             "status": "error",
             "error": str(exc),
             "mase": float("nan"),
-            "wape": float("nan"),
+            "wmape": float("nan"),
+            "rmsse": float("nan"),
             "bias": float("nan"),
             "mae": float("nan"),
             "rmse": float("nan"),
@@ -270,8 +271,8 @@ def run_backtest_lgbm(
     if model_col not in cv_df.columns:
         return {MODEL_NAME: {
             "status": "model_column_missing",
-            "mase": float("nan"), "wape": float("nan"), "bias": float("nan"),
-            "mae": float("nan"), "rmse": float("nan"),
+            "mase": float("nan"), "wmape": float("nan"), "rmsse": float("nan"),
+            "bias": float("nan"), "mae": float("nan"), "rmse": float("nan"),
             "n_windows": 0, "h": h,
         }}
 
@@ -285,7 +286,7 @@ def run_backtest_lgbm(
         metrics_by_window.append(m)
 
     # Promediar sobre ventanas
-    keys = ["mase", "wape", "bias", "mae", "rmse"]
+    keys = ["mase", "wmape", "rmsse", "bias", "mae", "rmse"]
     aggregated: dict = {}
     for k in keys:
         values = [w[k] for w in metrics_by_window if not np.isnan(w.get(k, float("nan")))]

@@ -49,6 +49,516 @@ INVENTORY_METRICS = {
 }
 
 
+XYZ_COLORS = {"X": "#5b8a72", "Y": "#c58b39", "Z": "#b05d4f"}
+
+
+def inject_app_styles() -> None:
+    st.markdown(
+        """
+        <style>
+        :root {
+            --appbar-h: 4.65rem;
+            --bg: #f6f1e7;
+            --surface: rgba(255, 252, 247, 0.90);
+            --surface-strong: #fffdf9;
+            --border: rgba(107, 92, 72, 0.16);
+            --text: #2c241b;
+            --muted: #6b5c48;
+        }
+
+        [data-testid="stAppViewContainer"] {
+            background:
+                linear-gradient(rgba(120, 103, 83, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(120, 103, 83, 0.05) 1px, transparent 1px),
+                linear-gradient(180deg, #faf6ef 0%, #f5efe4 100%);
+            background-size: 28px 28px, 28px 28px, 100% 100%;
+            color: var(--text);
+        }
+
+        [data-testid="stHeader"] {
+            background: transparent;
+            border-bottom: none;
+            height: var(--appbar-h);
+            z-index: 996;
+        }
+
+        [data-testid="stToolbar"] {
+            position: fixed;
+            top: 0.78rem;
+            right: 1rem;
+            background: rgba(255, 252, 247, 0.72);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            backdrop-filter: blur(8px);
+            margin-top: 0;
+            z-index: 1004;
+        }
+
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #efe6d8 0%, #e8dece 100%);
+            border-right: 1px solid var(--border);
+        }
+
+        [data-testid="stSidebar"] * {
+            color: var(--text);
+        }
+
+        .main .block-container {
+            max-width: 1480px;
+            padding-top: calc(var(--appbar-h) + 0.55rem);
+            padding-bottom: 2.25rem;
+        }
+
+        [data-testid="stSidebar"] > div:first-child {
+            padding-top: calc(var(--appbar-h) + 0.35rem);
+        }
+
+        [data-testid="stSidebar"][aria-expanded="false"] {
+            min-width: 4.85rem !important;
+            max-width: 4.85rem !important;
+        }
+
+        [data-testid="stSidebar"][aria-expanded="false"] > div:first-child {
+            width: 4.85rem !important;
+            min-width: 4.85rem !important;
+            margin-left: 0 !important;
+            transform: none !important;
+        }
+
+        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="stSidebarNav"],
+        [data-testid="stSidebar"][aria-expanded="false"] .stMarkdown,
+        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="stCaptionContainer"] {
+            overflow: hidden;
+        }
+
+        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="stMarkdownContainer"] p,
+        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="stMarkdownContainer"] h2,
+        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="stCaptionContainer"] {
+            display: none;
+        }
+
+        [data-testid="stSidebar"][aria-expanded="false"] div[role="radiogroup"] label {
+            justify-content: center;
+            padding: 0.42rem 0.35rem;
+        }
+
+        [data-testid="stSidebar"][aria-expanded="false"] div[role="radiogroup"] label p {
+            width: 1.4em;
+            min-width: 1.4em;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: clip;
+            font-size: 1.05rem;
+            margin: 0 auto;
+        }
+
+        [data-testid="stSidebar"][aria-expanded="false"] [data-testid="collapsedControl"] {
+            right: 0.8rem;
+        }
+
+        div[data-testid="stMetric"] {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 0.85rem 1rem;
+            box-shadow: 0 10px 28px rgba(83, 66, 45, 0.06);
+        }
+
+        div[data-testid="stMetric"] label,
+        div[data-testid="stMetric"] [data-testid="stMetricLabel"],
+        div[data-testid="stMetric"] [data-testid="stMetricValue"],
+        div[data-testid="stMetric"] [data-testid="stMetricDelta"],
+        div[data-testid="stMetric"] p,
+        div[data-testid="stMetric"] span {
+            color: var(--text) !important;
+            opacity: 1 !important;
+            fill: var(--text) !important;
+        }
+
+        div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
+            color: var(--muted) !important;
+        }
+
+        div[data-testid="stDataFrame"] *,
+        div[data-testid="stSelectbox"] *,
+        div[data-testid="stMultiSelect"] *,
+        div[data-testid="stTextInput"] *,
+        div[data-testid="stNumberInput"] *,
+        div[data-testid="stRadio"] *,
+        div[data-testid="stExpander"] * {
+            color: var(--text) !important;
+        }
+
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="input"] > div,
+        .stTextInput input,
+        .stNumberInput input {
+            background: rgba(255, 252, 247, 0.92) !important;
+            color: var(--text) !important;
+            border-color: var(--border) !important;
+        }
+
+        div[data-testid="stSpinner"] {
+            display: flex;
+            justify-content: center;
+            margin: 1.15rem auto 1.4rem auto;
+        }
+
+        div[data-testid="stSpinner"] > div {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 0.95rem;
+            width: min(42rem, 92vw);
+            background: linear-gradient(180deg, rgba(255, 253, 249, 0.98) 0%, rgba(249, 242, 232, 0.96) 100%);
+            border: 1px solid rgba(107, 92, 72, 0.12);
+            border-radius: 24px;
+            padding: 1rem 1.25rem;
+            box-shadow: 0 18px 42px rgba(83, 66, 45, 0.10);
+        }
+
+        div[data-testid="stSpinner"] > div::before {
+            content: "";
+            flex: 0 0 auto;
+            width: 1.45rem;
+            height: 1.45rem;
+            border-radius: 999px;
+            border: 3px solid rgba(109, 127, 97, 0.18);
+            border-top-color: #6d7f61;
+            border-right-color: #8aa07b;
+            animation: sota-spin 0.9s linear infinite;
+        }
+
+        div[data-testid="stSpinner"] > div::after {
+            content: "";
+            position: absolute;
+            left: 1.2rem;
+            right: 1.2rem;
+            bottom: 0.45rem;
+            height: 0.22rem;
+            border-radius: 999px;
+            background: linear-gradient(90deg, rgba(109, 127, 97, 0) 0%, rgba(109, 127, 97, 0.58) 50%, rgba(109, 127, 97, 0) 100%);
+            animation: sota-pulse 1.6s ease-in-out infinite;
+            opacity: 0.75;
+        }
+
+        div[data-testid="stSpinner"] svg {
+            display: none !important;
+        }
+
+        div[data-testid="stSpinner"] p {
+            margin: 0 !important;
+            font-size: 1.08rem !important;
+            font-weight: 650 !important;
+            letter-spacing: -0.01em;
+        }
+
+        div[data-testid="stSpinner"] * {
+            color: var(--text) !important;
+        }
+
+        @keyframes sota-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes sota-pulse {
+            0%, 100% { opacity: 0.35; transform: scaleX(0.86); }
+            50% { opacity: 0.8; transform: scaleX(1); }
+        }
+
+        button[kind],
+        [data-testid="baseButton-secondary"],
+        [data-testid="baseButton-tertiary"] {
+            color: var(--text);
+        }
+
+        [data-testid="stMarkdownContainer"] p,
+        [data-testid="stCaptionContainer"] {
+            color: var(--text);
+        }
+
+        div[role="radiogroup"] label {
+            background: rgba(255, 252, 247, 0.72);
+            border: 1px solid rgba(107, 92, 72, 0.10);
+            border-radius: 12px;
+            padding: 0.3rem 0.45rem;
+        }
+
+        div[role="radiogroup"] label:hover {
+            background: rgba(255, 252, 247, 0.96);
+        }
+
+        [data-testid="stSegmentedControl"] {
+            background: rgba(255, 252, 247, 0.74);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 0.25rem;
+            width: 100%;
+        }
+
+        [data-testid="stSegmentedControl"] button {
+            color: var(--text) !important;
+            border-radius: 14px !important;
+            flex: 1 1 0;
+            min-height: 3rem;
+        }
+
+        [data-testid="stSegmentedControl"] button[aria-pressed="true"] {
+            background: #6d7f61 !important;
+            color: #fff !important;
+        }
+
+        [data-baseweb="tab-list"] {
+            gap: 0.5rem;
+            background: transparent !important;
+        }
+
+        [data-baseweb="tab"] {
+            background: rgba(255, 252, 247, 0.74) !important;
+            border: 1px solid var(--border) !important;
+            border-radius: 999px !important;
+            color: var(--text) !important;
+            padding: 0.45rem 0.9rem !important;
+        }
+
+        [data-baseweb="tab"][aria-selected="true"] {
+            background: #6d7f61 !important;
+            color: #fff !important;
+        }
+
+        code {
+            background: rgba(130, 111, 88, 0.12) !important;
+            color: var(--text) !important;
+            border-radius: 8px;
+            padding: 0.08rem 0.35rem;
+        }
+
+        .sota-appbar {
+            position: fixed;
+            top: 0.38rem;
+            left: 1rem;
+            right: 1rem;
+            z-index: 1002;
+            pointer-events: none;
+        }
+
+        .sota-appbar-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            min-height: 3.58rem;
+            background: rgba(255, 252, 247, 0.76);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 0.72rem 6rem 0.72rem 1rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 12px 36px rgba(83, 66, 45, 0.08);
+        }
+
+        .sota-appbar-copy {
+            min-width: 0;
+        }
+
+        .sota-appbar-title {
+            color: var(--text);
+            font-size: 1.15rem;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -0.02em;
+            margin: 0;
+        }
+
+        .sota-appbar-subtitle {
+            color: var(--muted);
+            font-size: 0.82rem;
+            line-height: 1.2;
+            margin-top: 0.2rem;
+        }
+
+        .sota-appbar-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            border: 1px solid rgba(109, 127, 97, 0.16);
+            background: rgba(109, 127, 97, 0.12);
+            color: var(--text);
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 0.38rem 0.72rem;
+            white-space: nowrap;
+        }
+
+        .sota-sidebar-chip {
+            display: inline-block;
+            background: rgba(109, 127, 97, 0.18);
+            color: var(--text);
+            border: 1px solid rgba(109, 127, 97, 0.18);
+            border-radius: 999px;
+            padding: 0.18rem 0.55rem;
+            font-size: 0.86rem;
+            font-weight: 600;
+        }
+
+        .sota-top-actions {
+            margin-top: -0.15rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .sota-header-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 1rem 1.1rem 0.9rem 1.1rem;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 10px 30px rgba(83, 66, 45, 0.05);
+        }
+
+        .sota-overline {
+            color: var(--muted);
+            font-size: 0.78rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 0.35rem;
+        }
+
+        .sota-title {
+            color: var(--text);
+            font-size: 1.65rem;
+            font-weight: 700;
+            line-height: 1.15;
+            margin: 0;
+        }
+
+        .sota-subtitle {
+            color: var(--muted);
+            font-size: 0.95rem;
+            margin-top: 0.3rem;
+        }
+
+        .sota-badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            margin-top: 0.85rem;
+        }
+
+        .sota-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            border-radius: 999px;
+            padding: 0.34rem 0.7rem;
+            font-size: 0.78rem;
+            font-weight: 600;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            color: #fff;
+        }
+
+        .sota-section-note {
+            color: var(--muted);
+            font-size: 0.88rem;
+            margin-top: -0.2rem;
+            margin-bottom: 0.65rem;
+        }
+
+        .sota-hero {
+            max-width: 760px;
+            margin: 0.8rem auto 1.4rem auto;
+            text-align: center;
+            background: linear-gradient(180deg, rgba(255, 252, 247, 0.94) 0%, rgba(248, 241, 230, 0.90) 100%);
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            padding: 1.4rem 1.6rem 1.25rem 1.6rem;
+            box-shadow: 0 20px 44px rgba(83, 66, 45, 0.08);
+        }
+
+        .sota-hero-kicker {
+            color: #8a7458;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-bottom: 0.45rem;
+        }
+
+        .sota-hero-title {
+            color: var(--text);
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1.05;
+            margin: 0;
+        }
+
+        .sota-hero-copy {
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.55;
+            margin-top: 0.7rem;
+        }
+
+        @media (max-width: 920px) {
+            .sota-appbar {
+                left: 0.75rem;
+                right: 0.75rem;
+            }
+
+            .sota-appbar-inner {
+                padding-left: 0.85rem;
+                padding-right: 4.6rem;
+            }
+
+            .sota-appbar-pill {
+                display: none;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _escape_html(value: object) -> str:
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+def render_centered_hero(kicker: str, title: str, copy: str) -> None:
+    st.markdown(
+        (
+            '<div class="sota-hero">'
+            f'<div class="sota-hero-kicker">{_escape_html(kicker)}</div>'
+            f'<div class="sota-hero-title">{_escape_html(title)}</div>'
+            f'<div class="sota-hero-copy">{_escape_html(copy)}</div>'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+def render_app_header() -> None:
+    st.markdown(
+        (
+            '<div class="sota-appbar">'
+            '<div class="sota-appbar-inner">'
+            '<div class="sota-appbar-copy">'
+            '<div class="sota-appbar-title">SOTA Planning Viz</div>'
+            '<div class="sota-appbar-subtitle">Operación, clasificación y forecast sobre el canónico experimental.</div>'
+            '</div>'
+            '<div class="sota-appbar-pill">planning_core lab</div>'
+            '</div>'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
+
 @st.cache_resource
 def get_service() -> PlanningService:
     return PlanningService(CanonicalRepository())
@@ -63,6 +573,113 @@ def _run_sku_forecast(_service: PlanningService, sku: str, granularity: str, h: 
     navega entre secciones sin cambiar los parámetros de forecast.
     """
     return _service.sku_forecast(sku, granularity=granularity, h=h, n_windows=n_windows, return_cv=True)
+
+
+@st.cache_data(ttl=600, show_spinner="Construyendo dashboard...")
+def get_dashboard_data(_service: PlanningService) -> dict:
+    transactions = _service.repository.load_table("transactions")
+    inventory = _service.repository.load_table("inventory_snapshot")
+    receipts = _service.repository.load_table("purchase_receipts")
+    transfers = _service.repository.load_table("internal_transfers")
+    catalog = _service.repository.load_table("product_catalog")
+
+    daily_sales = (
+        transactions.groupby("date", as_index=False)[["quantity", "total_amount"]]
+        .sum()
+        .rename(columns={"quantity": "sales_qty", "total_amount": "sales_amount"})
+    )
+    daily_inventory = (
+        inventory.groupby("snapshot_date", as_index=False)[["on_hand_qty", "on_order_qty"]]
+        .sum()
+        .rename(columns={"snapshot_date": "date"})
+    )
+    daily_receipts = (
+        receipts.groupby("receipt_date", as_index=False)[["received_qty"]]
+        .sum()
+        .rename(columns={"receipt_date": "date", "received_qty": "purchase_receipt_qty"})
+    )
+    daily_transfers_out = (
+        transfers.groupby("ship_date", as_index=False)[["transfer_qty"]]
+        .sum()
+        .rename(columns={"ship_date": "date", "transfer_qty": "transfer_out_qty"})
+    )
+    daily_transfers_in = (
+        transfers.dropna(subset=["receipt_date"])
+        .groupby("receipt_date", as_index=False)[["transfer_qty"]]
+        .sum()
+        .rename(columns={"receipt_date": "date", "transfer_qty": "transfer_in_qty"})
+    )
+
+    network_ts = daily_inventory.merge(daily_sales, on="date", how="left")
+    network_ts = network_ts.merge(daily_receipts, on="date", how="left")
+    network_ts = network_ts.merge(daily_transfers_in, on="date", how="left")
+    network_ts = network_ts.merge(daily_transfers_out, on="date", how="left")
+
+    numeric_columns = [
+        "sales_qty",
+        "sales_amount",
+        "purchase_receipt_qty",
+        "transfer_in_qty",
+        "transfer_out_qty",
+        "on_hand_qty",
+        "on_order_qty",
+    ]
+    network_ts[numeric_columns] = network_ts[numeric_columns].fillna(0)
+    network_ts[[
+        "sales_qty",
+        "purchase_receipt_qty",
+        "transfer_in_qty",
+        "transfer_out_qty",
+        "on_hand_qty",
+        "on_order_qty",
+    ]] = network_ts[[
+        "sales_qty",
+        "purchase_receipt_qty",
+        "transfer_in_qty",
+        "transfer_out_qty",
+        "on_hand_qty",
+        "on_order_qty",
+    ]].astype(int)
+    network_ts["sales_amount"] = network_ts["sales_amount"].astype(float)
+    network_ts = network_ts.sort_values("date").reset_index(drop=True)
+
+    latest_snapshot_date = inventory["snapshot_date"].max()
+    latest_inventory = inventory.loc[inventory["snapshot_date"] == latest_snapshot_date].copy()
+
+    inventory_by_location = (
+        latest_inventory.groupby("location", as_index=False)[["on_hand_qty", "on_order_qty"]]
+        .sum()
+        .sort_values("on_hand_qty", ascending=False)
+        .reset_index(drop=True)
+    )
+    inventory_value_by_location = (
+        latest_inventory.merge(catalog[["sku", "cost"]], on="sku", how="left")
+        .assign(inventory_value=lambda df: df["on_hand_qty"] * df["cost"].fillna(0))
+        .groupby("location", as_index=False)["inventory_value"]
+        .sum()
+        .sort_values("inventory_value", ascending=False)
+        .reset_index(drop=True)
+    )
+    sales_by_location = (
+        transactions.groupby("location", as_index=False)[["quantity", "total_amount"]]
+        .sum()
+        .rename(columns={"quantity": "sales_qty", "total_amount": "sales_amount"})
+        .sort_values("sales_amount", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    return {
+        "network_timeseries": network_ts,
+        "inventory_by_location": inventory_by_location,
+        "inventory_value_by_location": inventory_value_by_location,
+        "sales_by_location": sales_by_location,
+        "latest_snapshot_date": latest_snapshot_date,
+        "sales_qty_total": int(transactions["quantity"].sum()) if not transactions.empty else 0,
+        "sales_amount_total": float(transactions["total_amount"].sum()) if not transactions.empty else 0.0,
+        "on_hand_total": int(latest_inventory["on_hand_qty"].sum()) if not latest_inventory.empty else 0,
+        "on_order_total": int(latest_inventory["on_order_qty"].sum()) if not latest_inventory.empty else 0,
+        "inventory_value_total": float(inventory_value_by_location["inventory_value"].sum()) if not inventory_value_by_location.empty else 0.0,
+    }
 
 
 def build_backtest_figure(
@@ -168,6 +785,52 @@ def build_line_figure(dataframe: pd.DataFrame, title: str, series: list[tuple[st
         margin=dict(l=20, r=20, t=60, b=20),
         height=360,
     )
+    return figure
+
+
+def build_metric_bar_figure(
+    dataframe: pd.DataFrame,
+    x_col: str,
+    y_col: str,
+    title: str,
+    color: str,
+    y_title: str,
+    horizontal: bool = False,
+) -> go.Figure:
+    figure = go.Figure()
+    if horizontal:
+        figure.add_trace(
+            go.Bar(
+                x=dataframe[y_col],
+                y=dataframe[x_col],
+                orientation="h",
+                marker_color=color,
+                text=dataframe[y_col],
+                textposition="auto",
+            )
+        )
+    else:
+        figure.add_trace(
+            go.Bar(
+                x=dataframe[x_col],
+                y=dataframe[y_col],
+                marker_color=color,
+                text=dataframe[y_col],
+                textposition="outside",
+            )
+        )
+
+    figure.update_layout(
+        title=title,
+        xaxis_title="" if horizontal else x_col,
+        yaxis_title=y_title if not horizontal else "",
+        margin=dict(l=20, r=20, t=60, b=20),
+        height=360,
+        showlegend=False,
+    )
+    if horizontal:
+        figure.update_yaxes(autorange="reversed")
+        figure.update_xaxes(title=y_title)
     return figure
 
 
@@ -277,6 +940,66 @@ def build_location_comparison_frame(
     return comparison_frame.loc[:, ordered_columns]
 
 
+def get_profile_for_sku(
+    service: PlanningService,
+    selected_sku: str,
+    classification_df: pd.DataFrame | None = None,
+) -> pd.Series | None:
+    if classification_df is not None and not classification_df.empty:
+        sku_row = classification_df[classification_df["sku"] == selected_sku]
+        if not sku_row.empty:
+            return sku_row.iloc[0]
+
+    fallback = service.classify_single_sku(selected_sku)
+    if fallback is None:
+        return None
+    return pd.Series(fallback)
+
+
+def render_sku_header_card(summary: dict, profile: pd.Series | None, currency_code: str) -> None:
+    catalog = summary["catalog"]
+    badge_specs: list[tuple[str, str]] = []
+
+    if profile is not None:
+        abc_class = profile.get("abc_class")
+        xyz_class = profile.get("xyz_class")
+        sb_class = profile.get("sb_class")
+        lifecycle = profile.get("lifecycle")
+        quality_score = profile.get("quality_score")
+
+        if abc_class:
+            badge_specs.append((f"ABC {abc_class}", ABC_COLORS.get(abc_class, "#7f8c8d")))
+        if xyz_class:
+            badge_specs.append((f"XYZ {xyz_class}", XYZ_COLORS.get(xyz_class, "#7f8c8d")))
+        if sb_class:
+            badge_specs.append((sb_class.upper(), SB_COLORS.get(sb_class, "#7f8c8d")))
+        if lifecycle:
+            badge_specs.append((lifecycle.capitalize(), LIFECYCLE_COLORS.get(lifecycle, "#7f8c8d")))
+        if quality_score is not None:
+            badge_specs.append((f"Quality {float(quality_score):.2f}", "#7a6a55"))
+
+    badge_html = "".join(
+        f'<span class="sota-badge" style="background:{color};">{_escape_html(label)}</span>'
+        for label, color in badge_specs
+    )
+
+    subtitle = (
+        f"{catalog.get('category', '')} | {catalog.get('supplier', '')} | "
+        f"MOQ {catalog.get('moq', '—')} | Precio base {format_currency(catalog.get('base_price', 0))} {currency_code}"
+    )
+    st.markdown(
+        (
+            '<div class="sota-header-card">'
+            '<div class="sota-overline">Producto</div>'
+            f'<div class="sota-title">{_escape_html(selected_sku := summary["sku"])} · {_escape_html(catalog.get("name", ""))}</div>'
+            f'<div class="sota-subtitle">{_escape_html(subtitle)}</div>'
+            f'<div class="sota-badge-row">{badge_html}</div>'
+            '</div>'
+        ),
+        unsafe_allow_html=True,
+    )
+
+
 def build_location_comparison_figure(
     dataframe: pd.DataFrame,
     title: str,
@@ -370,7 +1093,7 @@ CLASSIFICATION_GRANULARITY_OPTIONS = {
 }
 
 
-@st.cache_data(ttl=600, show_spinner="Clasificando catalogo...")
+@st.cache_data(ttl=600, show_spinner="Preparando clasificacion oficial...")
 def get_classification_data(_service: PlanningService, granularity: str | None = None) -> pd.DataFrame:
     return _service.classify_catalog(granularity=granularity)
 
@@ -817,9 +1540,68 @@ def render_classification_panoramic(service: PlanningService, classification_df:
 
     if selected_rows:
         selected_sku = display_df.iloc[selected_rows[0]]["sku"]
+        st.session_state["selected_sku"] = selected_sku
         st.session_state["classification_selected_sku"] = selected_sku
         st.session_state["classification_view"] = "Detalle"
         st.rerun()
+
+
+def _render_sku_section_resumen(
+    service: PlanningService,
+    selected_sku: str,
+    summary: dict,
+    profile: pd.Series | None,
+):
+    st.markdown('<div class="sota-section-note">Resumen rápido del SKU: desempeño, stock y clasificación base.</div>', unsafe_allow_html=True)
+
+    if profile is not None:
+        summary_cols = st.columns(5)
+        summary_cols[0].metric("Clase S-B", profile.get("sb_class", "—"))
+        summary_cols[1].metric("ABC-XYZ", profile.get("abc_xyz") or "—")
+        summary_cols[2].metric("Lifecycle", profile.get("lifecycle", "—"))
+        summary_cols[3].metric("Calidad", f"{float(profile.get('quality_score', 0.0)):.2f}")
+        summary_cols[4].metric("Vol. censurado", f"{float(profile.get('censored_demand_pct', 0.0)):.1%}")
+
+    network_ts = service.sku_timeseries(selected_sku)
+    network_ts = apply_temporality_filter(network_ts, "Ultimos 365 dias")
+
+    if network_ts.empty:
+        st.info("No hay serie operacional disponible para este SKU.")
+        return
+
+    chart_cols = st.columns(2)
+    with chart_cols[0]:
+        flow_fig = build_line_figure(
+            network_ts,
+            f"Flujo agregado de red — {selected_sku}",
+            [
+                ("sales_qty", "Ventas"),
+                ("purchase_receipt_qty", "Recepcion compra"),
+            ],
+        )
+        st.plotly_chart(flow_fig, use_container_width=True)
+
+    with chart_cols[1]:
+        stock_fig = build_line_figure(
+            network_ts,
+            f"Stock agregado de red — {selected_sku}",
+            [
+                ("on_hand_qty", "On hand"),
+                ("on_order_qty", "On order"),
+            ],
+        )
+        st.plotly_chart(stock_fig, use_container_width=True)
+
+    supply_cols = st.columns(2)
+    with supply_cols[0]:
+        st.write("Recepciones recientes")
+        receipts_df = service.purchase_receipts_for_sku(selected_sku).tail(10)
+        render_copyable_dataframe(receipts_df, f"sku_receipts_recent_{selected_sku}", height=260)
+
+    with supply_cols[1]:
+        st.write("Transferencias recientes")
+        transfers_df = service.internal_transfers_for_sku(selected_sku).tail(10)
+        render_copyable_dataframe(transfers_df, f"sku_transfers_recent_{selected_sku}", height=260)
 
 
 def _render_sku_section_operacional(service: PlanningService, selected_sku: str, summary: dict):
@@ -1072,13 +1854,22 @@ def _render_sku_section_forecast(service: PlanningService, selected_sku: str):
         return
 
     # --- KPIs del resultado ---
-    kpi_cols = st.columns(4)
+    winner_model = result.get("model")
+    winner_metrics = result.get("backtest", {}).get(winner_model, {}) if winner_model else {}
+
+    kpi_cols = st.columns(6)
     kpi_cols[0].metric("Estado", status)
-    kpi_cols[1].metric("Modelo ganador", result.get("model") or "—")
+    kpi_cols[1].metric("Modelo ganador", winner_model or "—")
     mase_val = result.get("mase")
     mase_str = f"{mase_val:.3f}" if (mase_val is not None and not math.isnan(mase_val)) else "N/A"
     kpi_cols[2].metric("MASE", mase_str)
-    kpi_cols[3].metric("Horizonte", f"{result.get('h', h)} periodos")
+    wape_val = winner_metrics.get("wape")
+    wape_str = f"{wape_val:.1%}" if (wape_val is not None and not math.isnan(wape_val)) else "N/A"
+    kpi_cols[3].metric("WAPE", wape_str)
+    rmse_val = winner_metrics.get("rmse")
+    rmse_str = f"{rmse_val:.3f}" if (rmse_val is not None and not math.isnan(rmse_val)) else "N/A"
+    kpi_cols[4].metric("RMSE", rmse_str)
+    kpi_cols[5].metric("Horizonte", f"{result.get('h', h)} periodos")
 
     if status == "fallback":
         st.caption("El backtest no pudo evaluar los modelos (serie corta o todos fallaron). Se usó el baseline como fallback.")
@@ -1154,7 +1945,7 @@ def _render_sku_section_forecast(service: PlanningService, selected_sku: str):
             st.write("Comparacion de modelos (backtest)")
             summary_df = backtest_summary(backtest_data)
             render_copyable_dataframe(
-                summary_df[["model", "mase", "wape", "bias", "n_windows", "status"]],
+                summary_df[["model", "mase", "wape", "rmse", "bias", "n_windows", "status"]],
                 f"backtest_summary_{selected_sku}",
             )
 
@@ -1175,15 +1966,16 @@ def render_sku_detail_unified(
         st.error("No se pudo cargar el resumen del SKU.")
         return
 
-    # --- Header: SKU + boton volver ---
+    profile = get_profile_for_sku(service, selected_sku, classification_df)
+
+    # --- Header: boton volver + card principal ---
     currency_code = service.currency_code()
-    header_col_a, header_col_b = st.columns([8.5, 1])
-    with header_col_a:
-        catalog = summary["catalog"]
-        st.caption(f"`{selected_sku}` — {catalog.get('name', '')} | {catalog.get('category', '')} | {catalog.get('supplier', '')}")
-    with header_col_b:
+    action_cols = st.columns([9.6, 1.4])
+    with action_cols[1]:
+        st.markdown('<div class="sota-top-actions"></div>', unsafe_allow_html=True)
         if st.button("← Volver", key=back_callback_key, type="tertiary"):
             return "back"
+    render_sku_header_card(summary, profile, currency_code)
 
     # --- KPIs operacionales (siempre visibles) ---
     kpi_cols = st.columns([1, 1.45, 1, 1, 1, 1])
@@ -1202,14 +1994,16 @@ def render_sku_detail_unified(
 
     # --- Sub-menu interno ---
     sku_section = st.segmented_control(
-        "Seccion",
-        options=["Operacional", "Clasificacion", "Forecast"],
-        default="Operacional",
+        "Sección del producto",
+        options=["Resumen", "Operación", "Clasificación", "Forecast"],
+        default="Resumen",
         selection_mode="single",
         key="sku_detail_section",
     )
 
-    if sku_section == "Clasificacion":
+    if sku_section == "Resumen":
+        _render_sku_section_resumen(service, selected_sku, summary, profile)
+    elif sku_section == "Clasificación":
         _render_sku_section_clasificacion(service, selected_sku, classification_df)
     elif sku_section == "Forecast":
         _render_sku_section_forecast(service, selected_sku)
@@ -1224,6 +2018,21 @@ def render_classification_tab(service: PlanningService):
     if "classification_view" not in st.session_state:
         st.session_state["classification_view"] = "Panorama"
 
+    current_view = st.session_state["classification_view"]
+
+    if current_view == "Panorama":
+        render_centered_hero(
+            "Clasificación oficial",
+            "Mapa analítico del catálogo",
+            "Explora el catálogo ya clasificado por la lógica oficial del repo, filtra segmentos y navega al detalle del producto sin perder contexto.",
+        )
+    else:
+        st.markdown("## Clasificación")
+        st.markdown(
+            '<div class="sota-section-note">Vista analítica del catálogo clasificado, con filtros y navegación al detalle del producto.</div>',
+            unsafe_allow_html=True,
+        )
+
     # Controles de granularidad
     control_cols = st.columns([1.5, 4.5])
     with control_cols[0]:
@@ -1237,8 +2046,6 @@ def render_classification_tab(service: PlanningService):
 
     # Cargar datos clasificados (cacheados)
     classification_df = get_classification_data(service, granularity=granularity)
-
-    current_view = st.session_state["classification_view"]
 
     if current_view == "Panorama":
         render_classification_panoramic(service, classification_df)
@@ -1257,41 +2064,180 @@ def render_classification_tab(service: PlanningService):
             st.rerun()
 
 
-def render_dataset_tab(service: PlanningService):
+def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFrame):
     overview = service.dataset_overview()
     quality = service.dataset_health()
+    dashboard = get_dashboard_data(service)
 
-    metric_columns = st.columns(5)
-    metric_columns[0].metric("SKUs", overview["sku_count"])
-    metric_columns[1].metric("Locaciones", overview["location_count"])
-    metric_columns[2].metric("Filas ventas", overview["table_rows"]["transactions"])
-    metric_columns[3].metric("Filas stock", overview["table_rows"]["inventory_snapshot"])
-    metric_columns[4].metric("Filas transfer.", overview["table_rows"]["internal_transfers"])
-
-    caption_parts = [f"Horizonte: {overview['date_range']['start']} a {overview['date_range']['end']}"]
-    if overview.get("profile"):
-        caption_parts.append(f"Perfil: {overview['profile']}")
-    if overview.get("currency"):
-        caption_parts.append(f"Moneda: {overview['currency']}")
-    st.caption(" | ".join(caption_parts))
-    st.write("Tablas cargadas")
-    render_copyable_dataframe(
-        pd.DataFrame(
-            [{"table": table_name, "rows": rows} for table_name, rows in overview["table_rows"].items()]
-        ),
-        "dataset_table_rows",
+    st.markdown("## Dashboard")
+    st.markdown(
+        '<div class="sota-section-note">Lectura agregada de la operación simulada: demanda, inventario, mix y exposición por location.</div>',
+        unsafe_allow_html=True,
     )
 
-    st.write("Chequeos basicos")
-    render_copyable_dataframe(
-        pd.DataFrame(
-            [{"check": check_name, "value": value} for check_name, value in quality.items()]
-        ),
-        "dataset_quality_checks",
+    control_cols = st.columns([1.2, 1.2, 4.6])
+    with control_cols[0]:
+        dashboard_granularity = st.selectbox(
+            "Granularidad",
+            list(GRANULARITY_FREQUENCIES.keys()),
+            index=2,
+            key="dashboard_granularity",
+        )
+    with control_cols[1]:
+        dashboard_temporality = st.selectbox(
+            "Temporalidad",
+            list(TEMPORALITY_WINDOWS.keys()),
+            index=3,
+            key="dashboard_temporality",
+        )
+
+    timeline = aggregate_timeseries(dashboard["network_timeseries"], dashboard_granularity)
+    timeline = apply_temporality_filter(timeline, dashboard_temporality)
+    central_location = overview.get("central_location")
+    central_on_hand = 0
+    if central_location:
+        latest_inv = dashboard["inventory_by_location"]
+        central_row = latest_inv[latest_inv["location"] == central_location]
+        if not central_row.empty:
+            central_on_hand = int(central_row["on_hand_qty"].iloc[0])
+
+    kpi_cols = st.columns(6)
+    kpi_cols[0].metric("Ventas totales", f"{dashboard['sales_qty_total']:,}")
+    kpi_cols[1].metric("Revenue total", format_currency(dashboard["sales_amount_total"]))
+    kpi_cols[2].metric("Inventario on hand", f"{dashboard['on_hand_total']:,}")
+    kpi_cols[3].metric("Inventario on order", f"{dashboard['on_order_total']:,}")
+    kpi_cols[4].metric("Stock CD central", f"{central_on_hand:,}")
+    kpi_cols[5].metric("SKUs con censura", int(classification_df["has_censored_demand"].sum()))
+
+    chart_cols = st.columns(2)
+    with chart_cols[0]:
+        flow_fig = build_line_figure(
+            timeline,
+            f"Flujo agregado de red ({dashboard_granularity}, {dashboard_temporality})",
+            [
+                ("sales_qty", "Ventas"),
+                ("purchase_receipt_qty", "Recepciones compra"),
+            ],
+        )
+        st.plotly_chart(flow_fig, use_container_width=True)
+
+    with chart_cols[1]:
+        stock_fig = build_line_figure(
+            timeline,
+            f"Inventario agregado de red ({dashboard_granularity}, {dashboard_temporality})",
+            [
+                ("on_hand_qty", "On hand"),
+                ("on_order_qty", "On order"),
+            ],
+        )
+        st.plotly_chart(stock_fig, use_container_width=True)
+
+    dist_cols = st.columns(2)
+    with dist_cols[0]:
+        inv_fig = build_metric_bar_figure(
+            dashboard["inventory_by_location"],
+            "location",
+            "on_hand_qty",
+            f"Inventario actual por location ({dashboard['latest_snapshot_date'].date().isoformat()})",
+            color="#6d7f61",
+            y_title="On hand",
+            horizontal=True,
+        )
+        st.plotly_chart(inv_fig, use_container_width=True)
+
+    with dist_cols[1]:
+        sales_loc_fig = build_metric_bar_figure(
+            dashboard["sales_by_location"],
+            "location",
+            "sales_amount",
+            "Revenue acumulado por location",
+            color="#b97d4b",
+            y_title="Revenue",
+            horizontal=True,
+        )
+        st.plotly_chart(sales_loc_fig, use_container_width=True)
+
+    mix_cols = st.columns(3)
+    with mix_cols[0]:
+        abc_fig = build_distribution_bar_figure(
+            classification_df,
+            "abc_class",
+            "Mix ABC",
+            ABC_COLORS,
+        )
+        st.plotly_chart(abc_fig, use_container_width=True)
+    with mix_cols[1]:
+        sb_fig = build_distribution_bar_figure(
+            classification_df,
+            "sb_class",
+            "Mix Syntetos-Boylan",
+            SB_COLORS,
+        )
+        st.plotly_chart(sb_fig, use_container_width=True)
+    with mix_cols[2]:
+        inventory_value_fig = build_metric_bar_figure(
+            dashboard["inventory_value_by_location"],
+            "location",
+            "inventory_value",
+            "Valor inventario por location",
+            color="#8e6a4f",
+            y_title=f"Valor ({overview['currency']})",
+            horizontal=True,
+        )
+        st.plotly_chart(inventory_value_fig, use_container_width=True)
+
+    table_cols = st.columns(2)
+    with table_cols[0]:
+        st.write("Top SKUs por revenue")
+        top_revenue = (
+            classification_df.sort_values("total_revenue", ascending=False)
+            .loc[:, ["sku", "abc_class", "sb_class", "total_revenue", "quality_score"]]
+            .head(10)
+        )
+        render_copyable_dataframe(top_revenue, "dashboard_top_revenue", height=330)
+
+    with table_cols[1]:
+        st.write("SKUs con mayor censura")
+        top_censored = (
+            classification_df.sort_values(
+                ["censored_demand_pct", "censored_pct", "total_revenue"],
+                ascending=[False, False, False],
+            )
+            .loc[:, ["sku", "abc_class", "sb_class", "censored_demand_pct", "censored_pct", "quality_score"]]
+            .head(10)
+        )
+        render_copyable_dataframe(top_censored, "dashboard_top_censored", height=330)
+
+    with st.expander("Dataset técnico y chequeos básicos"):
+        caption_parts = [f"Horizonte: {overview['date_range']['start']} a {overview['date_range']['end']}"]
+        if overview.get("profile"):
+            caption_parts.append(f"Perfil: {overview['profile']}")
+        if overview.get("currency"):
+            caption_parts.append(f"Moneda: {overview['currency']}")
+        st.caption(" | ".join(caption_parts))
+        st.write("Tablas cargadas")
+        render_copyable_dataframe(
+            pd.DataFrame(
+                [{"table": table_name, "rows": rows} for table_name, rows in overview["table_rows"].items()]
+            ),
+            "dataset_table_rows",
+        )
+        st.write("Chequeos básicos")
+        render_copyable_dataframe(
+            pd.DataFrame(
+                [{"check": check_name, "value": value} for check_name, value in quality.items()]
+            ),
+            "dataset_quality_checks",
+        )
+
+
+def render_catalog_browser(service: PlanningService, classification_df: pd.DataFrame) -> None:
+    st.markdown("## Catálogo")
+    st.markdown(
+        '<div class="sota-section-note">Listado navegable de productos con clasificación oficial embebida.</div>',
+        unsafe_allow_html=True,
     )
 
-
-def render_sku_browser(service: PlanningService) -> None:
     filter_columns = st.columns([1.4, 1, 1])
     with filter_columns[0]:
         search_text = st.text_input("Buscar SKU", placeholder="SKU, nombre, categoria o proveedor")
@@ -1327,6 +2273,11 @@ def render_sku_browser(service: PlanningService) -> None:
         :,
         ["sku", "name", "category", "supplier", "brand", "base_price", "moq"],
     ]
+    browser_dataframe = browser_dataframe.merge(
+        classification_df.loc[:, ["sku", "abc_class", "xyz_class", "abc_xyz", "sb_class", "quality_score"]],
+        on="sku",
+        how="left",
+    )
     st.caption(f"Resultados: {len(browser_dataframe):,} SKUs. Selecciona una fila para explorar el detalle.")
     browser_event = st.dataframe(
         browser_dataframe,
@@ -1338,11 +2289,15 @@ def render_sku_browser(service: PlanningService) -> None:
         column_config={
             "sku": st.column_config.TextColumn("SKU", width="small"),
             "name": st.column_config.TextColumn("Producto", width="large"),
+            "abc_class": st.column_config.TextColumn("ABC", width="small"),
+            "xyz_class": st.column_config.TextColumn("XYZ", width="small"),
+            "sb_class": st.column_config.TextColumn("S-B", width="small"),
             "category": st.column_config.TextColumn("Categoria", width="medium"),
             "supplier": st.column_config.TextColumn("Proveedor", width="medium"),
             "brand": st.column_config.TextColumn("Marca", width="small"),
             "base_price": st.column_config.NumberColumn("Precio base", format="%.0f"),
             "moq": st.column_config.NumberColumn("MOQ", format="%d"),
+            "quality_score": st.column_config.NumberColumn("Quality", format="%.2f"),
         },
         key="sku_browser_table",
     )
@@ -1356,55 +2311,103 @@ def render_sku_browser(service: PlanningService) -> None:
     if selected_rows:
         selected_sku = browser_dataframe.iloc[selected_rows[0]]["sku"]
         st.session_state["selected_sku"] = selected_sku
-        st.session_state["sku_explorer_view"] = "Detalle SKU"
+        st.session_state["catalog_view"] = "Detalle SKU"
         st.rerun()
 
 
-def render_sku_tab(service: PlanningService):
-    if "sku_explorer_view" not in st.session_state:
-        st.session_state["sku_explorer_view"] = "Listado"
+def render_catalog_tab(service: PlanningService, classification_df: pd.DataFrame):
+    if "catalog_view" not in st.session_state:
+        st.session_state["catalog_view"] = "Listado"
 
-    current_sku_view = st.session_state["sku_explorer_view"]
+    current_sku_view = st.session_state["catalog_view"]
 
     if current_sku_view == "Listado":
-        render_sku_browser(service)
+        render_catalog_browser(service, classification_df)
         return
 
     selected_sku = st.session_state.get("selected_sku")
     if not selected_sku:
         st.info("Selecciona un SKU desde el listado para ver el detalle.")
-        st.session_state["sku_explorer_view"] = "Listado"
+        st.session_state["catalog_view"] = "Listado"
         st.rerun()
 
     result = render_sku_detail_unified(
         service, selected_sku,
-        back_callback_key="back_to_sku_browser",
+        back_callback_key="back_to_catalog_browser",
+        classification_df=classification_df,
     )
     if result == "back":
-        st.session_state["sku_explorer_view"] = "Listado"
+        st.session_state["catalog_view"] = "Listado"
         st.rerun()
+
+
+def render_future_view(title: str, description: str):
+    st.markdown(f"## {title}")
+    st.info(description)
+
+
+def render_sidebar_navigation(service: PlanningService) -> str:
+    overview = service.dataset_overview()
+    nav_options = {
+        "dashboard": "🏠 Dashboard",
+        "catalogo": "📦 Catálogo",
+        "clasificacion": "🧭 Clasificación",
+        "alertas": "🚨 Alertas",
+        "escenarios": "🧪 Escenarios",
+    }
+
+    with st.sidebar:
+        selected_key = st.radio(
+            "Navegación",
+            list(nav_options.keys()),
+            format_func=lambda value: nav_options[value],
+            key="active_view_sidebar",
+        )
+        st.markdown("---")
+        st.markdown("**Dataset activo**")
+        st.caption(
+            f"{overview.get('profile', 'dataset')} | {overview.get('currency', '—')} | "
+            f"{overview['sku_count']} SKUs | {overview['location_count']} locaciones"
+        )
+        if overview.get("central_location"):
+            st.caption(f"Nodo central: {overview['central_location']}")
+
+        active_sku = st.session_state.get("selected_sku") or st.session_state.get("classification_selected_sku")
+        if active_sku:
+            st.markdown("**SKU activo**")
+            st.markdown(
+                f'<span class="sota-sidebar-chip">{_escape_html(active_sku)}</span>',
+                unsafe_allow_html=True,
+            )
+
+    return selected_key
 
 
 def main():
     st.set_page_config(page_title="SOTA Planning Viz", page_icon=":bar_chart:", layout="wide")
-    st.title("SOTA Planning Viz")
-    st.caption("Visualizadora basica del modelo canonico operacional.")
-
     service = get_service()
-    current_view = st.segmented_control(
-        "Vista",
-        options=["Dataset", "SKU Explorer", "Clasificacion"],
-        default="SKU Explorer",
-        selection_mode="single",
-        key="active_view",
-    )
+    inject_app_styles()
+    render_app_header()
 
-    if current_view == "Dataset":
-        render_dataset_tab(service)
-    elif current_view == "Clasificacion":
+    official_classification_df = get_classification_data(service, granularity="M")
+    current_view = render_sidebar_navigation(service)
+
+    if current_view == "dashboard":
+        render_dashboard_tab(service, official_classification_df)
+    elif current_view == "catalogo":
+        render_catalog_tab(service, official_classification_df)
+    elif current_view == "clasificacion":
         render_classification_tab(service)
+    elif current_view == "alertas":
+        render_future_view(
+            "Alertas",
+            "Vista reservada para alertas operacionales y de calidad. Aún no está implementada en esta UI experimental.",
+        )
     else:
-        render_sku_tab(service)
+        render_future_view(
+            "Escenarios",
+            "Vista reservada para escenarios, simulaciones y futuras capas de decisión. Aún no está implementada.",
+        )
 
 
 if __name__ == "__main__":

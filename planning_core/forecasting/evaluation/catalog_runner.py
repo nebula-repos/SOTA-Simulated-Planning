@@ -393,7 +393,7 @@ def _evaluate_sku(
             row.update({
                 "status": "no_forecast",
                 "model_winner": None,
-                "mase": float("nan"), "wape": float("nan"),
+                "mase": float("nan"), "wmape": float("nan"), "rmsse": float("nan"),
                 "bias": float("nan"), "mae": float("nan"), "rmse": float("nan"),
                 "granularity": config.granularity, "h": config.h,
                 "season_length": None, "n_obs": 0, "error_msg": None,
@@ -431,7 +431,8 @@ def _evaluate_sku(
             "status":        result.get("status"),
             "model_winner":  winner,
             "mase":          result.get("mase"),
-            "wape":          winner_metrics.get("wape", float("nan")),
+            "wmape":         winner_metrics.get("wmape", float("nan")),
+            "rmsse":         winner_metrics.get("rmsse", float("nan")),
             "bias":          winner_metrics.get("bias", float("nan")),
             "mae":           winner_metrics.get("mae",  float("nan")),
             "rmse":          winner_metrics.get("rmse", float("nan")),
@@ -452,7 +453,8 @@ def _evaluate_sku(
             "status":        "error",
             "model_winner":  None,
             "mase":          float("nan"),
-            "wape":          float("nan"),
+            "wmape":         float("nan"),
+            "rmsse":         float("nan"),
             "bias":          float("nan"),
             "mae":           float("nan"),
             "rmse":          float("nan"),
@@ -473,7 +475,7 @@ def _error_row(sku: str, config: EvalConfig, msg: str) -> dict:
         row[f"mase_{m}"] = float("nan")
     row.update({
         "status": "error", "model_winner": None,
-        "mase": float("nan"), "wape": float("nan"),
+        "mase": float("nan"), "wmape": float("nan"), "rmsse": float("nan"),
         "bias": float("nan"), "mae": float("nan"), "rmse": float("nan"),
         "granularity": config.granularity, "h": config.h,
         "season_length": None, "n_obs": None, "error_msg": msg,

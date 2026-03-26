@@ -148,6 +148,7 @@ multiples que MSTL no captura bien. Baja prioridad mientras LightGBM cubra esos 
 | D20 | `h` fijo — deberia derivarse del lead time real del proveedor por SKU | Baja |
 | D21 | Notebook de visualizacion del sweep (`03_param_sweep_analysis.ipynb`) | Baja |
 | D22 | `services.py` importa `forecasting.selector` directamente — core tiene dependencia runtime de statsforecast | Media |
+| D23 | Integrar WMAPE y RMSSE en la seleccion del modelo ganador (`_pick_winner`): actualmente solo usa MASE. Posibles enfoques: (a) score combinado ponderado MASE+RMSSE por clase de demanda (RMSSE mas relevante para lumpy/erratic), (b) RMSSE como desempate cuando delta MASE < umbral. Requiere experimentacion con el catalogo real antes de activar. | Alta |
 
 ---
 

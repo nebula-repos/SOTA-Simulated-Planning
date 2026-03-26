@@ -81,7 +81,7 @@ print(f"\nResultados guardados en: {run_dir}")
 # Resumen por segmento
 print("\n=== MASE mediana por sb_class ===")
 seg = aggregator.compute_segment_metrics(
-    result.sku_results, segment_cols=["sb_class"]
+    result.sku_results, segment_cols=["sb_class", "abc_class"]
 )
 sb_view = seg[seg["segment_col"] == "sb_class"][
     ["segment_value", "n_skus", "n_ok", "n_fallback", "mase_median", "mase_p90", "top_model", "top_model_pct"]

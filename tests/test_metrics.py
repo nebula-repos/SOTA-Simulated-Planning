@@ -11,7 +11,8 @@ from planning_core.forecasting.metrics import (
     compute_mae,
     compute_mase,
     compute_rmse,
-    compute_wape,
+    compute_rmsse,
+    compute_wmape,
 )
 
 
@@ -91,28 +92,67 @@ class TestComputeMase:
 
 
 # ---------------------------------------------------------------------------
-# compute_wape
+# compute_wmape
 # ---------------------------------------------------------------------------
 
-class TestComputeWape:
+class TestComputeWmape:
     def test_perfect_forecast_returns_zero(self, perfect_forecast):
         actual, forecast = perfect_forecast
-        assert compute_wape(actual, forecast) == pytest.approx(0.0, abs=1e-9)
+        assert compute_wmape(actual, forecast) == pytest.approx(0.0, abs=1e-9)
 
     def test_known_value(self):
         actual = np.array([100.0, 100.0])
         forecast = np.array([110.0, 90.0])
-        # |110-100| + |90-100| = 20, total actual = 200 → WAPE = 0.10
-        assert compute_wape(actual, forecast) == pytest.approx(0.10, abs=1e-9)
+        # |110-100| + |90-100| = 20, total actual = 200 → WMAPE = 0.10
+        assert compute_wmape(actual, forecast) == pytest.approx(0.10, abs=1e-9)
 
     def test_zero_actual_returns_nan(self):
         actual = np.array([0.0, 0.0])
         forecast = np.array([5.0, 5.0])
-        assert math.isnan(compute_wape(actual, forecast))
+        assert math.isnan(compute_wmape(actual, forecast))
 
     def test_length_mismatch_raises(self):
         with pytest.raises(ValueError):
-            compute_wape(np.array([1.0, 2.0]), np.array([1.0]))
+            compute_wmape(np.array([1.0, 2.0]), np.array([1.0]))
+
+
+# ---------------------------------------------------------------------------
+# compute_rmsse
+# ---------------------------------------------------------------------------
+
+class TestComputeRmsse:
+    def test_perfect_forecast_returns_zero(self, perfect_forecast):
+        actual, forecast = perfect_forecast
+        train = np.array([8.0, 12.0, 10.0, 9.0, 11.0, 10.0, 8.0, 12.0])
+        result = compute_rmsse(actual, forecast, season_length=2, train_actual=train)
+        assert result == pytest.approx(0.0, abs=1e-9)
+
+    def test_known_value_seasonal(self):
+        """RMSSE = sqrt(MSE_model / MSE_naive_seasonal)."""
+        train = np.array([10.0, 20.0, 10.0, 20.0, 10.0, 20.0])
+        actual = np.array([10.0, 20.0])
+        forecast = np.array([12.0, 18.0])  # errors: -2, +2
+        # MSE_model = mean([4, 4]) = 4
+        # seasonal lag-2: naive errors = [0, 0, 0, 0] → MSE_naive = 0 → NaN
+        # Use lag1 to get a non-zero denominator
+        # train lag1 errors sq: [100, 100, 100, 100, 100] → MSE_naive = 100
+        result = compute_rmsse(actual, forecast, season_length=2, train_actual=train,
+                               naive_type="lag1")
+        expected = math.sqrt(4.0 / 100.0)
+        assert result == pytest.approx(expected, rel=1e-6)
+
+    def test_zero_denominator_returns_nan(self):
+        train = np.array([5.0, 5.0, 5.0, 5.0])
+        actual = np.array([5.0, 5.0])
+        forecast = np.array([5.0, 5.0])
+        result = compute_rmsse(actual, forecast, season_length=2, train_actual=train)
+        assert math.isnan(result)
+
+    def test_rmsse_ge_zero(self, constant_forecast):
+        actual, forecast = constant_forecast
+        train = np.arange(1.0, 11.0)
+        result = compute_rmsse(actual, forecast, season_length=2, train_actual=train)
+        assert result >= 0.0 or math.isnan(result)
 
 
 # ---------------------------------------------------------------------------
@@ -169,12 +209,12 @@ class TestComputeAllMetrics:
     def test_returns_all_keys(self, perfect_forecast):
         actual, forecast = perfect_forecast
         result = compute_all_metrics(actual, forecast, season_length=2)
-        assert set(result.keys()) == {"mase", "wape", "bias", "mae", "rmse"}
+        assert set(result.keys()) == {"mase", "wmape", "rmsse", "bias", "mae", "rmse"}
 
     def test_perfect_forecast_errors_are_zero(self, perfect_forecast):
         actual, forecast = perfect_forecast
         result = compute_all_metrics(actual, forecast, season_length=2)
-        for key in ("wape", "bias", "mae", "rmse"):
+        for key in ("wmape", "bias", "mae", "rmse"):
             assert result[key] == pytest.approx(0.0, abs=1e-9), f"{key} should be 0"
 
     def test_naive_type_passed_through(self):

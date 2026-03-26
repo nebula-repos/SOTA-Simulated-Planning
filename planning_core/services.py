@@ -12,6 +12,8 @@ from planning_core.classification import (
     treat_outliers,
 )
 from planning_core.forecasting.selector import select_and_forecast
+from planning_core.inventory.params import get_sku_params
+from planning_core.inventory.service_level import get_csl_target
 from planning_core.preprocessing import censored_summary, mark_censored_demand
 from planning_core.repository import CanonicalRepository
 from planning_core.validation import basic_health_report
@@ -745,3 +747,45 @@ class PlanningService:
             )
 
         return pd.DataFrame(enriched_rows)
+
+    # -----------------------------------------------------------------------
+    # Módulo de inventario
+    # -----------------------------------------------------------------------
+
+    def service_level_config(self) -> dict:
+        """Retorna la política CSL activa para cada clase ABC.
+
+        Lee primero ``manifest["service_level_policy"]`` y aplica los defaults
+        del PDF sección 8.4 donde no haya override explícito.
+
+        Returns
+        -------
+        dict
+            ``{"A": float, "B": float, "C": float}`` — CSL objetivo por clase.
+        """
+        manifest = self.repository.load_manifest()
+        policy = manifest.get("service_level_policy")
+        return {abc: get_csl_target(abc, policy) for abc in ("A", "B", "C")}
+
+    def sku_inventory_params(self, sku: str, abc_class: str | None = None) -> dict:
+        """Retorna los parámetros de inventario para un SKU como dict.
+
+        Parameters
+        ----------
+        sku : str
+            Identificador del SKU.
+        abc_class : str or None
+            Clase ABC del SKU. Si no se provee, se usa None (review period = default C).
+
+        Returns
+        -------
+        dict
+            Campos: ``sku, lead_time_days, sigma_lt_days, review_period_days,
+            carrying_cost_rate, abc_class``.
+        """
+        catalog = self.repository.load_table("product_catalog")
+        row = catalog.loc[catalog["sku"] == sku]
+        supplier = row["supplier"].iloc[0] if not row.empty else None
+        manifest = self.repository.load_manifest()
+        params = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
+        return params.to_dict()

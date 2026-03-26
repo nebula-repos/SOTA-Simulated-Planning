@@ -51,7 +51,8 @@ def _make_sku_results(n: int = 10) -> pd.DataFrame:
             "status":        status,
             "model_winner":  models[i % len(models)] if status in ("ok", "fallback") else None,
             "mase":          mase,
-            "wape":          float(rng.uniform(0.1, 0.5)) if not math.isnan(mase) else float("nan"),
+            "wmape":         float(rng.uniform(0.1, 0.5)) if not math.isnan(mase) else float("nan"),
+            "rmsse":         float(rng.uniform(0.3, 1.5)) if not math.isnan(mase) else float("nan"),
             "bias":          float(rng.uniform(-0.3, 0.3)) if not math.isnan(mase) else float("nan"),
             "mae":           float(rng.uniform(5, 50)) if not math.isnan(mase) else float("nan"),
             "rmse":          float(rng.uniform(6, 60)) if not math.isnan(mase) else float("nan"),
@@ -135,7 +136,7 @@ class TestAggregator:
     def test_global_metrics_keys(self):
         df = _make_sku_results(20)
         metrics = aggregator.compute_global_metrics(df)
-        for key in ("n_total", "n_ok", "n_fallback", "mase_median", "mase_p90", "wape_median"):
+        for key in ("n_total", "n_ok", "n_fallback", "mase_median", "mase_p90", "wmape_median", "rmsse_median"):
             assert key in metrics, f"Falta clave: {key}"
 
     def test_global_n_total_equals_len(self):
@@ -274,7 +275,7 @@ class TestComparator:
                 # SKU válido que cambia de modelo
                 {"sku": "SKU-OK", "sb_class": "smooth", "abc_class": "A",
                  "status": "ok", "model_winner": "AutoARIMA" if flip_model else "AutoETS",
-                 "mase": 0.7, "wape": 0.2, "bias": 0.0, "mae": 5.0, "rmse": 6.0,
+                 "mase": 0.7, "wmape": 0.2, "rmsse": 0.8, "bias": 0.0, "mae": 5.0, "rmse": 6.0,
                  "granularity": "M", "h": 3, "season_length": 12, "n_obs": 36,
                  "error_msg": None, "xyz_class": "X", "abc_xyz": "AX",
                  "is_seasonal": True, "lifecycle": "mature", "quality_score": 0.9,
@@ -282,8 +283,8 @@ class TestComparator:
                 # SKU inactivo — no debe aparecer como "cambio"
                 {"sku": "SKU-INACTIVE", "sb_class": "inactive", "abc_class": None,
                  "status": "no_forecast", "model_winner": None,
-                 "mase": float("nan"), "wape": float("nan"), "bias": float("nan"),
-                 "mae": float("nan"), "rmse": float("nan"),
+                 "mase": float("nan"), "wmape": float("nan"), "rmsse": float("nan"),
+                 "bias": float("nan"), "mae": float("nan"), "rmse": float("nan"),
                  "granularity": "M", "h": 3, "season_length": None, "n_obs": 0,
                  "error_msg": None, "xyz_class": None, "abc_xyz": None,
                  "is_seasonal": False, "lifecycle": "inactive", "quality_score": 0.0,
@@ -291,8 +292,8 @@ class TestComparator:
                 # SKU con error — no debe aparecer como "cambio"
                 {"sku": "SKU-ERROR", "sb_class": "smooth", "abc_class": "B",
                  "status": "error", "model_winner": None,
-                 "mase": float("nan"), "wape": float("nan"), "bias": float("nan"),
-                 "mae": float("nan"), "rmse": float("nan"),
+                 "mase": float("nan"), "wmape": float("nan"), "rmsse": float("nan"),
+                 "bias": float("nan"), "mae": float("nan"), "rmse": float("nan"),
                  "granularity": "M", "h": 3, "season_length": 12, "n_obs": 10,
                  "error_msg": "algo falló", "xyz_class": "Y", "abc_xyz": "BY",
                  "is_seasonal": False, "lifecycle": "mature", "quality_score": 0.5,

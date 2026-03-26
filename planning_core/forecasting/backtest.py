@@ -85,7 +85,7 @@ def run_backtest(
     -------
     dict[str, dict]
         Clave: nombre del modelo.
-        Valor: dict con claves ``mase``, ``wape``, ``bias``, ``mae``, ``rmse``,
+        Valor: dict con claves ``mase``, ``wmape``, ``rmsse``, ``bias``, ``mae``, ``rmse``,
         ``n_windows``, ``h``, ``status``.
 
         Si la serie es demasiado corta: ``{"status": "series_too_short", ...}``.
@@ -113,7 +113,8 @@ def run_backtest(
             "n_obs": len(nixtla_df),
             "min_required": min_required,
             "mase": float("nan"),
-            "wape": float("nan"),
+            "wmape": float("nan"),
+            "rmsse": float("nan"),
             "bias": float("nan"),
             "mae": float("nan"),
             "rmse": float("nan"),
@@ -142,8 +143,8 @@ def run_backtest(
         if model_name not in cv_df.columns:
             results[model_name] = {
                 "status": "model_column_missing",
-                "mase": float("nan"), "wape": float("nan"), "bias": float("nan"),
-                "mae": float("nan"), "rmse": float("nan"),
+                "mase": float("nan"), "wmape": float("nan"), "rmsse": float("nan"),
+                "bias": float("nan"), "mae": float("nan"), "rmse": float("nan"),
                 "n_windows": 0, "h": h,
             }
             continue
@@ -170,10 +171,10 @@ def run_backtest(
 def _aggregate_window_metrics(windows: list[dict]) -> dict:
     """Promedia metricas sobre ventanas del backtest ignorando NaN."""
     if not windows:
-        return {"mase": float("nan"), "wape": float("nan"),
+        return {"mase": float("nan"), "wmape": float("nan"), "rmsse": float("nan"),
                 "bias": float("nan"), "mae": float("nan"), "rmse": float("nan")}
 
-    keys = ["mase", "wape", "bias", "mae", "rmse"]
+    keys = ["mase", "wmape", "rmsse", "bias", "mae", "rmse"]
     result = {}
     for k in keys:
         values = [w[k] for w in windows if not np.isnan(w.get(k, float("nan")))]
