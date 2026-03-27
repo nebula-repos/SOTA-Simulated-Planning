@@ -1,7 +1,9 @@
 # Output data
-output/*.csv
-output/*.parquet
-/output
+/output/*
+!/output/*.csv
+!/output/dataset_manifest.json
+/output/*.parquet
+/output/eval_runs/
 
 # Python
 __pycache__/

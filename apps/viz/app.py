@@ -65,6 +65,10 @@ APP_NAV_ITEMS = {
         "label": "Clasificación",
         "icon": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 12 17 7"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>',
     },
+    "health": {
+        "label": "Health",
+        "icon": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>',
+    },
     "alertas": {
         "label": "Alertas",
         "icon": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 21 20H3L12 4Z"/><path d="M12 9v4.5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>',
@@ -196,6 +200,38 @@ def inject_app_styles(sidebar_compact: bool = False) -> None:
 
         div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
             color: var(--muted) !important;
+        }
+
+        div[data-testid="stMetricValue"] > div {
+            font-size: 1.35rem !important;
+            white-space: nowrap;
+            overflow: visible !important;
+        }
+
+        .sota-kpi-currency {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 0.85rem 1rem;
+            box-shadow: 0 10px 28px rgba(83, 66, 45, 0.06);
+            height: 100%;
+        }
+        .sota-kpi-currency .sota-kpi-label {
+            color: var(--muted);
+            font-size: 0.875rem;
+            margin-bottom: 0.35rem;
+        }
+        .sota-kpi-currency .sota-kpi-value {
+            font-size: 1.35rem;
+            font-weight: 600;
+            color: var(--text);
+            white-space: nowrap;
+        }
+        .sota-kpi-currency .sota-kpi-unit {
+            font-size: 0.72rem;
+            color: var(--muted);
+            font-weight: 400;
+            letter-spacing: 0.03em;
         }
 
         div[data-testid="stDataFrame"] *,
@@ -691,6 +727,17 @@ def get_service() -> PlanningService:
 
 
 @st.cache_data(show_spinner=False)
+def _get_sku_inventory_data(_service: PlanningService, sku: str, abc_class: str | None) -> tuple[dict, dict]:
+    """Wrapper cacheado para sku_safety_stock + sku_inventory_params.
+
+    El prefijo ``_`` en ``_service`` indica a Streamlit que no intente hashearlo.
+    """
+    ss = _service.sku_safety_stock(sku, abc_class=abc_class)
+    params = _service.sku_inventory_params(sku, abc_class=abc_class)
+    return ss, params
+
+
+@st.cache_data(show_spinner=False)
 def _run_sku_forecast(_service: PlanningService, sku: str, granularity: str, h: int, n_windows: int) -> dict:
     """Wrapper cacheado para sku_forecast.
 
@@ -793,12 +840,19 @@ def get_dashboard_data(_service: PlanningService) -> dict:
         .sort_values("sales_amount", ascending=False)
         .reset_index(drop=True)
     )
+    # Serie diaria por location — permite filtrar por temporalidad en la vista
+    daily_sales_by_location = (
+        transactions.groupby(["date", "location"], as_index=False)[["quantity", "total_amount"]]
+        .sum()
+        .rename(columns={"quantity": "sales_qty", "total_amount": "sales_amount"})
+    )
 
     return {
         "network_timeseries": network_ts,
         "inventory_by_location": inventory_by_location,
         "inventory_value_by_location": inventory_value_by_location,
         "sales_by_location": sales_by_location,
+        "daily_sales_by_location": daily_sales_by_location,
         "latest_snapshot_date": latest_snapshot_date,
         "sales_qty_total": int(transactions["quantity"].sum()) if not transactions.empty else 0,
         "sales_amount_total": float(transactions["total_amount"].sum()) if not transactions.empty else 0.0,
@@ -886,10 +940,22 @@ def build_backtest_figure(
 
 
 def format_currency(value: float | int) -> str:
-    return f"$ {value:,.0f}"
+    abs_val = abs(value)
+    if abs_val >= 1_000_000_000:
+        return f"{value / 1_000_000_000:.2f} B CLP"
+    if abs_val >= 1_000_000:
+        return f"{value / 1_000_000:.1f} M CLP"
+    return f"{value:,.0f} CLP"
 
 
-def build_line_figure(dataframe: pd.DataFrame, title: str, series: list[tuple[str, str]]) -> go.Figure:
+def build_line_figure(
+    dataframe: pd.DataFrame,
+    title: str,
+    series: list[tuple[str, str]],
+    y_title: str = "Cantidad",
+    y_tickformat: str = ",",
+    y_ticksuffix: str = "",
+) -> go.Figure:
     figure = go.Figure()
     for column_name, label in series:
         if column_name not in dataframe.columns:
@@ -906,7 +972,8 @@ def build_line_figure(dataframe: pd.DataFrame, title: str, series: list[tuple[st
     figure.update_layout(
         title=title,
         xaxis_title="Fecha",
-        yaxis_title="Cantidad",
+        yaxis_title=y_title,
+        yaxis=dict(tickformat=y_tickformat, ticksuffix=y_ticksuffix),
         legend_title="Serie",
         margin=dict(l=20, r=20, t=60, b=20),
         height=360,
@@ -922,7 +989,9 @@ def build_metric_bar_figure(
     color: str,
     y_title: str,
     horizontal: bool = False,
+    text_col: str | None = None,
 ) -> go.Figure:
+    text_data = dataframe[text_col] if text_col and text_col in dataframe.columns else dataframe[y_col]
     figure = go.Figure()
     if horizontal:
         figure.add_trace(
@@ -931,7 +1000,7 @@ def build_metric_bar_figure(
                 y=dataframe[x_col],
                 orientation="h",
                 marker_color=color,
-                text=dataframe[y_col],
+                text=text_data,
                 textposition="auto",
             )
         )
@@ -941,7 +1010,7 @@ def build_metric_bar_figure(
                 x=dataframe[x_col],
                 y=dataframe[y_col],
                 marker_color=color,
-                text=dataframe[y_col],
+                text=text_data,
                 textposition="outside",
             )
         )
@@ -2082,6 +2151,189 @@ def _render_sku_section_forecast(service: PlanningService, selected_sku: str):
             )
 
 
+def _render_sku_section_inventario(
+    service: PlanningService,
+    selected_sku: str,
+    summary: dict,
+    profile: pd.Series | None,
+) -> None:
+    """Sección de inventario: safety stock, ROP y parámetros de reposición."""
+
+    abc_class = profile.get("abc_class") if profile is not None else None
+
+    with st.spinner("Calculando safety stock"):
+        ss_result, params = _get_sku_inventory_data(service, selected_sku, abc_class)
+
+    if ss_result["n_periods"] < 3:
+        st.warning(
+            f"Solo {ss_result['n_periods']} período(s) histórico(s) — "
+            "el safety stock se estimó en 0 (datos insuficientes para σ_d confiable)."
+        )
+
+    ss  = ss_result["safety_stock"]
+    rop = ss_result["reorder_point"]
+    on_hand = summary["last_on_hand_total"]
+    on_order = summary["last_on_order_total"]
+    # Stock Efectivo = on_hand + on_order (stock en tránsito) — PDF §2.1
+    stock_efectivo = on_hand + on_order
+    gap = stock_efectivo - rop
+
+    # Cobertura neta y ratio de posicionamiento — PDF §2.3
+    mean_d = ss_result["mean_demand_daily"]
+    coverage_ss = ss_result["coverage_ss_days"]
+    if mean_d > 0:
+        coverage_net = stock_efectivo / mean_d
+    else:
+        coverage_net = 0.0
+    coverage_obj = params["lead_time_days"] + params["review_period_days"] + coverage_ss
+    positioning_ratio = (coverage_net / coverage_obj) if coverage_obj > 0 else 0.0
+
+    _RATIO_TO_STATUS = [
+        (0.3, "Quiebre inminente 🔴"),
+        (0.7, "Substock 🟠"),
+        (1.3, "Equilibrio 🟢"),
+        (2.0, "Sobrestock leve 🟡"),
+        (float("inf"), "Sobrestock crítico ⚫"),
+    ]
+    health_label = next(lbl for thr, lbl in _RATIO_TO_STATUS if positioning_ratio < thr)
+
+    # --- KPI strip ---
+    kpi_cols = st.columns(6)
+    kpi_cols[0].metric("Safety Stock", f"{ss:,.0f} u")
+    kpi_cols[1].metric("ROP", f"{rop:,.0f} u")
+    kpi_cols[2].metric(
+        "Stock efectivo vs ROP",
+        f"{stock_efectivo:,.0f} u",
+        delta=f"{gap:+,.0f} u",
+        delta_color="normal",
+        help=f"Stock efectivo = on_hand ({on_hand:,} u) + on_order ({on_order:,} u). PDF §2.1.",
+    )
+    kpi_cols[3].metric("Cobertura SS", f"{coverage_ss:.1f} días" if coverage_ss > 0 else "—")
+    csl_help = "" if params["ss_method"] != "simple_pct_lt" else " (objetivo de negocio; método simple no garantiza este CSL)"
+    kpi_cols[4].metric("CSL objetivo", f"{params['csl_target']:.1%}", help=f"Nivel de servicio objetivo por clase ABC.{csl_help}")
+    kpi_cols[5].metric("Lead time", f"{params['lead_time_days']:.0f} días")
+
+    # --- Fila de diagnóstico (ratio + health) ---
+    diag_cols = st.columns([1, 1, 1, 3])
+    diag_cols[0].metric("Cobertura neta", f"{coverage_net:.1f} días", help="Stock efectivo / demanda diaria. PDF §2.3.")
+    diag_cols[1].metric("Cobertura objetivo", f"{coverage_obj:.1f} días", help="LT + Revisión + Cobertura SS. PDF §2.3.")
+    diag_cols[2].metric("Ratio posicionamiento", f"{positioning_ratio:.2f}", help="Cobertura neta / objetivo. <0.7 substock, 0.7-1.3 equilibrio, >1.3 sobrestock.")
+    diag_cols[3].markdown(f"**Estado:** {health_label}")
+
+    st.divider()
+
+    # --- Gráficos ---
+    chart_cols = st.columns([1.1, 0.9])
+
+    with chart_cols[0]:
+        st.caption("Stock histórico vs SS y ROP")
+        timeseries = service.sku_timeseries(selected_sku)
+        if timeseries.empty:
+            st.info("No hay serie histórica de stock disponible.")
+        else:
+            fig_stock = go.Figure()
+            fig_stock.add_trace(go.Scatter(
+                x=timeseries["date"],
+                y=timeseries["on_hand_qty"],
+                name="Stock actual (on-hand)",
+                line=dict(color="#2980b9", width=1.8),
+                fill="tozeroy",
+                fillcolor="rgba(41,128,185,0.08)",
+            ))
+            if rop > 0:
+                fig_stock.add_hline(
+                    y=rop,
+                    line_dash="dot",
+                    line_color="#e74c3c",
+                    line_width=1.5,
+                    annotation_text=f"ROP = {rop:,.0f}",
+                    annotation_position="bottom right",
+                    annotation_font_color="#e74c3c",
+                )
+            if ss > 0:
+                fig_stock.add_hline(
+                    y=ss,
+                    line_dash="dot",
+                    line_color="#27ae60",
+                    line_width=1.5,
+                    annotation_text=f"SS = {ss:,.0f}",
+                    annotation_position="top right",
+                    annotation_font_color="#27ae60",
+                )
+            fig_stock.update_layout(
+                xaxis_title="Fecha",
+                yaxis_title="Unidades",
+                template="plotly_white",
+                height=360,
+                margin=dict(l=20, r=20, t=20, b=20),
+                legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
+            )
+            st.plotly_chart(fig_stock, use_container_width=True)
+
+    with chart_cols[1]:
+        ss_method = ss_result["ss_method"]
+
+        if ss_method == "extended":
+            st.caption("Drivers del Safety Stock")
+            z2       = params["z_factor"] ** 2
+            exposure = params["lead_time_days"] + params["review_period_days"]
+            sigma_d  = ss_result["sigma_demand_daily"]
+            d_mean   = ss_result["mean_demand_daily"]
+            sigma_lt = params["sigma_lt_days"]
+
+            term_demand = z2 * exposure * (sigma_d ** 2)
+            term_lt     = z2 * (d_mean ** 2) * (sigma_lt ** 2)
+            total = max(term_demand + term_lt, 1e-9)
+
+            pct_demand = term_demand / total * 100
+            pct_lt     = term_lt / total * 100
+
+            fig_decomp = go.Figure(go.Bar(
+                x=[pct_demand, pct_lt],
+                y=["Variab. demanda", "Variab. lead time"],
+                orientation="h",
+                marker_color=["#3498db", "#e67e22"],
+                text=[f"{pct_demand:.1f}%", f"{pct_lt:.1f}%"],
+                textposition="auto",
+            ))
+            fig_decomp.update_layout(
+                xaxis_title="Contribución al SS² (%)",
+                xaxis=dict(range=[0, 105]),
+                template="plotly_white",
+                height=200,
+                margin=dict(l=10, r=20, t=10, b=40),
+                showlegend=False,
+            )
+            st.plotly_chart(fig_decomp, use_container_width=True)
+
+            st.caption(
+                f"z={params['z_factor']:.2f} · σ_d={sigma_d:.4f} u/día · "
+                f"σ_LT={sigma_lt:.1f} días · exposición={exposure:.0f} días"
+            )
+
+        else:
+            # simple_pct_lt (clase C) — tabla de parámetros en su lugar
+            st.caption("Parámetros SS (método simple)")
+            simple_rows = [
+                {"Parámetro": "Método",              "Valor": ss_method},
+                {"Parámetro": "Lead time (días)",     "Valor": f"{params['lead_time_days']:.0f}"},
+                {"Parámetro": "σ LT (días)",          "Valor": f"{params['sigma_lt_days']:.1f}"},
+                {"Parámetro": "Revisión (días)",      "Valor": f"{params['review_period_days']:.0f}"},
+                {"Parámetro": "Demanda media diaria", "Valor": f"{ss_result['mean_demand_daily']:.4f}"},
+                {"Parámetro": "CSL objetivo",         "Valor": f"{params['csl_target']:.1%}"},
+            ]
+            st.dataframe(
+                pd.DataFrame(simple_rows),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    # --- Expander parámetros completos ---
+    with st.expander("Parámetros de inventario completos"):
+        params_display = {k: v for k, v in params.items() if k != "sku"}
+        render_copyable_dataframe(pd.DataFrame([params_display]), f"inv_params_{selected_sku}")
+
+
 def render_sku_detail_unified(
     service: PlanningService,
     selected_sku: str,
@@ -2130,6 +2382,7 @@ def render_sku_detail_unified(
         "operacion": "Operación",
         "clasificacion": "Clasificación",
         "forecast": "Forecast",
+        "inventario": "Inventario",
     }
     sku_section = st.radio(
         "Sección del producto",
@@ -2146,6 +2399,8 @@ def render_sku_detail_unified(
         _render_sku_section_clasificacion(service, selected_sku, classification_df)
     elif sku_section == "forecast":
         _render_sku_section_forecast(service, selected_sku)
+    elif sku_section == "inventario":
+        _render_sku_section_inventario(service, selected_sku, summary, profile)
     else:
         _render_sku_section_operacional(service, selected_sku, summary)
 
@@ -2240,13 +2495,26 @@ def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFra
         if not central_row.empty:
             central_on_hand = int(central_row["on_hand_qty"].iloc[0])
 
+    # Flujo: sumar el período filtrado. Stock: último snapshot (no cambia con temporalidad).
+    kpi_sales_qty = int(timeline["sales_qty"].sum())
+    kpi_sales_amount = float(timeline["sales_amount"].sum())
+
     kpi_cols = st.columns(6)
-    kpi_cols[0].metric("Ventas totales", f"{dashboard['sales_qty_total']:,}")
-    kpi_cols[1].metric("Revenue total", format_currency(dashboard["sales_amount_total"]))
-    kpi_cols[2].metric("Inventario on hand", f"{dashboard['on_hand_total']:,}")
-    kpi_cols[3].metric("Inventario on order", f"{dashboard['on_order_total']:,}")
-    kpi_cols[4].metric("Stock CD central", f"{central_on_hand:,}")
-    kpi_cols[5].metric("SKUs con censura", int(classification_df["has_censored_demand"].sum()))
+    kpi_cols[0].metric("Ventas totales", f"{kpi_sales_qty:,} u")
+    with kpi_cols[1]:
+        _amt = kpi_sales_amount
+        _num = f"{_amt / 1_000_000_000:.2f} B" if _amt >= 1e9 else f"{_amt / 1_000_000:.1f} M"
+        st.markdown(
+            f'<div class="sota-kpi-currency">'
+            f'<div class="sota-kpi-label">Revenue total</div>'
+            f'<div class="sota-kpi-value">{_num} <span class="sota-kpi-unit">CLP</span></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    kpi_cols[2].metric("Inventario on hand", f"{dashboard['on_hand_total']:,} u")
+    kpi_cols[3].metric("Inventario on order", f"{dashboard['on_order_total']:,} u")
+    kpi_cols[4].metric("Stock CD central", f"{central_on_hand:,} u")
+    kpi_cols[5].metric("SKUs con censura", f"{int(classification_df['has_censored_demand'].sum())} SKUs")
 
     chart_cols = st.columns(2)
     with chart_cols[0]:
@@ -2257,6 +2525,9 @@ def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFra
                 ("sales_qty", "Ventas"),
                 ("purchase_receipt_qty", "Recepciones compra"),
             ],
+            y_title="Unidades",
+            y_tickformat="~s",
+            y_ticksuffix=" u",
         )
         st.plotly_chart(flow_fig, use_container_width=True)
 
@@ -2268,32 +2539,53 @@ def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFra
                 ("on_hand_qty", "On hand"),
                 ("on_order_qty", "On order"),
             ],
+            y_title="Unidades",
+            y_tickformat="~s",
+            y_ticksuffix=" u",
         )
         st.plotly_chart(stock_fig, use_container_width=True)
 
     dist_cols = st.columns(2)
     with dist_cols[0]:
+        inv_data = dashboard["inventory_by_location"].copy()
+        inv_data["_label"] = inv_data["on_hand_qty"].apply(lambda x: f"{x:,} u")
         inv_fig = build_metric_bar_figure(
-            dashboard["inventory_by_location"],
+            inv_data,
             "location",
             "on_hand_qty",
             f"Inventario actual por location ({dashboard['latest_snapshot_date'].date().isoformat()})",
             color="#6d7f61",
-            y_title="On hand",
+            y_title="Unidades",
             horizontal=True,
+            text_col="_label",
         )
         st.plotly_chart(inv_fig, use_container_width=True)
 
     with dist_cols[1]:
-        sales_loc_fig = build_metric_bar_figure(
-            dashboard["sales_by_location"],
-            "location",
-            "sales_amount",
-            "Revenue acumulado por location",
-            color="#b97d4b",
-            y_title="Revenue",
-            horizontal=True,
+        # Filtrar ventas por location al mismo período que timeline
+        date_min = timeline["date"].min()
+        date_max = timeline["date"].max()
+        rev_loc_filtered = (
+            dashboard["daily_sales_by_location"]
+            .query("@date_min <= date <= @date_max")
+            .groupby("location", as_index=False)["sales_amount"]
+            .sum()
+            .sort_values("sales_amount", ascending=False)
+            .reset_index(drop=True)
         )
+        rev_loc_filtered["_amount_b"] = rev_loc_filtered["sales_amount"] / 1_000_000_000
+        rev_loc_filtered["_label"] = rev_loc_filtered["_amount_b"].apply(lambda x: f"{x:.1f} B CLP")
+        sales_loc_fig = build_metric_bar_figure(
+            rev_loc_filtered,
+            "location",
+            "_amount_b",
+            f"Revenue por location ({dashboard_temporality})",
+            color="#b97d4b",
+            y_title="Revenue (B CLP)",
+            horizontal=True,
+            text_col="_label",
+        )
+        sales_loc_fig.update_xaxes(tickformat=".1f", ticksuffix=" B")
         st.plotly_chart(sales_loc_fig, use_container_width=True)
 
     mix_cols = st.columns(3)
@@ -2301,7 +2593,7 @@ def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFra
         abc_fig = build_distribution_bar_figure(
             classification_df,
             "abc_class",
-            "Mix ABC",
+            "Mix ABC (catálogo completo)",
             ABC_COLORS,
         )
         st.plotly_chart(abc_fig, use_container_width=True)
@@ -2309,20 +2601,25 @@ def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFra
         sb_fig = build_distribution_bar_figure(
             classification_df,
             "sb_class",
-            "Mix Syntetos-Boylan",
+            "Mix Syntetos-Boylan (catálogo completo)",
             SB_COLORS,
         )
         st.plotly_chart(sb_fig, use_container_width=True)
     with mix_cols[2]:
+        inv_val_data = dashboard["inventory_value_by_location"].copy()
+        inv_val_data["_value_b"] = inv_val_data["inventory_value"] / 1_000_000_000
+        inv_val_data["_label"] = inv_val_data["_value_b"].apply(lambda x: f"{x:.2f} B CLP")
         inventory_value_fig = build_metric_bar_figure(
-            dashboard["inventory_value_by_location"],
+            inv_val_data,
             "location",
-            "inventory_value",
-            "Valor inventario por location",
+            "_value_b",
+            f"Valor inventario por location ({dashboard['latest_snapshot_date'].date().isoformat()})",
             color="#8e6a4f",
-            y_title=f"Valor ({overview['currency']})",
+            y_title=f"Valor (B {overview['currency']})",
             horizontal=True,
+            text_col="_label",
         )
+        inventory_value_fig.update_xaxes(tickformat=".1f", ticksuffix=" B")
         st.plotly_chart(inventory_value_fig, use_container_width=True)
 
     table_cols = st.columns(2)
@@ -2480,6 +2777,511 @@ def render_catalog_tab(service: PlanningService, classification_df: pd.DataFrame
         st.rerun()
 
 
+@st.cache_data(show_spinner=False, ttl=300)
+def _get_catalog_health(_service: PlanningService) -> "pd.DataFrame":
+    """Wrapper cacheado para catalog_health_report (TTL 5 min)."""
+    return _service.catalog_health_report()
+
+
+_HEALTH_COLORS: dict[str, str] = {
+    "quiebre_inminente": "#e74c3c",
+    "substock":          "#e67e22",
+    "equilibrio":        "#27ae60",
+    "sobrestock_leve":   "#f1c40f",
+    "sobrestock_critico":"#95a5a6",
+    "dead_stock":        "#7f8c8d",
+}
+
+_HEALTH_LABELS: dict[str, str] = {
+    "quiebre_inminente": "Quiebre inminente",
+    "substock":          "Substock",
+    "equilibrio":        "Equilibrio",
+    "sobrestock_leve":   "Sobrestock leve",
+    "sobrestock_critico":"Sobrestock critico",
+    "dead_stock":        "Dead stock",
+}
+
+_ALERT_EMOJI: dict[str, str] = {
+    "rojo":    "🔴",
+    "naranja": "🟠",
+    "amarillo":"🟡",
+    "gris":    "⚫",
+    "none":    "🟢",
+}
+
+
+def _scatter_posicionamiento(filtered: "pd.DataFrame") -> None:
+    """Scatter cobertura neta vs objetivo con banda de equilibrio."""
+    scatter_df = filtered[filtered["mean_demand_daily"] > 0].copy()
+    if scatter_df.empty:
+        st.info("Sin SKUs con demanda estimada para el scatter.")
+        return
+
+    p85_net = scatter_df["coverage_net_days"].quantile(0.85)
+    p85_obj = scatter_df["coverage_obj_days"].quantile(0.85)
+    axis_max = min(max(p85_net, p85_obj, 1.0) * 1.2, 730.0)
+
+    n_out = int(
+        ((scatter_df["coverage_net_days"] > axis_max) | (scatter_df["coverage_obj_days"] > axis_max)).sum()
+    )
+    scatter_df = scatter_df[
+        (scatter_df["coverage_net_days"] <= axis_max) &
+        (scatter_df["coverage_obj_days"] <= axis_max)
+    ].copy()
+
+    scatter_df["size"] = (scatter_df["on_hand"].clip(lower=1) ** 0.4).clip(upper=20)
+    scatter_df["hover"] = (
+        scatter_df["sku"] + "<br>"
+        + "ABC: " + scatter_df["abc_class"].fillna("—") + "<br>"
+        + "Ratio: " + scatter_df["positioning_ratio"].round(2).astype(str) + "<br>"
+        + "On hand: " + scatter_df["on_hand"].round(0).astype(int).astype(str) + " u<br>"
+        + "P(quiebre): " + (scatter_df["stockout_probability"] * 100).round(1).astype(str) + "%"
+    )
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=[0, axis_max, axis_max, 0], y=[0, axis_max * 1.3, axis_max * 0.7, 0],
+        fill="toself", fillcolor="rgba(39,174,96,0.08)", line=dict(width=0),
+        name="Zona equilibrio (0.7x–1.3x)", showlegend=True, hoverinfo="skip",
+    ))
+    fig.add_trace(go.Scatter(
+        x=[0, axis_max], y=[0, axis_max], mode="lines",
+        line=dict(color="#27ae60", dash="dot", width=1),
+        name="Equilibrio exacto (y=x)", showlegend=True, hoverinfo="skip",
+    ))
+    for status, color in _HEALTH_COLORS.items():
+        sub = scatter_df[scatter_df["health_status"] == status]
+        if sub.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=sub["coverage_obj_days"], y=sub["coverage_net_days"],
+            mode="markers",
+            marker=dict(color=color, size=sub["size"], opacity=0.85, line=dict(width=0.5, color="#fff")),
+            name=_HEALTH_LABELS.get(status, status),
+            text=sub["hover"], hovertemplate="%{text}<extra></extra>",
+        ))
+    fig.update_layout(
+        xaxis=dict(title="Cobertura objetivo (días)", range=[0, axis_max]),
+        yaxis=dict(title="Cobertura neta (días)", range=[0, axis_max]),
+        height=400, margin=dict(l=0, r=0, t=10, b=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    if n_out > 0:
+        st.caption(f"{n_out} SKU(s) con cobertura > {axis_max:.0f} días excluidos — aparecen en la tabla.")
+
+
+def _histogram_ratios(filtered: "pd.DataFrame") -> None:
+    """Histograma de distribución del ratio de posicionamiento con bandas de color."""
+    hdf = filtered[filtered["mean_demand_daily"] > 0].copy()
+    if hdf.empty:
+        st.info("Sin datos para el histograma.")
+        return
+
+    ratios = hdf["positioning_ratio"].clip(upper=3.0)
+    band_colors = [
+        (0.0, 0.3,  "#e74c3c", "Quiebre"),
+        (0.3, 0.7,  "#e67e22", "Substock"),
+        (0.7, 1.3,  "#27ae60", "Equilibrio"),
+        (1.3, 2.0,  "#f1c40f", "Sobrestock leve"),
+        (2.0, 3.01, "#95a5a6", "Sobrestock crítico"),
+    ]
+
+    fig = go.Figure()
+    # Una barra por banda para colorear por estado
+    for lo, hi, color, label in band_colors:
+        mask = (ratios >= lo) & (ratios < hi)
+        sub_ratios = ratios[mask]
+        if sub_ratios.empty:
+            continue
+        fig.add_trace(go.Histogram(
+            x=sub_ratios, name=label,
+            marker_color=color, opacity=0.85,
+            xbins=dict(start=lo, end=hi, size=0.1),
+            hovertemplate=f"{label}: %{{y}} SKUs<extra></extra>",
+        ))
+    # Líneas verticales de bandas
+    for boundary in [0.3, 0.7, 1.3, 2.0]:
+        fig.add_vline(x=boundary, line_dash="dot", line_color="#999", line_width=1)
+    fig.add_vline(x=1.0, line_dash="solid", line_color="#27ae60", line_width=1.5,
+                  annotation_text="Objetivo", annotation_position="top right",
+                  annotation_font_color="#27ae60")
+    fig.update_layout(
+        barmode="stack",
+        xaxis_title="Ratio de posicionamiento",
+        yaxis_title="N° SKUs",
+        height=400, margin=dict(l=0, r=0, t=10, b=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
+        showlegend=True,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    n_ok = int(((ratios >= 0.7) & (ratios < 1.3)).sum())
+    st.caption(
+        f"{n_ok} de {len(hdf)} SKUs ({n_ok/len(hdf):.0%}) en zona de equilibrio. "
+        "Ratio = cobertura neta / cobertura objetivo (PDF §2.3)."
+    )
+
+
+def _radar_salud(df_full: "pd.DataFrame", group_col: str) -> None:
+    """Radar/spider chart de perfil de salud por dimensión de agrupación.
+
+    Vértices (ejes angulares) = grupos (proveedores, clases ABC, etc.).
+    Polígonos (trazados)      = métricas de salud, uno por métrica.
+    Un grupo óptimo toca el borde exterior (100%) en todos los polígonos.
+    """
+    df = df_full[df_full[group_col].notna()].copy()
+    groups = sorted(df[group_col].unique().tolist())
+    if len(groups) < 3:
+        st.info(f"Se necesitan ≥ 3 grupos para el radar (hay {len(groups)}).")
+        return
+
+    metric_names = [
+        "Sin quiebre/sub",
+        "Equilibrio",
+        "Sin sobrestock",
+        "Ratio vs obj",
+        "Sin P(quiebre)",
+    ]
+    metric_fill   = [
+        "rgba(231,76,60,0.18)",
+        "rgba(39,174,96,0.22)",
+        "rgba(241,196,15,0.18)",
+        "rgba(52,152,219,0.20)",
+        "rgba(155,89,182,0.18)",
+    ]
+    metric_stroke = ["#e74c3c", "#27ae60", "#f1c40f", "#3498db", "#9b59b6"]
+
+    # Calcular métricas por grupo (índice: grupo → lista de 5 valores)
+    grp_labels: list[str] = []
+    metrics_by_grp: dict[str, list[float]] = {}
+    for grp in groups:
+        sub = df[df[group_col] == grp]
+        n   = len(sub)
+        grp_labels.append(f"{grp}\n(n={n})")
+        pct_quiebre_sub = sub["health_status"].isin(["quiebre_inminente", "substock"]).mean()
+        pct_equilibrio  = (sub["health_status"] == "equilibrio").mean()
+        pct_sobre       = sub["health_status"].isin(["sobrestock_leve", "sobrestock_critico"]).mean()
+        ratio_med       = float(sub["positioning_ratio"].clip(0, 3).mean())
+        ratio_score     = max(0.0, 1.0 - abs(ratio_med - 1.0))  # 1.0 si ratio=1
+        pct_low_risk    = (sub["stockout_probability"] < 0.10).mean()
+        metrics_by_grp[grp] = [
+            round((1 - pct_quiebre_sub) * 100, 1),
+            round(pct_equilibrio        * 100, 1),
+            round((1 - pct_sobre)       * 100, 1),
+            round(ratio_score           * 100, 1),
+            round(pct_low_risk          * 100, 1),
+        ]
+
+    # Cerrar el polígono repitiendo el primer vértice
+    theta_closed = grp_labels + [grp_labels[0]]
+
+    fig = go.Figure()
+    for idx, (metric, fill, stroke) in enumerate(
+        zip(metric_names, metric_fill, metric_stroke)
+    ):
+        r_values = [metrics_by_grp[g][idx] for g in groups]
+        r_closed = r_values + [r_values[0]]
+        fig.add_trace(go.Scatterpolar(
+            r=r_closed,
+            theta=theta_closed,
+            fill="toself",
+            fillcolor=fill,
+            line=dict(color=stroke, width=2),
+            name=metric,
+            hovertemplate="<b>%{theta}</b><br>" + metric + ": %{r:.1f}%<extra></extra>",
+        ))
+
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%", tickfont=dict(size=10)),
+            angularaxis=dict(tickfont=dict(size=11)),
+        ),
+        height=480,
+        margin=dict(l=40, r=40, t=30, b=40),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
+        showlegend=True,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.caption(
+        "Cada **vértice** = grupo. Cada **polígono** = una métrica de salud (0–100%, borde = óptimo). "
+        "Un grupo ideal llena el radar en todos los ejes. "
+        "'Ratio vs obj' = 100 si el ratio promedio = 1.0 (cae simétricamente hacia sobrestock o substock)."
+    )
+
+
+def _bar_health_por_grupo(df_full: "pd.DataFrame", group_col: str) -> None:
+    """Bar stacked horizontal: composición de health_status por grupo."""
+    df = df_full[df_full[group_col].notna()].copy()
+    if df.empty:
+        st.info("Sin datos agrupados.")
+        return
+
+    statuses = ["quiebre_inminente", "substock", "equilibrio", "sobrestock_leve", "sobrestock_critico", "dead_stock"]
+    groups = sorted(df[group_col].unique().tolist())
+
+    fig = go.Figure()
+    for status in statuses:
+        counts = [int((df[df[group_col] == g]["health_status"] == status).sum()) for g in groups]
+        if sum(counts) == 0:
+            continue
+        fig.add_trace(go.Bar(
+            y=groups, x=counts, orientation="h",
+            name=_HEALTH_LABELS.get(status, status),
+            marker_color=_HEALTH_COLORS.get(status, "#ccc"),
+            hovertemplate="%{y} — " + _HEALTH_LABELS.get(status, status) + ": %{x} SKUs<extra></extra>",
+        ))
+    fig.update_layout(
+        barmode="stack",
+        xaxis_title="N° SKUs",
+        height=max(300, len(groups) * 45 + 80),
+        margin=dict(l=0, r=0, t=10, b=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _bar_capital_exceso(df_full: "pd.DataFrame", group_col: str, currency: str) -> None:
+    """Bar horizontal: capital inmovilizado en exceso por grupo (valorizado)."""
+    df = df_full[df_full[group_col].notna()].copy()
+    agg = df.groupby(group_col)["excess_capital"].sum().sort_values(ascending=True)
+    agg = agg[agg > 0]
+    if agg.empty:
+        st.info("Sin capital en exceso detectado.")
+        return
+    fig = go.Figure(go.Bar(
+        y=agg.index.tolist(), x=agg.values,
+        orientation="h",
+        marker_color="#f1c40f",
+        text=[f"{v/1e6:.1f}M" if v >= 1e6 else f"{v/1e3:.0f}K" for v in agg.values],
+        textposition="auto",
+        hovertemplate="%{y}: %{x:,.0f} " + currency + "<extra></extra>",
+    ))
+    fig.update_layout(
+        xaxis_title=f"Capital en exceso ({currency})",
+        height=max(280, len(agg) * 40 + 80),
+        margin=dict(l=0, r=0, t=10, b=0),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _bar_urgentes_valorizado(filtered: "pd.DataFrame", currency: str) -> None:
+    """Top-10 SKUs urgentes con capital en riesgo valorizado en CLP."""
+    urg = filtered[
+        filtered["health_status"].isin(["quiebre_inminente", "substock"]) &
+        (filtered["stockout_capital"] > 0)
+    ].nlargest(10, "stockout_capital").copy()
+
+    if urg.empty:
+        st.success("Sin SKUs urgentes con capital en riesgo.")
+        return
+
+    urg["color"] = urg["alert_level"].map({"rojo": "#e74c3c", "naranja": "#e67e22"}).fillna("#95a5a6")
+    urg["label"] = urg["stockout_capital"].apply(
+        lambda v: f"{v/1e6:.1f}M" if v >= 1e6 else f"{v/1e3:.0f}K"
+    )
+    fig = go.Figure(go.Bar(
+        x=urg["stockout_capital"], y=urg["sku"],
+        orientation="h",
+        marker_color=urg["color"],
+        text=urg["label"], textposition="auto",
+        hovertemplate="%{y}: %{x:,.0f} " + currency + " en riesgo<extra></extra>",
+    ))
+    fig.update_layout(
+        xaxis_title=f"Capital en riesgo ({currency})",
+        yaxis=dict(autorange="reversed"),
+        height=360, margin=dict(l=0, r=0, t=10, b=0),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def render_health_tab(service: PlanningService) -> None:
+    st.markdown("## Health Status Report")
+    st.caption("Diagnóstico de posicionamiento de inventario para todo el catálogo activo. PDF §2, §3, §11.")
+
+    col_title, col_reload = st.columns([9, 1])
+    with col_reload:
+        if st.button("↺ Recargar", key="health_reload", help="Limpia el cache y recalcula el diagnóstico"):
+            _get_catalog_health.clear()
+            st.rerun()
+
+    with st.spinner("Calculando diagnóstico del catálogo..."):
+        df = _get_catalog_health(service)
+
+    if df.empty:
+        st.warning("No hay datos de catálogo disponibles para generar el reporte.")
+        return
+
+    # Compatibilidad: versiones cacheadas antiguas pueden no tener columnas financieras
+    for _col in ("excess_capital", "stockout_capital", "unit_cost", "base_price",
+                 "category", "subcategory", "supplier", "brand"):
+        if _col not in df.columns:
+            df[_col] = 0.0 if _col in ("excess_capital", "stockout_capital", "unit_cost", "base_price") else None
+
+    currency = service.currency_code()
+
+    # ------------------------------------------------------------------
+    # FILA 0 — KPI strip (§3.2 + financiero §3.3)
+    # ------------------------------------------------------------------
+    n_quiebre  = int((df["health_status"] == "quiebre_inminente").sum())
+    n_substock = int((df["health_status"] == "substock").sum())
+    n_equil    = int((df["health_status"] == "equilibrio").sum())
+    n_sobre    = int(df["health_status"].isin(["sobrestock_leve", "sobrestock_critico"]).sum())
+    n_dead     = int((df["health_status"] == "dead_stock").sum())
+    total_excess_cap   = float(df["excess_capital"].sum())
+    total_stockout_cap = float(df["stockout_capital"].sum())
+
+    def _fmt_money(v: float) -> str:
+        if v >= 1e9:
+            return f"{v/1e9:.1f}B {currency}"
+        if v >= 1e6:
+            return f"{v/1e6:.1f}M {currency}"
+        return f"{v/1e3:.0f}K {currency}"
+
+    c0, c1, c2, c3, c4, c5, c6, c7 = st.columns(8)
+    c0.metric("Quiebre 🔴",       n_quiebre)
+    c1.metric("Substock 🟠",      n_substock)
+    c2.metric("Equilibrio 🟢",    n_equil)
+    c3.metric("Sobrestock 🟡⚫",  n_sobre)
+    c4.metric("Dead stock ⚫",    n_dead)
+    c5.metric("Cap. exceso",      _fmt_money(total_excess_cap),
+              help=f"Capital inmovilizado en exceso = exceso_u × costo. PDF §3.3.")
+    c6.metric("Cap. en riesgo",   _fmt_money(total_stockout_cap),
+              help="Capital en riesgo de quiebre = orden_sugerida × costo.")
+    c7.metric("Total catálogo",   f"{len(df)} SKUs")
+
+    st.markdown("---")
+
+    # ------------------------------------------------------------------
+    # FILTROS
+    # ------------------------------------------------------------------
+    fc0, fc1, fc2, fc3 = st.columns([1, 1, 1, 2])
+    alert_opts    = ["rojo", "naranja", "amarillo", "gris", "none"]
+    sel_alerts    = fc0.multiselect("Alerta", alert_opts, default=alert_opts, key="h_alert")
+    abc_opts      = sorted(df["abc_class"].dropna().unique().tolist())
+    sel_abc       = fc1.multiselect("ABC", abc_opts, default=abc_opts, key="h_abc")
+    only_alerts   = fc2.checkbox("Solo con alerta", key="h_only")
+    search_sku    = fc3.text_input("Buscar SKU", key="h_search")
+
+    mask = df["alert_level"].isin(sel_alerts)
+    if sel_abc:
+        mask &= df["abc_class"].isin(sel_abc)
+    if only_alerts:
+        mask &= df["alert_level"] != "none"
+    if search_sku:
+        mask &= df["sku"].str.contains(search_sku.upper(), case=False, na=False)
+    filtered = df[mask].copy()
+    st.caption(f"{len(filtered)} SKUs mostrados de {len(df)}.")
+
+    # ------------------------------------------------------------------
+    # FILA 1 — Scatter posicionamiento + Histograma de ratios (§2.3 + §3.1)
+    # ------------------------------------------------------------------
+    col1a, col1b = st.columns(2)
+    with col1a:
+        st.markdown("**Posicionamiento de inventario** (§2.3)")
+        _scatter_posicionamiento(filtered)
+    with col1b:
+        st.markdown("**Distribución del ratio de posicionamiento** (§2.3)")
+        _histogram_ratios(filtered)
+
+    st.markdown("---")
+
+    # ------------------------------------------------------------------
+    # FILA 2 — Radar perfil de salud + Bar stacked composición (§3.5)
+    # Selector de dimensión: controla ambos gráficos
+    # ------------------------------------------------------------------
+    st.markdown("**Perfil de salud por dimensión** (§3.5)")
+    _GROUP_OPTIONS = {
+        "Clase ABC":     "abc_class",
+        "Proveedor":     "supplier",
+        "Categoría":     "category",
+        "Subcategoría":  "subcategory",
+    }
+    sel_dim = st.radio(
+        "Agrupar por",
+        list(_GROUP_OPTIONS.keys()),
+        horizontal=True,
+        key="h_group_dim",
+    )
+    group_col = _GROUP_OPTIONS[sel_dim]
+
+    col2a, col2b = st.columns(2)
+    with col2a:
+        st.markdown(f"**Radar de salud — por {sel_dim}**")
+        _radar_salud(filtered, group_col)
+    with col2b:
+        st.markdown(f"**Composición de estado — por {sel_dim}**")
+        _bar_health_por_grupo(filtered, group_col)
+
+    st.markdown("---")
+
+    # ------------------------------------------------------------------
+    # FILA 3 — Financiero: capital inmovilizado + urgentes valorizados (§3.3)
+    # ------------------------------------------------------------------
+    st.markdown("**Análisis financiero** (§3.3)")
+    col3a, col3b = st.columns(2)
+    with col3a:
+        st.markdown(f"**Capital en exceso por {sel_dim}** ({currency})")
+        _bar_capital_exceso(filtered, group_col, currency)
+    with col3b:
+        st.markdown(f"**Top urgentes — capital en riesgo** ({currency})")
+        _bar_urgentes_valorizado(filtered, currency)
+
+    st.markdown("---")
+
+    # ------------------------------------------------------------------
+    # FILA 4 — Tabla interactiva detallada
+    # ------------------------------------------------------------------
+    st.markdown("**Detalle por SKU**")
+    display_cols = {
+        "sku": "SKU", "abc_class": "ABC", "category": "Categoría", "supplier": "Proveedor",
+        "health_status": "Estado", "alert_level": "Alerta",
+        "coverage_net_days": "Cob. neta (d)", "coverage_obj_days": "Cob. obj (d)",
+        "positioning_ratio": "Ratio",
+        "on_hand": "On hand (u)", "reorder_point": "ROP (u)", "safety_stock": "SS (u)",
+        "stockout_probability": "P(quiebre)",
+        "suggested_order_qty": "Orden sug. (u)", "excess_units": "Exceso (u)",
+        "excess_capital": f"Cap. exceso ({currency})", "stockout_capital": f"Cap. riesgo ({currency})",
+    }
+    avail = [c for c in display_cols if c in filtered.columns]
+    if not filtered.empty:
+        table_df = filtered[avail].rename(columns={c: display_cols[c] for c in avail}).copy()
+        for col in ["Cob. neta (d)", "Cob. obj (d)", "Ratio"]:
+            if col in table_df:
+                table_df[col] = table_df[col].round(1 if col != "Ratio" else 2)
+        for col in ["On hand (u)", "ROP (u)", "SS (u)", "Orden sug. (u)", "Exceso (u)"]:
+            if col in table_df:
+                table_df[col] = table_df[col].round(0).astype(int)
+        if "P(quiebre)" in table_df:
+            table_df["P(quiebre)"] = (table_df["P(quiebre)"] * 100).round(1).astype(str) + "%"
+        if "Alerta" in table_df:
+            table_df["Alerta"] = table_df["Alerta"].map(_ALERT_EMOJI).fillna("—") + " " + table_df["Alerta"]
+        for col in [f"Cap. exceso ({currency})", f"Cap. riesgo ({currency})"]:
+            if col in table_df:
+                table_df[col] = table_df[col].round(0).astype(int)
+
+        st.dataframe(table_df, use_container_width=True, hide_index=True, height=420)
+
+        st.caption("Selecciona un SKU para ir directo a su subsección Inventario.")
+        jump_sku = st.selectbox("Ir al SKU", options=[""] + filtered["sku"].tolist(), key="h_jump")
+        if jump_sku:
+            st.session_state["selected_sku"] = jump_sku
+            st.session_state["sku_section"] = "inventario"
+            st.query_params["view"] = "catalogo"
+            st.rerun()
+    else:
+        st.info("Sin resultados con los filtros aplicados.")
+
+    # Expander: textos explicativos de los SKUs más urgentes (§11.5)
+    urgentes_text = filtered[
+        filtered["health_status"].isin(["quiebre_inminente", "substock"]) &
+        (filtered["stockout_capital"] > 0)
+    ].nlargest(5, "stockout_capital")
+    if not urgentes_text.empty:
+        with st.expander("Diagnóstico textual — SKUs más urgentes (§11.5)"):
+            for _, row in urgentes_text.iterrows():
+                st.markdown(f"**{row['sku']}** — {row['diagnosis_text']}")
+
+
 def render_future_view(title: str, description: str):
     st.markdown(f"## {title}")
     st.info(description)
@@ -2492,6 +3294,7 @@ def render_sidebar_navigation(service: PlanningService) -> str:
         "dashboard": "◫ Dashboard",
         "catalogo": "◻ Catalogo",
         "clasificacion": "◎ Clasificacion",
+        "health": "◈ Health",
         "alertas": "◇ Alertas",
         "escenarios": "△ Escenarios",
     }
@@ -2499,6 +3302,7 @@ def render_sidebar_navigation(service: PlanningService) -> str:
         "dashboard": "◫",
         "catalogo": "◻",
         "clasificacion": "◎",
+        "health": "◈",
         "alertas": "◇",
         "escenarios": "△",
     }
@@ -2555,6 +3359,8 @@ def main():
         render_catalog_tab(service, official_classification_df)
     elif current_view == "clasificacion":
         render_classification_tab(service)
+    elif current_view == "health":
+        render_health_tab(service)
     elif current_view == "alertas":
         render_future_view(
             "Alertas",

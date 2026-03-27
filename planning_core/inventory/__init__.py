@@ -8,6 +8,10 @@ service_level
     Política de nivel de servicio (CSL) por segmento ABC y factor z.
 safety_stock
     Cálculo de safety stock (SS) y punto de reorden (ROP).
+diagnostics
+    Diagnóstico de salud de inventario: ratio de posicionamiento, bandas de
+    clasificación (quiebre/substock/equilibrio/sobrestock), P(quiebre) y
+    recomendaciones de reorden o reducción.
 """
 
 from planning_core.inventory.params import (
@@ -30,6 +34,12 @@ from planning_core.inventory.safety_stock import (
     compute_rop,
     compute_sku_safety_stock,
 )
+from planning_core.inventory.diagnostics import (
+    InventoryDiagnosis,
+    diagnose_sku,
+    HEALTH_BANDS,
+    DEAD_STOCK_DAYS_THRESHOLD,
+)
 
 __all__ = [
     "InventoryParams",
@@ -46,4 +56,8 @@ __all__ = [
     "compute_safety_stock",
     "compute_rop",
     "compute_sku_safety_stock",
+    "InventoryDiagnosis",
+    "diagnose_sku",
+    "HEALTH_BANDS",
+    "DEAD_STOCK_DAYS_THRESHOLD",
 ]

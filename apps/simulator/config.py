@@ -204,21 +204,23 @@ _INDUSTRIAL = {
     # Distribución ABC
     "abc_ratios": {"A": 0.10, "B": 0.25, "C": 0.65},
 
-    # Demanda base por clase ABC (unidades/día cuando hay demanda)
+    # Demanda base por clase ABC (unidades/día — λ para muestreo Poisson)
+    # Calibrado para: ventas anuales ~25 B CLP, inventario on-hand ~10 B CLP
+    # Ej. A-top = 0.32 u/día ≈ 10 u/mes (bomba Parker de alta rotación)
     "base_demand_ranges": {
-        "A": (2, 15),
-        "B": (0.5, 4),
-        "C": (0.1, 1.0),
+        "A": (0.04, 0.32),
+        "B": (0.010, 0.080),
+        "C": (0.002, 0.020),
     },
 
     # Parámetros de catálogo
     "supplier_profiles": {
-        "Hydroline Andina": {"avg_lead_time_days": 145, "payment_terms_days": 30},
-        "Tecfluid Norte": {"avg_lead_time_days": 155, "payment_terms_days": 30},
-        "Andes Motion": {"avg_lead_time_days": 165, "payment_terms_days": 45},
-        "Pacific Seal Supply": {"avg_lead_time_days": 180, "payment_terms_days": 45},
-        "Industrial Flow Partners": {"avg_lead_time_days": 190, "payment_terms_days": 60},
-        "Maestranza Integral": {"avg_lead_time_days": 200, "payment_terms_days": 60},
+        "Hydroline Andina": {"avg_lead_time_days": 21, "payment_terms_days": 30},   # distribuidor local
+        "Maestranza Integral": {"avg_lead_time_days": 35, "payment_terms_days": 30},  # fabricante local
+        "Tecfluid Norte": {"avg_lead_time_days": 55, "payment_terms_days": 30},    # regional sudamérica
+        "Andes Motion": {"avg_lead_time_days": 90, "payment_terms_days": 45},      # importación regional
+        "Pacific Seal Supply": {"avg_lead_time_days": 150, "payment_terms_days": 45},  # importación Europa
+        "Industrial Flow Partners": {"avg_lead_time_days": 180, "payment_terms_days": 60},  # importación Asia
     },
     "internal_transfer_profiles": {
         "Santiago": {"avg_lead_time_days": 1},

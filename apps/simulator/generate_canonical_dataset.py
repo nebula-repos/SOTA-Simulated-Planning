@@ -108,9 +108,9 @@ def sample_actual_lead_time(lead_time_days, variability=0.12, lower_bound=0.7, u
 def generate_purchase_data_direct(catalog, daily_demand_by_sku_location, daily_prices_by_sku_location, dates):
     """Abastecimiento directo a la location operativa."""
     purchase_policy = {
-        "A": {"history_days": 30, "review_days": 14, "safety_days": 10, "partial_prob": 0.10},
-        "B": {"history_days": 45, "review_days": 21, "safety_days": 14, "partial_prob": 0.14},
-        "C": {"history_days": 60, "review_days": 30, "safety_days": 21, "partial_prob": 0.18},
+        "A": {"history_days": 30, "review_days": 14, "review_days_max": 28, "safety_days": 10, "partial_prob": 0.10},
+        "B": {"history_days": 45, "review_days": 21, "review_days_max": 42, "safety_days": 14, "partial_prob": 0.14},
+        "C": {"history_days": 60, "review_days": 30, "review_days_max": 60, "safety_days": 21, "partial_prob": 0.18},
     }
 
     catalog_lookup = {row["sku"]: row for _, row in catalog.iterrows()}
@@ -281,9 +281,9 @@ def generate_purchase_data_direct(catalog, daily_demand_by_sku_location, daily_p
 def generate_purchase_data_central(catalog, daily_demand_by_sku_location, daily_prices_by_sku_location, dates):
     """Compra centralizada a proveedor y abastecimiento a sucursales vía traslado interno."""
     purchase_policy = {
-        "A": {"history_days": 30, "review_days": 14, "safety_days": 10, "partial_prob": 0.10},
-        "B": {"history_days": 45, "review_days": 21, "safety_days": 14, "partial_prob": 0.14},
-        "C": {"history_days": 60, "review_days": 30, "safety_days": 21, "partial_prob": 0.18},
+        "A": {"history_days": 30, "review_days": 14, "review_days_max": 28, "safety_days": 10, "partial_prob": 0.10},
+        "B": {"history_days": 45, "review_days": 21, "review_days_max": 42, "safety_days": 14, "partial_prob": 0.14},
+        "C": {"history_days": 60, "review_days": 30, "review_days_max": 60, "safety_days": 21, "partial_prob": 0.18},
     }
     transfer_policy = {
         "A": {"history_days": 21, "review_days": 7, "safety_days": 5},
@@ -569,9 +569,13 @@ def generate_purchase_data_central(catalog, daily_demand_by_sku_location, daily_
                 })
 
                 central_on_order += order_qty
-                central_next_review_day = day_idx + central_policy["review_days"]
+                central_next_review_day = day_idx + random.randint(
+                    central_policy["review_days"], central_policy.get("review_days_max", central_policy["review_days"])
+                )
             elif day_idx >= central_next_review_day:
-                central_next_review_day = day_idx + central_policy["review_days"]
+                central_next_review_day = day_idx + random.randint(
+                    central_policy["review_days"], central_policy.get("review_days_max", central_policy["review_days"])
+                )
 
             inventory_snapshots.append({
                 "snapshot_date": current_date,
@@ -838,8 +842,9 @@ def generate_timeseries(product, dates):
     # Combinar todo
     demand = trend * seasonality * dow * noise * intermittent_mask * spike_effects
 
-    # Redondear a enteros de demanda latente
-    demand = np.maximum(0, np.round(demand)).astype(int)
+    # Muestrear enteros desde Poisson(λ=demand_continua)
+    # Preserva el valor esperado incluso para λ sub-unitario (demanda industrial esporádica).
+    demand = np.random.poisson(np.maximum(0, demand)).astype(int)
 
     # Calcular precio con variación por spikes
     base_price = product["base_price"]

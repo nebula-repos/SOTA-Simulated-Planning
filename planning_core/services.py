@@ -12,8 +12,9 @@ from planning_core.classification import (
     treat_outliers,
 )
 from planning_core.forecasting.selector import select_and_forecast
+from planning_core.inventory.diagnostics import InventoryDiagnosis, diagnose_sku
 from planning_core.inventory.params import get_sku_params
-from planning_core.inventory.safety_stock import compute_sku_safety_stock
+from planning_core.inventory.safety_stock import compute_sku_safety_stock, SafetyStockResult
 from planning_core.inventory.service_level import get_csl_target
 from planning_core.preprocessing import censored_summary, mark_censored_demand
 from planning_core.repository import CanonicalRepository
@@ -837,3 +838,137 @@ class PlanningService:
             params, demand_series, granularity=granularity, simple_safety_pct=simple_safety_pct
         )
         return result.to_dict()
+
+    def catalog_health_report(
+        self,
+        granularity: str | None = None,
+        simple_safety_pct: float = 0.5,
+    ) -> pd.DataFrame:
+        """Diagnóstica el estado de salud de inventario de todo el catálogo activo.
+
+        Ejecuta el pipeline completo de diagnóstico (§11.2 del PDF) para cada
+        SKU activo: estado actual → necesidad futura → ratio → clasificación.
+
+        Parameters
+        ----------
+        granularity : str or None
+            Granularidad de la serie de demanda. Si None, usa la oficial del manifest.
+        simple_safety_pct : float
+            Fracción del LT demand usada como SS para clase C. Default 0.5.
+
+        Returns
+        -------
+        pd.DataFrame
+            Una fila por SKU activo. Columnas: todos los campos de
+            ``InventoryDiagnosis`` más ``days_since_last_movement``.
+        """
+        if granularity is None:
+            granularity = self.official_classification_granularity()
+
+        # --- 1. Clasificación del catálogo completo (ABC por SKU) ---
+        classification_df = self.classify_catalog(granularity=granularity)
+
+        # --- 2. Posición de stock actual vectorizada (una sola carga de tabla) ---
+        inventory = self.repository.load_table("inventory_snapshot")
+        latest_date = inventory["snapshot_date"].max()
+        latest_inv = inventory[inventory["snapshot_date"] == latest_date]
+
+        stock_by_sku = (
+            latest_inv.groupby("sku")[["on_hand_qty", "on_order_qty"]]
+            .sum()
+            .rename(columns={"on_hand_qty": "on_hand", "on_order_qty": "on_order"})
+        )
+
+        # --- 3. Última fecha de movimiento por SKU (para dead stock) ---
+        transactions = self.repository.load_table("transactions")
+        if not transactions.empty and "date" in transactions.columns:
+            last_movement = (
+                transactions.groupby("sku")["date"]
+                .max()
+                .rename("last_movement_date")
+            )
+            latest_tx_date = pd.to_datetime(transactions["date"]).max()
+        else:
+            last_movement = pd.Series(dtype="object", name="last_movement_date")
+            latest_tx_date = pd.Timestamp.now()
+
+        # --- 4. Parámetros globales compartidos (una sola carga de manifest/catalog) ---
+        catalog = self.repository.load_table("product_catalog")
+        manifest = self.repository.load_manifest()
+
+        # Índice de atributos del catálogo por SKU para lookup O(1)
+        _CAT_COLS = ["sku", "category", "subcategory", "supplier", "brand", "base_price", "cost"]
+        _available_cat_cols = [c for c in _CAT_COLS if c in catalog.columns]
+        catalog_index = catalog[_available_cat_cols].set_index("sku")
+
+        # --- 5. Loop por SKU ---
+        diagnoses: list[dict] = []
+        for _, row in classification_df.iterrows():
+            sku = row["sku"]
+            abc_class = row.get("abc_class")
+
+            # Stock position
+            if sku in stock_by_sku.index:
+                on_hand = float(stock_by_sku.loc[sku, "on_hand"])
+                on_order = float(stock_by_sku.loc[sku, "on_order"])
+            else:
+                on_hand, on_order = 0.0, 0.0
+
+            # Days since last movement
+            if sku in last_movement.index and pd.notna(last_movement[sku]):
+                last_mv = pd.to_datetime(last_movement[sku])
+                days_since = int((latest_tx_date - last_mv).days)
+            else:
+                days_since = 9999  # sin registro → tratado como dead stock
+
+            # Atributos del catálogo para este SKU
+            if sku in catalog_index.index:
+                cat_row = catalog_index.loc[sku]
+                supplier = cat_row.get("supplier") if "supplier" in catalog_index.columns else None
+                category = cat_row.get("category")
+                subcategory = cat_row.get("subcategory")
+                brand = cat_row.get("brand")
+                base_price = float(cat_row.get("base_price") or 0.0)
+                unit_cost = float(cat_row.get("cost") or 0.0)
+            else:
+                supplier = category = subcategory = brand = None
+                base_price = unit_cost = 0.0
+
+            # Inventory params
+            sku_catalog_row = catalog.loc[catalog["sku"] == sku]
+            params = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
+
+            # Safety stock
+            demand_series = self.sku_demand_series(sku, granularity=granularity)
+            ss_result = compute_sku_safety_stock(
+                params, demand_series, granularity=granularity, simple_safety_pct=simple_safety_pct
+            )
+
+            # Diagnóstico
+            diagnosis = diagnose_sku(
+                sku=sku,
+                on_hand=on_hand,
+                on_order=on_order,
+                ss_result=ss_result,
+                params=params,
+                abc_class=abc_class,
+                days_since_last_movement=days_since,
+            )
+            d = diagnosis.to_dict()
+            d["days_since_last_movement"] = days_since
+            # Atributos del catálogo — para análisis agrupado en la UI
+            d["category"] = category
+            d["subcategory"] = subcategory
+            d["supplier"] = supplier
+            d["brand"] = brand
+            d["base_price"] = base_price
+            d["unit_cost"] = unit_cost
+            # Métricas financieras derivadas
+            d["excess_capital"] = diagnosis.excess_units * unit_cost
+            d["stockout_capital"] = diagnosis.suggested_order_qty * unit_cost
+            diagnoses.append(d)
+
+        if not diagnoses:
+            return pd.DataFrame()
+
+        return pd.DataFrame(diagnoses)
