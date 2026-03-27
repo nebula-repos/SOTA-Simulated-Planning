@@ -1,451 +1,330 @@
-# Registro de Deuda Tecnica y Documental
+# Registro de Deuda Técnica
 
 ## Objetivo
 
-Dejar explicitada la deuda tecnica y documental detectada durante la inspeccion del repo para usarla como backlog de trabajo.
+Backlog de deuda técnica, bugs no declarados y oportunidades de mejora detectadas en inspecciones del repo.
+Solo contiene items **vigentes** — lo resuelto se elimina. Cada item tiene prioridad, tipo y acción concreta.
 
-Este documento cubre:
+Última actualización: `2026-03-26`
 
-- inconsistencias entre documentacion y codigo
-- gaps entre arquitectura declarada e implementacion real
-- riesgos de modelado y semantica
-- gaps de testing, validacion e integracion
-- decisiones de diseno pendientes antes de corregir ciertas piezas
-
-## Estado actual del repo evaluado
-
-Fecha de analisis: `2026-03-24`
-
-Contexto observado:
-
-- generador de dataset canonico operativo y consistente
-- capa `planning_core` funcional para lectura, agregacion y clasificacion
-- UI y API livianas conectadas al canonico
-- modulo de forecasting parcialmente implementado pero no integrado
-- tests existentes centrados en metricas y wrappers de forecast
+---
 
 ## Resumen ejecutivo
 
-La deuda no esta concentrada en una sola capa. Hoy hay cuatro frentes principales:
+| Frente | Items vigentes | Prioridad más alta |
+|---|---|---|
+| Testing / cobertura | D09, D26, D27 | Alta |
+| Performance / N+1 | D23, D24 | Alta |
+| Validación de datos | D08 | Alta |
+| Forecasting post-exp | D18, D19, D20, D21 | Media–Baja |
+| Arquitectura / deuda estructural | D14, D15, D22 | Media |
+| Calidad de código | D25, D28, D29, D30 | Baja–Media |
 
-1. deuda documental: el repo documenta una realidad anterior en varias partes
-2. deuda semantica/modelado: hay decisiones importantes que hoy estan implicitas o inferidas
-3. deuda de producto/integracion: forecasting existe como libreria interna, pero no como capacidad end-to-end
-4. deuda de confiabilidad: validaciones y tests cubren una porcion menor de la superficie real del sistema
+---
 
-## Inventario priorizado
+## Inventario vigente
 
-| ID | Prioridad | Tipo | Resumen | Estado |
-|---|---|---|---|---|
-| D01 | Alta | Documental | `README.md` no refleja el estado real del repo | **Resuelto** |
-| D02 | Alta | Documental | Documentacion de forecasting y metricas quedo desfasada respecto al codigo | **Resuelto** |
-| D03 | Alta | Semantica | El nodo central y las locations no estan modelados explicitamente como entidad/configuracion | **Resuelto** |
-| D04 | Alta | Semantica | La clasificacion masiva depende de una granularidad global que altera fuertemente los resultados | **Resuelto en codigo** (pendiente re-ejecutar output/) |
-| D05 | Alta | Semantica | La clasificacion usa demanda atendida y no incorpora censura por stockout en el pipeline principal | **Resuelto** |
-| D06 | Alta | Integracion | El modulo de forecasting existe pero no esta integrado a `planning_core`, API ni UI | **Resuelto** — `sku_forecast()` + endpoint API + seccion UI |
-| D07 | Alta | Integracion | Faltan `backtest.py` y `selector.py`, aunque son piezas centrales del roadmap declarado | **Resuelto** — ambos implementados |
-| D08 | Alta | Validacion | `planning_core/validation.py` cubre solo chequeos basicos y esta muy por debajo de `docs/data_health_checks.md` | Pendiente |
-| D09 | Alta | Testing | No hay tests para simulador, repository, services, clasificacion, preprocessing, API o UI | Pendiente (parcial: test_services.py existe) |
-| D10 | Media | Semantica | Inconsistencia de frecuencias semanales (`W` vs `W-MON`) entre capas | **Resuelto** — `GRANULARITY_PLANNING_KEYS` centraliza convencion en app.py |
-| D11 | Media | Semantica | `central_location()` se infiere heuristica y no desde un contrato explicito | **Resuelto** |
-| D12 | Media | Configuracion | Hay parametros del simulador definidos pero no usados | **Resuelto** |
-| D13 | Media | Modelo | El esquema permite OCs multi-linea, pero el generador siempre produce 1 linea por OC | **Cerrado** (simplificacion deliberada) |
-| D14 | Media | Performance | `classify_catalog()` recomputa sobre todo el catalogo y en API no hay cache | Pendiente |
-| D15 | Media | Producto | No existe capa formal para resultados derivados persistidos | Pendiente |
-| D16 | Baja | Operacion | No hay estructura de `notebooks/`, `experiments/` o `scripts/` para trabajo reproducible de analitica | **Resuelto** |
-| D17 | Baja | Forecasting | Parametrización única (h, n_windows) para todo el catálogo — no diferenciada por segmento | Decisión tomada: h=3/w=3 global. Ver D17 |
-| D18 | Media | Forecasting | MASE > 1 para intermittent/lumpy — métricas operacionales (Fill Rate, CSL) no implementadas | Pendiente |
-| D19 | Baja | Forecasting | Empate técnico en horse-race no detectado — ganador puede cambiar por diferencias de MASE < 0.02 | Pendiente |
-| D20 | Baja | Forecasting | `h` fijo para todo el catálogo — no derivado del lead time del proveedor por SKU | Pendiente |
-| D21 | Baja | Analitica | Notebook de análisis del sweep de parametrización (`03_param_sweep_analysis.ipynb`) no existe | Pendiente |
-| D22 | Media | Packaging | `planning_core/services.py` importa `forecasting.selector` directamente — el core tiene dependencia runtime de statsforecast aunque pyproject.toml la declare como extra `[forecast]` opcional | Pendiente |
+| ID | Prio | Tipo | Resumen |
+|---|---|---|---|
+| D08 | Alta | Validación | `validation.py` muy por debajo del framework documentado |
+| D09 | Alta | Testing | Sin tests para simulador, repository, services, classification, validation, API |
+| D14 | Media | Performance | `classify_catalog()` sin caché en API; recomputa sobre todo el catálogo |
+| D15 | Media | Arquitectura | Sin capa formal para artefactos derivados persistidos |
+| D18 | Media | Forecasting | MASE > 1 en intermittent/lumpy — sin métricas operacionales (Fill Rate, CSL) |
+| D19 | Baja | Forecasting | Empate técnico en horse-race no detectado — ganador puede cambiar con MASE < 0.02 |
+| D20 | Baja | Forecasting | `h` fijo para todo el catálogo — no derivado del lead time por SKU |
+| D21 | Baja | Analítica | Notebook de análisis del sweep de parametrización no existe |
+| D22 | Media | Packaging | `services.py` importa `forecasting.selector` a nivel módulo — dependencia runtime de statsforecast |
+| D23 | Alta | Performance | N+1 scan de transactions en `catalog_health_report` — carga completa por cada SKU |
+| D24 | Alta | Performance | N+1 scan en `classify_all_skus` — filtro O(n) por cada SKU en el loop |
+| D25 | Baja | Código | `sku_catalog_row` computado pero no usado en `catalog_health_report` |
+| D26 | Alta | Testing | Sin tests para `diagnostics.py` / `InventoryDiagnosis` / `diagnose_sku` |
+| D27 | Alta | Testing | Sin tests para `catalog_health_report` (el método más complejo de Fase 4) |
+| D28 | Media | Código | Valores sentinel `9999.0` / `999.0` para `inf` en diagnostics sin constantes nombradas |
+| D29 | Baja | UI | `use_container_width=True` deprecado en Streamlit (deadline 2025-12-31) — 30 instancias en app.py |
+| D30 | Baja | UI | TTL de caché `_get_catalog_health` en 300 s — demasiado corto para un cálculo de ~74 s |
+
+---
 
 ## Detalle por item
 
-### D01. `README.md` no refleja el estado real del repo
+### D08. `validation.py` muy por debajo del framework documentado
 
-**Tipo**: documental  
+**Tipo**: validación
 **Prioridad**: alta
 
-**Evidencia**
+`docs/data_health_checks.md` describe un framework amplio de auditoría. El módulo actual solo chequea duplicados, negativos y un conteo de transfers sin `receipt_date`.
 
-- [README.md](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/README.md) declara que el proyecto esta en `Fase 0 (Data Generation)`.
-- El repo ya contiene implementacion de clasificacion en [planning_core/classification.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/classification.py), exposicion en [planning_core/services.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/services.py), endpoints en [apps/api/main.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/apps/api/main.py) y UI en [apps/viz/app.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/apps/viz/app.py).
-- El README tambien afirma que el nodo central no genera ventas operativas, pero el simulador y otros docs ya modelan `CD Santiago` como nodo hibrido.
+Faltan: FK checks, receipts-before-order, over-receipt, reconciliación de inventario, locations válidas.
 
-**Impacto**
+**Acción**: implementar al menos una v1 ejecutable con los checks más críticos de integridad relacional.
 
-- induce decisiones equivocadas sobre el alcance real del repo
-- hace parecer inexistentes capacidades que si estan implementadas
-- vuelve ambiguo el punto de partida para nuevas tareas
+---
 
-**Accion sugerida**
+### D09. Sin tests para simulador, repository, services, classification, validation, API
 
-- reescribir `README.md` para separar claramente:
-  - implementado hoy
-  - parcialmente implementado
-  - planificado
-
-**Decision pendiente**
-
-- definir si el README debe describir el repo como:
-  - laboratorio de planning con varias capas ya operativas
-  - o simulador central con modulos experimentales alrededor
-
-### D02. Documentacion de forecasting y metricas desfasada
-
-**Tipo**: documental
-**Prioridad**: alta
-**Estado**: ✅ Resuelto — 2026-03-24
-
-`docs/forecasting_models_plan.md` y `docs/models/evaluation_metrics.md` actualizados para reflejar:
-- lo que ya esta implementado (modelos, metricas, backtest, selector, integracion en services)
-- lo que queda pendiente (API endpoint, UI de forecast, Fase 3.1-3.3)
-
-### D03. Nodo central y universo de locations no estan modelados explicitamente
-
-**Tipo**: semantica/modelado
-**Prioridad**: alta
-**Estado**: ✅ Resuelto — 2026-03-24
-
-El manifest persistido en `output/dataset_manifest.json` contiene la clave `location_model` con:
-
-```json
-"location_model": {
-  "all_locations": ["Santiago", "Antofagasta", "Copiapó", "Concepción", "Lima", "CD Santiago"],
-  "branch_locations": ["Santiago", "Antofagasta", "Copiapó", "Concepción", "Lima"],
-  "central_location": "CD Santiago",
-  "central_supply_mode": true,
-  "central_node_sales_mode": true
-}
-```
-
-`PlanningService.location_model()` lee este contrato explicito. La heuristica en `central_location()` queda como fallback defensivo pero no se invoca con el manifest actual.
-
-### D04. La clasificacion masiva depende de granularidad global y distorsiona resultados
-
-**Tipo**: semantica/analitica  
+**Tipo**: testing
 **Prioridad**: alta
 
-**Evidencia**
+Tests existentes cubren solo forecasting (modelos, métricas, backtest) e inventory params/safety_stock.
 
-- [planning_core/classification.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/classification.py) usa una granularidad global en `classify_all_skus()` si no se fuerza una.
-- Sobre el dataset real:
-  - `M`: `smooth 682`, `intermittent 69`, `lumpy 22`
-  - `W`: `smooth 589`, `intermittent 154`, `lumpy 30`
-  - `D`: `intermittent 676`, `lumpy 91`, `smooth 16`
+Sin cobertura para:
+- `apps/simulator/generate_canonical_dataset.py`
+- `planning_core/repository.py`
+- `planning_core/services.py` (métodos: `classify_catalog`, `sku_timeseries`, `catalog_health_report`)
+- `planning_core/classification.py` (`classify_all_skus`, `classify_sku`)
+- `planning_core/validation.py`
+- `apps/api/main.py`
 
-**Impacto**
+**Acción**: agregar suites por capa, priorizar `classification.py` y `services.py`.
 
-- la clasificacion cambia de forma estructural segun granularidad
-- el resultado actual puede suavizar artificialmente patrones intermitentes
-- cualquier mapeo futuro clasificacion -> forecast queda condicionado por una decision metodologica no resuelta
+---
 
-**Accion sugerida**
+### D14. `classify_catalog()` no está cacheado en la API
 
-- decidir una semantica oficial para clasificacion:
-  - por SKU agregado de red
-  - por SKU-location
-  - ambas
-- decidir si la granularidad debe ser:
-  - global
-  - por SKU
-  - fija por caso de uso
-
-**Decision actual**
-
-- para este repo/piloto, la clasificacion oficial queda fijada como `SKU` agregado de red
-- la clasificacion por sucursal queda fuera de alcance y se abordara en otro piloto
-
-**Decision pendiente**
-
-- resuelta: la granularidad oficial por defecto queda mensual (`M`)
-
-**Estado**
-
-- implementado en codigo para la clasificacion oficial del repo
-- pendiente re-ejecutar sobre `output/` regenerado y revisar la salida final en UI/API con el dataset persistido
-
-### D05. El pipeline principal clasifica demanda atendida sin incorporar censura
-
-**Tipo**: semantica/forecasting
-**Prioridad**: alta
-**Estado**: ✅ Resuelto — 2026-03-24
-
-Decision tomada e implementada:
-- clasificacion opera sobre demanda observada (sin reconstruccion)
-- `mark_censored_demand()` y `censored_summary()` calculan censura por separado
-- `classify_catalog()` y `classify_single_sku()` augmentan el resultado con flags de censura via `_augment_catalog_classification_with_censoring()`
-- `quality_score` penaliza periodos censurados
-- `sku_censored_mask()` expuesto en servicios y UI
-- reconstruccion de demanda queda para fase posterior de forecasting
-
-### D06. El modulo de forecasting existe pero no esta integrado al flujo principal
-
-**Tipo**: integracion/producto
-**Prioridad**: alta
-**Estado**: ✅ Resuelto — 2026-03-24
-
-Integración completa en tres capas:
-
-1. `PlanningService.sku_forecast()` en `planning_core/services.py` — horse-race + forecast final
-2. `GET /sku/{sku}/forecast` en `apps/api/main.py` — parámetros `granularity`, `h`, `n_windows`, `location`
-3. Seccion **Forecast** en detalle de SKU (`apps/viz/app.py`) — controles interactivos, gráfico histórico + forecast con IC 80%, tabla de forecast, resumen del horse-race
-
-### D07. Faltan `backtest.py` y `selector.py`
-
-**Tipo**: integracion/arquitectura
-**Prioridad**: alta
-**Estado**: ✅ Resuelto — 2026-03-24
-
-- `planning_core/forecasting/backtest.py`: `run_backtest()` expanding-window con minimo de 3 ventanas, `backtest_summary()`
-- `planning_core/forecasting/selector.py`: `select_and_forecast()` — candidatos por clasificacion SB, horse-race por MASE, forecast final con modelo ganador
-
-### D08. `validation.py` esta muy por debajo del framework documentado
-
-**Tipo**: validacion  
-**Prioridad**: alta
-
-**Evidencia**
-
-- [docs/data_health_checks.md](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/docs/data_health_checks.md) describe un framework amplio.
-- [planning_core/validation.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/planning_core/validation.py) solo chequea:
-  - duplicados
-  - negativos
-  - un conteo de transfers abiertos sin `receipt_date`
-
-**Impacto**
-
-- la documentacion promete un nivel de auditoria que el codigo no entrega
-- futuros cambios podrian romper integridad relacional o semantica sin alarmas
-
-**Accion sugerida**
-
-- definir una v1 realista del health check
-- implementar al menos:
-  - FK checks
-  - receipts before order
-  - over-receipt
-  - reconciliacion de inventario
-  - locations validas
-
-### D09. Falta cobertura de tests fuera del forecasting
-
-**Tipo**: testing  
-**Prioridad**: alta
-
-**Evidencia**
-
-- Tests existentes:
-  - [tests/test_models.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/tests/test_models.py)
-  - [tests/test_metrics.py](/Users/mtombolini-vr/Desktop/SOTA /SOTA-Simulated-Planning/tests/test_metrics.py)
-- No hay tests para:
-  - simulador
-  - repository
-  - services
-  - classification
-  - preprocessing
-  - validation
-  - API
-
-**Impacto**
-
-- mucha logica de negocio queda sin red de seguridad
-- cualquier refactor en simulacion o clasificacion es riesgoso
-
-**Accion sugerida**
-
-- agregar suites por capa, empezando por:
-  - `planning_core/classification.py`
-  - `planning_core/services.py`
-  - `planning_core/validation.py`
-
-### D10. Inconsistencia de frecuencia semanal entre capas
-
-**Tipo**: semantica
-**Prioridad**: media
-**Estado**: ✅ Resuelto — 2026-03-24
-
-Se creo `GRANULARITY_PLANNING_KEYS` en `apps/viz/app.py` como constante top-level que mapea nombres de display a claves de la API de `planning_core` (`"W"`). Se eliminó el dict inline duplicado que existia en la funcion de censura. Se agrego comentario explicando la diferencia:
-- `GRANULARITY_FREQUENCIES`: pandas resample strings directos (`"W-MON"`)
-- `GRANULARITY_PLANNING_KEYS`: claves internas de planning_core (`"W"` → `"W-MON"` via `FREQ_MAP`)
-
-### D11. `central_location()` usa inferencia heuristica
-
-**Tipo**: semantica/servicios
-**Prioridad**: media
-**Estado**: ✅ Resuelto por D03 — 2026-03-24
-
-`central_location()` lee primero `location_model.central_location` del manifest. Como el manifest ya tiene este campo explicito, la heuristica (inferencia desde `purchase_orders` o `internal_transfers`) nunca se invoca en condiciones normales. El codigo de fallback permanece como salvaguarda defensiva.
-
-### D12. Parametros del simulador definidos pero no usados
-
-**Tipo**: configuracion
-**Prioridad**: media
-**Estado**: ✅ Resuelto — 2026-03-24
-
-Eliminados de `apps/simulator/config.py`:
-- `STOCKOUT_RECORD_PROBABILITY = 0.3` (constante top-level huerfana)
-- `"stockouts_per_abc"` en `_INDUSTRIAL` y `_RETAIL`
-- `"stockout_duration"` en `_INDUSTRIAL` y `_RETAIL`
-- `STOCKOUTS_PER_ABC` y `STOCKOUT_DURATION` (exports de esas claves)
-
-Los stockouts en el simulador son emergentes (el stock llega a cero por demanda), no programados. Esta decision queda documentada como deliberada. 35/35 tests pasan tras la limpieza.
-
-### D13. El modelo permite OCs multi-linea pero el generador no las produce
-
-**Tipo**: modelo/simulacion
-**Prioridad**: media
-**Estado**: ✅ Cerrado como simplificacion deliberada — 2026-03-24
-
-El generador produce 1 SKU por OC (`po_line_id = f"{po_id}-L01"`) de forma intencional. El modelo E/R soporta multi-linea para compatibilidad futura con datos reales, pero el simulador no requiere esa complejidad para los casos de uso actuales (forecasting + clasificacion por SKU). Las OCs multi-linea quedan para una fase de integracion con datos reales de ERP.
-
-### D14. `classify_catalog()` tiene costo relevante y la API no cachea
-
-**Tipo**: performance  
+**Tipo**: performance
 **Prioridad**: media
 
-**Evidencia**
+La clasificación masiva sobre el dataset actual tarda varios segundos. La UI lo mitiga con `@st.cache_data`, pero la API (`GET /catalog/classify`) recalcula en cada request.
 
-- La clasificacion masiva sobre el dataset actual tarda varios segundos.
-- La UI usa cache (`@st.cache_data`), pero la API no.
+**Acción**: agregar caché en memoria (functools.lru_cache o similar) o materializar el resultado en disco con TTL.
 
-**Impacto**
+---
 
-- endpoints de clasificacion pueden degradarse a medida que crece el catalogo
+### D15. Sin capa formal para artefactos derivados persistidos
 
-**Accion sugerida**
-
-- introducir cache o materializacion para resultados derivados
-
-### D15. Falta una capa formal para artefactos derivados persistidos
-
-**Tipo**: arquitectura/producto  
+**Tipo**: arquitectura
 **Prioridad**: media
 
-**Evidencia**
+No existe contrato formal para persistir: clasificaciones, quality reports, forecasts, backtests, diagnósticos de salud.
+Todo se recalcula en memoria — sin trazabilidad de corridas analíticas.
 
-- El repo distingue bien entre canonico y derivado a nivel conceptual.
-- Pero no existe una capa persistida o contrato formal para:
-  - clasificaciones
-  - quality reports
-  - forecasts
-  - resultados de backtest
+**Acción**: decidir si los derivados viven como: vistas on-demand, archivos en `output/derived/`, o capa semántica separada.
 
-**Impacto**
+---
 
-- todo se recalcula en memoria
-- no hay trazabilidad de corridas analiticas
+### D18. Métricas operacionales ausentes para demanda intermitente/lumpy
 
-**Accion sugerida**
+**Tipo**: forecasting
+**Prioridad**: media
 
-- definir si los derivados viven como:
-  - vistas on-demand
-  - archivos en `output/derived/`
-  - o una capa semantica separada
+MASE > 1 es esperado para SKUs intermitentes y lumpy. Las métricas relevantes para estos segmentos son Fill Rate y CSL alcanzado — ninguna está implementada.
 
-### D16. Falta estructura reproducible de trabajo analitico experimental
+**Acción**: implementar métricas operacionales en `backtest.py` o módulo separado.
 
-**Tipo**: operacion/repositorio  
+---
+
+### D19. Empate técnico en horse-race no detectado
+
+**Tipo**: forecasting
 **Prioridad**: baja
 
-**Evidencia**
+El selector elige el ganador por MASE mínimo sin umbral de indiferencia. Diferencias < 0.02 no son estadísticamente significativas pero cambian el modelo seleccionado.
 
-- no hay `notebooks/`, `experiments/` ni `scripts/` del dominio
+**Acción**: agregar lógica de "empate" — si la diferencia entre primer y segundo lugar es < ε, preferir el modelo más simple (Naive o ETS sobre Prophet/GB).
 
-**Impacto**
+---
 
-- las pruebas exploratorias futuras tienden a quedar dispersas
+### D20. Horizonte `h` fijo para todo el catálogo
 
-**Accion sugerida**
+**Tipo**: forecasting
+**Prioridad**: baja
 
-- si el repo va a seguir como laboratorio, conviene definir una convención minima
+`h=3` es un global fijo. No se deriva del lead time del proveedor por SKU. Un SKU con lead time de 90 días necesita un horizonte de ~3 meses; uno con 21 días solo 1.
 
-## Orden recomendado de resolucion
+**Acción**: derivar `h` desde `InventoryParams.lead_time_days` por SKU al momento de seleccionar el modelo.
 
-### Bloque 1. Alinear realidad del repo
+---
 
-1. ✅ `D01` — resuelto 2026-03-24
-2. ✅ `D02` — resuelto 2026-03-24
-3. ✅ `D03` — resuelto 2026-03-24
+### D21. Notebook de análisis del sweep de parametrización no existe
 
-### Bloque 2. Fijar semantica antes de crecer
+**Tipo**: analítica
+**Prioridad**: baja
 
-4. ✅ `D04` — resuelto 2026-03-24
-5. ✅ `D05` — resuelto 2026-03-24
-6. ✅ `D10` — resuelto 2026-03-24
-7. ✅ `D11` — resuelto por D03, 2026-03-24
+`docs/forecasting_param_sweep_results.md` documenta resultados pero no hay notebook reproducible (`notebooks/03_param_sweep_analysis.ipynb`).
 
-### Bloque 3. Cerrar huecos estructurales
+**Acción**: crear el notebook para hacer el análisis visual reproducible.
 
-8. ~~`D08`~~ — pendiente (validation.py)
-9. ~~`D09`~~ — pendiente (tests por capa)
-10. ✅ `D12` — resuelto 2026-03-24
-11. ✅ `D13` — cerrado como simplificacion deliberada 2026-03-24
+---
 
-### Bloque 4. Habilitar forecast productizable
+### D22. `services.py` importa `forecasting.selector` a nivel módulo
 
-12. ✅ `D06` — resuelto (parcial: falta API + UI) 2026-03-24
-13. ✅ `D07` — resuelto 2026-03-24
-14. ~~`D14`~~ — pendiente (cache API)
-15. ~~`D15`~~ — pendiente (artefactos derivados)
+**Tipo**: packaging
+**Prioridad**: media
 
-### Bloque 5. Mejoras operativas
+```python
+# planning_core/services.py — top-level import
+from planning_core.forecasting.selector import select_and_forecast
+```
 
-16. ✅ `D16` — resuelto 2026-03-24 (creados `notebooks/` y `experiments/`)
+Esto hace que `statsforecast` sea una dependencia **runtime** del core aunque `pyproject.toml` la declare como extra `[forecast]` opcional. Cualquier import de `PlanningService` arrastra toda la cadena de dependencias de forecasting.
 
-### Bloque 6. Forecasting — mejoras post-experimentación (2026-03-25)
+**Acción**: mover el import dentro de la función `sku_forecast()` (lazy import) o crear un módulo bridge.
 
-17. `D17` — Decisión tomada: `h=3, n_windows=3` global. Ver `docs/forecasting_param_sweep_results.md`
-18. `D18` — pendiente (métricas operacionales intermittent/lumpy)
-19. `D19` — pendiente (detección de empate técnico en horse-race)
-20. `D20` — pendiente (h derivado del lead time por SKU)
-21. `D21` — pendiente (notebook de análisis del sweep)
+---
 
-## Preguntas de diseño que conviene responder antes de corregir deuda fuerte
+### D23. N+1 scan de transactions en `catalog_health_report`
 
-### Q1. Semantica de clasificacion
+**Tipo**: performance
+**Prioridad**: alta
+**Archivo**: `planning_core/services.py`, línea 942
 
-Respondida para este repo:
+```python
+# Dentro del loop por SKU (660+ iteraciones):
+demand_series = self.sku_demand_series(sku, granularity=granularity)
+```
 
-- la clasificacion oficial queda por `SKU` agregado de red
-- `SKU + location` se deja para otro piloto
+`sku_demand_series` llama a `repository.load_table("transactions")` (cacheado) y luego filtra con `transactions[transactions["sku"] == sku]` — un O(n) scan completo por cada SKU. Con 660 SKUs y ~2M filas de transactions: 660 scans completos secuenciales.
 
-### Q2. Granularidad oficial
+**Acción**: pre-agrupar `transactions` por SKU antes del loop usando `groupby`, igual que hace `classify_catalog` con `tx_groups` (línea 734). Pasar el grupo pre-filtrado directamente a `prepare_demand_series`.
 
-La clasificacion por defecto debe usar:
+---
 
-- una granularidad fija global
-- granularidad automatica por SKU
-- o granularidad fija por caso de uso
+### D24. N+1 scan en `classify_all_skus`
 
-### Q3. Nodo central
+**Tipo**: performance
+**Prioridad**: alta
+**Archivo**: `planning_core/classification.py`, línea 1079–1092
 
-Recomendacion pragmatica:
+```python
+for sku in all_skus:
+    if sku in skus_with_tx:
+        sku_tx = transactions[transactions["sku"] == sku]  # O(n) por iteración
+        profile = classify_sku(sku_tx, ...)
+```
 
-- resolver primero con metadata explicita en el manifest
-- dejar tabla maestra de locations para una etapa posterior donde ya exista una capa semantica mas formal
+Mismo patrón que D23. La tabla de transactions se filtra con un boolean mask por cada SKU, lo cual escala O(SKUs × rows).
 
-### Q4. Integracion de forecasting
+**Acción**: usar `transactions.groupby("sku")` antes del loop y acceder con `.get_group(sku)`. El `tx_groups = dict(groupby)` tarda una vez O(n) y los lookups son O(1).
 
-La primera integracion de forecast debe llegar primero a:
+---
 
-- `planning_core` solamente
-- `planning_core + API`
-- o `planning_core + API + UI`
+### D25. `sku_catalog_row` computado pero no usado
 
-### Q5. Nivel de health check deseado
+**Tipo**: código / dead code
+**Prioridad**: baja
+**Archivo**: `planning_core/services.py`, línea 938
 
-La v1 de validaciones debe ser:
+```python
+sku_catalog_row = catalog.loc[catalog["sku"] == sku]  # ← nunca usado
+params = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
+```
 
-- minima pero ejecutable en cada corrida
-- o mas completa aunque sea mas lenta
+La variable se calcula (O(n) scan) pero no se consume. Debería eliminarse.
 
-## Criterio para ir resolviendo uno por uno
+**Acción**: eliminar la línea.
 
-Para cada item conviene mantener este formato:
+---
 
-1. fijar la decision de diseno si aplica
-2. corregir documentacion o codigo
-3. agregar test o validacion de regresion
-4. dejar explicitado el cambio en este backlog o en el doc correspondiente
+### D26. Sin tests para `diagnostics.py` / `diagnose_sku`
+
+**Tipo**: testing
+**Prioridad**: alta
+
+El módulo de Fase 4 más crítico para la UI de Health no tiene ningún test:
+
+Casos sin cobertura:
+- `diagnose_sku` con demanda cero (coverage_net → inf, ratio → inf, dead stock)
+- `diagnose_sku` con todas las bandas de salud (quiebre, substock, equilibrio, sobrestock_leve, sobrestock_critico)
+- `_stockout_probability` con `sigma_ddlt = 0` (demanda determinística)
+- `_classify_ratio` con `is_dead_stock=True`
+- `DEAD_STOCK_DAYS_THRESHOLD` boundary (89 días vs 90 días)
+
+**Acción**: crear `tests/test_diagnostics.py` con suites para `diagnose_sku` y helpers.
+
+---
+
+### D27. Sin tests para `catalog_health_report`
+
+**Tipo**: testing
+**Prioridad**: alta
+**Archivo**: `planning_core/services.py`
+
+`catalog_health_report` es el método más complejo agregado en Fase 4 y no tiene ningún test. Cubre: clasificación, lookup de stock, dead stock, SS, diagnóstico, columnas financieras.
+
+Casos sin cobertura:
+- Retorna DataFrame con columnas esperadas (`excess_capital`, `stockout_capital`, etc.)
+- SKU sin transacciones → days_since = 9999 → dead stock
+- SKU sin snapshot de inventario → on_hand=0, on_order=0
+- DataFrame no vacío cuando hay al menos un SKU activo
+
+**Acción**: crear suite en `tests/test_services.py` o archivo dedicado.
+
+---
+
+### D28. Valores sentinel `9999.0` / `999.0` para infinito en diagnostics
+
+**Tipo**: código / semántica
+**Prioridad**: media
+**Archivo**: `planning_core/inventory/diagnostics.py`, líneas 349, 373, 389
+
+```python
+ratio_for_band = positioning_ratio if not math.isinf(positioning_ratio) else 999.0
+coverage_net_days=coverage_net_days if not math.isinf(coverage_net_days) else 9999.0,
+```
+
+Los valores `9999.0` y `999.0` aparecen literales sin constante nombrada. Si el umbral cambia o se introduce serialización, estos "inf disfrazados" pueden aparecer en reportes como valores de stock reales.
+
+**Acción**: definir constantes: `_INF_COVERAGE_SENTINEL = 9999.0` y `_INF_RATIO_SENTINEL = 999.0` en la cabecera del módulo.
+
+---
+
+### D29. `use_container_width=True` deprecado en Streamlit
+
+**Tipo**: UI / deuda API
+**Prioridad**: baja
+**Archivo**: `apps/viz/app.py`, ~30 instancias
+
+El parámetro fue deprecado con deadline 2025-12-31. En Streamlit 1.50 (instalado) sigue en la firma del método, pero puede removerse en versiones futuras.
+
+**Acción**: eliminar el parámetro en todos los `st.plotly_chart()`, `st.dataframe()`, y `st.button()` donde aparece — es el comportamiento default actual.
+
+---
+
+### D30. TTL de caché `_get_catalog_health` demasiado corto
+
+**Tipo**: UI / performance
+**Prioridad**: baja
+**Archivo**: `apps/viz/app.py`
+
+```python
+@st.cache_data(show_spinner=False, ttl=300)
+def _get_catalog_health(_service):
+```
+
+El cálculo tarda ~74 segundos (incluido el pytest). Con TTL=300 s (5 min) en una sesión activa, el sistema regenerará frecuentemente y bloqueará la UI.
+
+**Acción**: subir TTL a 1800 s (30 min) o hacerlo configurable. El botón "↺ Recargar" ya existe para recarga manual forzada.
+
+---
+
+## Preguntas de diseño abiertas
+
+### Q1. Artefactos derivados (D15)
+
+¿Los derivados (clasificaciones, forecasts, diagnósticos) deben ser:
+- vistas on-demand recalculadas (hoy)
+- archivos en `output/derived/` con versión y timestamp
+- base de datos ligera (DuckDB/SQLite)
+
+### Q2. Horizonte de forecast por SKU (D20)
+
+¿El horizonte `h` debe ser:
+- global fijo (hoy: `h=3`)
+- derivado del `lead_time_days` del proveedor por SKU
+- configurable por segmento ABC
+
+### Q3. Nivel de health check deseado (D08)
+
+¿La v1 de validaciones debe ser:
+- mínima ejecutable en cada corrida del simulador
+- más completa aunque más lenta (on-demand)
+
+---
+
+## Criterio para resolver items
+
+1. Fijar la decisión de diseño si aplica
+2. Corregir documentación o código
+3. Agregar test o validación de regresión
+4. Marcar como resuelto con fecha y eliminar en la próxima inspección
