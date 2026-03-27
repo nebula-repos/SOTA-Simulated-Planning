@@ -1,6 +1,6 @@
 # Módulo de Forecasting — Estado actual y roadmap
 
-**Última actualización:** 2026-03-25
+**Última actualización:** 2026-03-27
 
 ---
 
@@ -21,7 +21,7 @@
 
 | Archivo | Contenido | Estado |
 |---|---|---|
-| `metrics.py` | MASE adaptativo (lag-1/lag-12/mean), WAPE, Bias, MAE, RMSE | ✅ |
+| `metrics.py` | MASE adaptativo (lag-1/lag-12/mean), WMAPE, RMSSE, WAPE, Bias, MAE, RMSE | ✅ |
 | `backtest.py` | `run_backtest` expanding-window, `backtest_summary`, `return_cv` | ✅ |
 | `selector.py` | `select_and_forecast`, `get_model_candidates`, `_get_naive_type` | ✅ |
 | `utils.py` | `FREQ_MAP`, `SEASON_LENGTH`, `to_nixtla_df`, `_normalize_forecast` | ✅ |
@@ -41,15 +41,16 @@
 
 ### Tests
 
-82 tests unitarios e integracion, 100% passing (2026-03-25).
+170 tests unitarios e integración, 100% passing (2026-03-27).
 
 | Suite | Cobertura |
 |---|---|
-| `test_metrics.py` | MASE (seasonal/lag1/mean/edge cases), WAPE, Bias, MAE, RMSE |
+| `test_metrics.py` | MASE (seasonal/lag1/mean/edge cases), WMAPE, RMSSE, WAPE, Bias, MAE, RMSE |
 | `test_models.py` | naive, ets, sba, to_nixtla_df |
 | `test_backtest_selector.py` | run_backtest, select_and_forecast (smoke tests por sb_class) |
-| `test_services.py` | sku_forecast, clasificacion, censura |
+| `test_services.py` | sku_forecast, clasificacion, censura, safety_stock |
 | `test_evaluation.py` | EvalConfig, CatalogEvalResult, aggregator, run_store, comparator |
+| `test_inventory.py` | params, service_level, safety_stock (compute_demand_stats, compute_safety_stock, compute_rop, compute_sku_safety_stock, PlanningService.sku_safety_stock) |
 
 ---
 
@@ -101,7 +102,12 @@ Ver `docs/forecasting_param_sweep_results.md` para tablas completas y justificac
 planning_core/
 ├── classification.py          ← Fase 1 (completa)
 ├── preprocessing.py           ← Fase 1 (completa)
-├── services.py                ← sku_forecast() integrado
+├── services.py                ← sku_forecast() + sku_safety_stock() + catalog_health_report()
+├── inventory/                 ← Fase 4 (completa)
+│   ├── params.py              ← InventoryParams, lead times reales por proveedor, σ_LT
+│   ├── service_level.py       ← CSL por ABC, factor z, ServiceLevelConfig
+│   ├── safety_stock.py        ← SS (extended/standard/simple_pct_lt), ROP, SafetyStockResult
+│   └── diagnostics.py         ← diagnose_sku, InventoryDiagnosis, bandas de salud, P(quiebre)
 └── forecasting/
     ├── __init__.py
     ├── utils.py               ← FREQ_MAP, SEASON_LENGTH, to_nixtla_df
@@ -131,24 +137,27 @@ planning_core/
 ### Fase 3.4 — Prophet / NeuralProphet
 
 Para series con estacionalidad compleja, calendarios (feriados, cierres), o patrones
-multiples que MSTL no captura bien. Baja prioridad mientras LightGBM cubra esos casos.
+múltiples que MSTL no captura bien. Baja prioridad mientras LightGBM cubra esos casos.
 
-### Fase 4 — Motor de recomendacion de compra
+### Fase 5 — Motor de recomendación de compra
 
-- Politicas de reposicion: ROP, (s, S), (s, Q)
-- Input: forecast (`yhat`, `yhat_lo80`, `yhat_hi80`) + lead time por proveedor + MOQ + stock actual
-- Output: tabla de ordenes recomendadas por SKU con fecha sugerida y cantidad
+La Fase 4 (inventario, SS, diagnóstico de salud) está completa. La Fase 5 se enfoca en generar órdenes de compra accionables:
 
-### Deuda tecnica del modulo (ver `technical_debt_register.md`)
+- Políticas de reposición: ROP, (s, S), (s, Q)
+- Input: `InventoryDiagnosis.suggested_order_qty` + forecast (`yhat_hi80`) + MOQ + condiciones de pago
+- Output: tabla de órdenes recomendadas por SKU con fecha sugerida, cantidad y proveedor
+
+### Deuda técnica del módulo (ver `technical_debt_register.md`)
 
 | ID | Resumen | Prioridad |
 |----|---------|-----------|
-| D18 | Metricas operacionales para intermittent/lumpy (Fill Rate, CSL) | Media |
-| D19 | Empate tecnico en horse-race: `_pick_winner` prefiere modelo mas simple si MASE delta < 0.02 | Baja |
-| D20 | `h` fijo — deberia derivarse del lead time real del proveedor por SKU | Baja |
-| D21 | Notebook de visualizacion del sweep (`03_param_sweep_analysis.ipynb`) | Baja |
-| D22 | `services.py` importa `forecasting.selector` directamente — core tiene dependencia runtime de statsforecast | Media |
-| D23 | Integrar WMAPE y RMSSE en la seleccion del modelo ganador (`_pick_winner`): actualmente solo usa MASE. Posibles enfoques: (a) score combinado ponderado MASE+RMSSE por clase de demanda (RMSSE mas relevante para lumpy/erratic), (b) RMSSE como desempate cuando delta MASE < umbral. Requiere experimentacion con el catalogo real antes de activar. | Alta |
+| D18 | Métricas operacionales para intermittent/lumpy (Fill Rate, CSL alcanzado) | Media |
+| D19 | Empate técnico en horse-race: preferir modelo más simple si delta MASE < 0.02 | Baja |
+| D20 | `h` fijo — debería derivarse del lead time real del proveedor por SKU | Baja |
+| D21 | Notebook de visualización del sweep (`03_param_sweep_analysis.ipynb`) | Baja |
+| D22 | `services.py` importa `forecasting.selector` a nivel módulo — dependencia runtime de statsforecast | Media |
+
+> Nota: el antiguo ítem "Integrar WMAPE y RMSSE en `_pick_winner`" queda diferido hasta experimentar con datos reales. WMAPE y RMSSE ya están implementados en `metrics.py`; la integración en el selector requiere validación empírica antes de activar.
 
 ---
 

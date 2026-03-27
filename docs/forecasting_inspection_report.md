@@ -9,7 +9,8 @@ Revisión exhaustiva de formulación, modelado, lógica de código y consistenci
 16 tests nuevos agregados en Round 2 (total suite al cierre Round 2: 51 tests).
 
 **Actualización 2026-03-25**: suite ampliada en Round 3 (benchmark adaptativo, backtest selector).
-Total suite actual: **82 tests, 82 passing**.
+**Actualización 2026-03-27**: módulo de inventario (Fase 4) integrado — 88 tests adicionales en `test_inventory.py`.
+Total suite actual: **170 tests, 170 passing**.
 
 ---
 
