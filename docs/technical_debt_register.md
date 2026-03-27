@@ -5,7 +5,7 @@
 Backlog de deuda técnica, bugs no declarados y oportunidades de mejora detectadas en inspecciones del repo.
 Solo contiene items **vigentes** — lo resuelto se elimina. Cada item tiene prioridad, tipo y acción concreta.
 
-Última actualización: `2026-03-26`
+Última actualización: `2026-03-27`
 
 ---
 
@@ -16,6 +16,7 @@ Solo contiene items **vigentes** — lo resuelto se elimina. Cada item tiene pri
 | Testing / cobertura | D09, D26, D27 | Alta |
 | Performance / N+1 | D23, D24 | Alta |
 | Validación de datos | D08 | Alta |
+| **Calidad de forecast** | **D31, D32, D33** | **Alta** |
 | Forecasting post-exp | D18, D19, D20, D21 | Media–Baja |
 | Arquitectura / deuda estructural | D14, D15, D22 | Media |
 | Calidad de código | D25, D28, D29, D30 | Baja–Media |
@@ -43,6 +44,9 @@ Solo contiene items **vigentes** — lo resuelto se elimina. Cada item tiene pri
 | D28 | Media | Código | Valores sentinel `9999.0` / `999.0` para `inf` en diagnostics sin constantes nombradas |
 | D29 | Baja | UI | `use_container_width=True` deprecado en Streamlit (deadline 2025-12-31) — 30 instancias en app.py |
 | D30 | Baja | UI | TTL de caché `_get_catalog_health` en 300 s — demasiado corto para un cálculo de ~74 s |
+| D31 | Alta | Forecasting | Selección de modelo usa solo MASE — WMAPE, RMSSE y Bias computados pero ignorados |
+| D32 | Alta | Forecasting | Calidad de forecast insatisfactoria — margen de mejora amplio sin explorar (tuning, ensemble, post-procesado) |
+| D33 | Media | Forecasting | Métricas de error del catálogo no expuestas en UI — no hay dashboard de calidad agregada |
 
 ---
 
@@ -298,6 +302,110 @@ El cálculo tarda ~74 segundos (incluido el pytest). Con TTL=300 s (5 min) en un
 
 ---
 
+### D31. Selección de modelo usa solo MASE — métricas secundarias ignoradas
+
+**Tipo**: forecasting / selección de modelos
+**Prioridad**: alta
+**Archivo**: `planning_core/forecasting/selector.py` — `_pick_winner()`
+
+El horse-race elige el modelo ganador comparando únicamente MASE. WMAPE, RMSSE y Bias ya están implementados en `metrics.py` y calculados en `backtest_summary`, pero no influyen en la decisión.
+
+**Problemas concretos**:
+- **MASE no detecta sesgo sistemático**: un modelo puede ganar en MASE y aun así sobre-predecir consistentemente → sobrestock acumulado. `Bias` debería actuar como penalización o filtro.
+- **RMSSE penaliza errores grandes más que MASE**: para SKUs lumpy/erratic con spikes, RMSSE discrimina mejor entre modelos que "aciertan la magnitud" vs los que simplemente minimizan el promedio.
+- **WMAPE pondera por volumen**: para ABC-A, los errores en periodos de alta demanda importan más que en periodos bajos — MASE no lo captura.
+- **Empate técnico sin desempate formal** (ver D19): si dos modelos difieren en MASE < 0.02, hoy gana el que sale primero en el DataFrame, no el más simple ni el de menor bias.
+
+**Acciones sugeridas**:
+1. Agregar **filtro de bias**: si el ganador por MASE tiene `|Bias| > umbral` (e.g. 0.15), preferir el siguiente candidato con menor sesgo.
+2. Agregar **desempate por RMSSE**: cuando `delta MASE < 0.02`, desempatar con RMSSE — más estable para series con varianza alta.
+3. Evaluar un **score combinado ponderado** por segmento: `score = α×MASE + β×RMSSE + γ×|Bias|` con pesos distintos para smooth, erratic e intermittent/lumpy. Requiere experimentación con el catálogo real antes de activar.
+4. Exponer en el resumen del horse-race (UI) el Bias y RMSSE del ganador para transparencia.
+
+**Decisión pendiente**: elegir entre (a) score combinado o (b) filtros/desempates secuenciales. La opción (b) es más interpretable y menos frágil para un primer paso.
+
+---
+
+### D32. Calidad de forecast insatisfactoria — margen de mejora amplio sin explorar
+
+**Tipo**: forecasting / calidad de resultados
+**Prioridad**: alta
+
+Los resultados actuales del horse-race (MASE mediana global 0.7475, `h=3, n_windows=3`) son funcionales pero no convincentes. Hay múltiples ejes de mejora sin tocar:
+
+**1. Calibración de modelos (sin tuning)**
+
+Ningún modelo está tuneado — todos usan configuraciones por defecto:
+- `AutoETS` y `AutoARIMA` buscan el mejor modelo automáticamente pero dentro de un espacio no ajustado al dominio industrial (oleohidráulica con demanda muy irregular).
+- `LightGBM` usa lags fijos sin exploración de ventanas ni features de dominio.
+- Los umbrales de candidatura (`n_obs >= 36` para LightGBM mensual) son conservadores pero no validados empíricamente.
+
+**2. Features de dominio ausentes en LightGBM**
+
+El modelo ML solo usa lags y features de calendario genéricas. No incorpora:
+- Lead time del proveedor como feature
+- Clase ABC/XYZ como feature categórica
+- Precio unitario / valor del SKU
+- Estacionalidad detectada por autocorrelación (flag booleano ya calculado en clasificación)
+
+**3. Sin ensemble ni combinación de forecasts**
+
+La literatura (Hyndman & Athanasopoulos, M4 Competition) muestra que combinar los top-k modelos del horse-race supera sistemáticamente al ganador individual. Actualmente se descarta todo salvo el ganador.
+
+**4. Sin post-procesado**
+
+- No hay corrección de bias post-predicción (ajuste por sesgo histórico del ganador).
+- No hay calibración de intervalos de confianza — los IC 80% no se validan empíricamente contra cobertura real.
+- No hay suavizado de forecast para series muy ruidosas.
+
+**5. Horizonte fijo desconectado del lead time (ver D20)**
+
+`h=3` para todos los SKUs es correcto para lead times de ~90 días, pero insuficiente para proveedores con LT=180 días y excesivo para LT=21 días. Un horizonte mal calibrado degrada el backtest y el modelo elegido.
+
+**6. Granularidad mensual forzada**
+
+La granularidad mensual reduce dramáticamente el número de observaciones disponibles para el backtest (3 años = 36 puntos). Algunos SKUs con series suaves podrían beneficiarse de granularidad semanal, que duplica el tamaño de muestra efectivo.
+
+**Acciones sugeridas (por prioridad de impacto/esfuerzo)**:
+
+| Acción | Impacto esperado | Esfuerzo |
+|---|---|---|
+| Corrección de bias post-predicción | Alto para SKUs con sesgo sistemático | Bajo |
+| Ensemble simple (promedio top-3) | Alto — demostrado en literatura | Medio |
+| Features de dominio en LightGBM | Alto para SKUs erratic/lumpy | Medio |
+| Horizonte `h` por SKU (D20) | Alto para catálogos con LT muy variable | Medio |
+| Granularidad adaptativa por SKU | Medio — complejidad de pipeline | Alto |
+| Tuning de hiperparámetros | Medio — depende del SKU | Alto |
+
+**Criterio de éxito**: reducir MASE mediana global por debajo de 0.65, o demostrar mejora estadísticamente significativa en al menos 2 segmentos ABC.
+
+---
+
+### D33. Métricas de error del catálogo no expuestas en UI
+
+**Tipo**: forecasting / experiencia de usuario
+**Prioridad**: media
+**Archivo**: `apps/viz/app.py`
+
+WMAPE, RMSSE y Bias están calculados en `backtest_summary` y disponibles en `PlanningService.sku_forecast(return_cv=True)`, pero la UI solo muestra:
+- El gráfico del horse-race por SKU individual
+- El modelo ganador y su MASE
+
+No existe ninguna vista de **calidad agregada del catálogo** que permita responder:
+- ¿Cuántos SKUs tienen MASE > 1? ¿Por qué segmento?
+- ¿Hay sesgo sistemático en algún proveedor o categoría?
+- ¿Cuál es la distribución de WMAPE por clase ABC?
+- ¿Los IC 80% tienen cobertura empírica real del ~80%?
+
+**Acciones sugeridas**:
+1. Agregar vista "Calidad de forecast" en la UI con:
+   - Distribución de MASE, WMAPE, Bias por segmento (ABC, SB class, is_seasonal)
+   - KPI strip: % SKUs con MASE < 1, mediana WMAPE, % con |Bias| < 0.1
+   - Scatter MASE vs Bias coloreado por ABC para detectar clusters problemáticos
+2. Exponer estas métricas en la subsección "Forecast" del detalle de SKU (hoy solo muestra MASE del ganador).
+
+---
+
 ## Preguntas de diseño abiertas
 
 ### Q1. Artefactos derivados (D15)
@@ -313,6 +421,16 @@ El cálculo tarda ~74 segundos (incluido el pytest). Con TTL=300 s (5 min) en un
 - global fijo (hoy: `h=3`)
 - derivado del `lead_time_days` del proveedor por SKU
 - configurable por segmento ABC
+
+### Q4. Estrategia de mejora del forecast (D31, D32)
+
+¿El siguiente paso prioritario debe ser:
+- (a) **Corrección de bias + desempate por RMSSE** en `_pick_winner` — cambio quirúrgico, bajo riesgo, impacto inmediato
+- (b) **Ensemble de top-k modelos** — mayor complejidad de pipeline, pero evidencia empírica sólida de mejora
+- (c) **Features de dominio en LightGBM** — requiere ingeniería de features y re-experimentación
+- (d) **Horizonte `h` por SKU** — dependiente de D20, pero integra bien con el módulo de inventario ya existente
+
+La opción (a) es el camino de menor fricción y debería hacerse primero independientemente de las otras.
 
 ### Q3. Nivel de health check deseado (D08)
 

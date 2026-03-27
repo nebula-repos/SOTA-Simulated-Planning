@@ -2,6 +2,8 @@
 
 Sistema de demand planning con forecasting, clasificación de series temporales, gestión de inventario y recomendación de compra para catálogos industriales.
 
+**Demo en vivo:** [sota-simulated-planning.streamlit.app](https://sota-simulated-planning.streamlit.app/)
+
 ## Propósito
 
 Este repositorio implementa un pipeline completo de **demand planning** que abarca:
