@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import math
+import sys
+from pathlib import Path
 from urllib.parse import urlencode
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+
+# Cuando Streamlit ejecuta un archivo dentro de apps/viz, puede resolver
+# planning_core desde site-packages en vez del repo desplegado. Forzamos
+# el root del repositorio al inicio de sys.path para usar el código local.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from planning_core.classification import compute_acf, detect_outliers, prepare_demand_series, select_granularity
 from planning_core.forecasting.backtest import backtest_summary
