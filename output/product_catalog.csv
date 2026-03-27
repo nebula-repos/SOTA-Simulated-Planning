@@ -1,0 +1,801 @@
+sku,name,category,subcategory,brand,supplier,base_price,cost,moq,warranty_months
+SKU-00001,Bucher Hydraulics Caudalímetros 514,Instrumentación,Caudalímetros,Bucher Hydraulics,Industrial Flow Partners,435750.0,319405.0,5,6.0
+SKU-00002,Webtec Microcontroladores 663,Control y Electrónica,Microcontroladores,Webtec,Industrial Flow Partners,718789.0,541967.0,10,36.0
+SKU-00003,FaberCom Retorno 860,Filtros,Retorno,FaberCom,Tecfluid Norte,42342.0,29809.0,5,
+SKU-00004,Argo Hytos Agua-Aceite 389,Enfriadores,Agua-Aceite,Argo Hytos,Maestranza Integral,1516419.0,1279858.0,25,24.0
+SKU-00005,Webtec Engranaje 146,Motores Hidráulicos,Engranaje,Webtec,Maestranza Integral,1932229.0,1625005.0,2,12.0
+SKU-00006,Denison Pistones Axiales 580,Bombas Hidráulicas,Pistones Axiales,Denison,Industrial Flow Partners,3927806.0,3146173.0,25,12.0
+SKU-00007,KTR Data Loggers 510,Instrumentación,Data Loggers,KTR,Maestranza Integral,580334.0,442215.0,1,
+SKU-00008,Marzocchi Sensores Presión 354,Instrumentación,Sensores Presión,Marzocchi,Industrial Flow Partners,421277.0,327332.0,5,
+SKU-00009,Scanreco Pistones 553,Motores Hidráulicos,Pistones,Scanreco,Pacific Seal Supply,3061409.0,2449127.0,10,18.0
+SKU-00010,Scanreco Proporcionales 740,Válvulas,Proporcionales,Scanreco,Tecfluid Norte,465688.0,377207.0,1,6.0
+SKU-00011,Poclain Proporcionales 805,Comandos Direccionales,Proporcionales,Poclain,Maestranza Integral,690879.0,529904.0,10,18.0
+SKU-00012,Webtec Tomas de Fuerza 803,Accesorios y Acoples,Tomas de Fuerza,Webtec,Hydroline Andina,61712.0,40298.0,10,
+SKU-00013,Marzocchi Proporcionales 252,Comandos Direccionales,Proporcionales,Marzocchi,Industrial Flow Partners,2033296.0,1667303.0,2,36.0
+SKU-00014,Poclain Direccional 549,Válvulas,Direccional,Poclain,Hydroline Andina,153590.0,117957.0,25,12.0
+SKU-00015,Webtec Orbitales 712,Motores Hidráulicos,Orbitales,Webtec,Industrial Flow Partners,2132041.0,1801575.0,10,
+SKU-00016,KTR Pistones Radiales 121,Bombas Hidráulicas,Pistones Radiales,KTR,Pacific Seal Supply,1239100.0,1071822.0,25,24.0
+SKU-00017,Marzocchi Izado 285,Winches,Izado,Marzocchi,Hydroline Andina,4697100.0,4128751.0,10,12.0
+SKU-00018,Bucher Hydraulics Tomas de Fuerza 437,Accesorios y Acoples,Tomas de Fuerza,Bucher Hydraulics,Hydroline Andina,120153.0,84828.0,1,6.0
+SKU-00019,Bucher Hydraulics Pistones 190,Acumuladores,Pistones,Bucher Hydraulics,Tecfluid Norte,1020869.0,814653.0,1,18.0
+SKU-00020,KTR Retorno 990,Filtros,Retorno,KTR,Hydroline Andina,116661.0,78046.0,1,36.0
+SKU-00021,Scanreco Agua-Aceite 308,Enfriadores,Agua-Aceite,Scanreco,Hydroline Andina,497028.0,414024.0,10,
+SKU-00022,Denison Proporcionales 826,Válvulas,Proporcionales,Denison,Tecfluid Norte,364540.0,255543.0,25,6.0
+SKU-00023,Casappa Reductores Planetarios 220,Mandos Finales,Reductores Planetarios,Casappa,Hydroline Andina,4776210.0,4246051.0,1,18.0
+SKU-00024,Bucher Hydraulics Planetarios 349,Winches,Planetarios,Bucher Hydraulics,Industrial Flow Partners,2105239.0,1715770.0,10,18.0
+SKU-00025,Calzoni Caudalímetros 891,Instrumentación,Caudalímetros,Calzoni,Maestranza Integral,555465.0,402157.0,1,12.0
+SKU-00026,Hydac Vejiga 775,Acumuladores,Vejiga,Hydac,Tecfluid Norte,1245180.0,1012331.0,25,24.0
+SKU-00027,FaberCom Caudalímetros 429,Instrumentación,Caudalímetros,FaberCom,Pacific Seal Supply,306075.0,229556.0,10,18.0
+SKU-00028,Sun Hydraulics Monoblock 584,Comandos Direccionales,Monoblock,Sun Hydraulics,Pacific Seal Supply,1031471.0,744722.0,5,36.0
+SKU-00029,Calzoni Displays 614,Control y Electrónica,Displays,Calzoni,Industrial Flow Partners,961253.0,700753.0,1,6.0
+SKU-00030,Rexroth Adaptadores 991,Accesorios y Acoples,Adaptadores,Rexroth,Andes Motion,29429.0,18128.0,2,18.0
+SKU-00031,Poclain Planetarios 182,Winches,Planetarios,Poclain,Andes Motion,4798389.0,4165002.0,10,36.0
+SKU-00032,Calzoni Accesorios Estanque 732,Filtros,Accesorios Estanque,Calzoni,Tecfluid Norte,78202.0,44810.0,25,
+SKU-00033,Webtec Engranaje 270,Motores Hidráulicos,Engranaje,Webtec,Maestranza Integral,3784479.0,3118411.0,1,18.0
+SKU-00034,Parker Control Remoto 350,Control y Electrónica,Control Remoto,Parker,Hydroline Andina,423031.0,343501.0,10,6.0
+SKU-00035,Marzocchi Agua-Aceite 799,Enfriadores,Agua-Aceite,Marzocchi,Industrial Flow Partners,1616161.0,1386666.0,10,24.0
+SKU-00036,Marzocchi Proporcionales 394,Comandos Direccionales,Proporcionales,Marzocchi,Maestranza Integral,672608.0,507146.0,1,18.0
+SKU-00037,Commercial Hydraulics Recuperación 356,Winches,Recuperación,Commercial Hydraulics,Hydroline Andina,2929514.0,2516453.0,10,36.0
+SKU-00038,Argo Hytos Manómetros 402,Instrumentación,Manómetros,Argo Hytos,Andes Motion,516401.0,404858.0,5,24.0
+SKU-00039,Parker Control Remoto 863,Control y Electrónica,Control Remoto,Parker,Industrial Flow Partners,505177.0,413740.0,1,24.0
+SKU-00040,Sun Hydraulics Manómetros 873,Instrumentación,Manómetros,Sun Hydraulics,Pacific Seal Supply,487101.0,373606.0,5,36.0
+SKU-00041,Rexroth Microcontroladores 849,Control y Electrónica,Microcontroladores,Rexroth,Industrial Flow Partners,793292.0,616388.0,25,12.0
+SKU-00042,Webtec Reductores Planetarios 643,Mandos Finales,Reductores Planetarios,Webtec,Tecfluid Norte,6181862.0,5433857.0,25,12.0
+SKU-00043,Commercial Hydraulics Agua-Aceite 991,Enfriadores,Agua-Aceite,Commercial Hydraulics,Tecfluid Norte,1840991.0,1393630.0,5,36.0
+SKU-00044,FaberCom Spin-On 474,Filtros,Spin-On,FaberCom,Hydroline Andina,23765.0,13237.0,10,24.0
+SKU-00045,Parker Orbitales 490,Motores Hidráulicos,Orbitales,Parker,Tecfluid Norte,2775547.0,2278724.0,5,24.0
+SKU-00046,Rexroth Izado 724,Winches,Izado,Rexroth,Industrial Flow Partners,1786020.0,1602060.0,25,12.0
+SKU-00047,Poclain Monoblock 243,Comandos Direccionales,Monoblock,Poclain,Industrial Flow Partners,2080776.0,1485674.0,10,
+SKU-00048,Webtec Engranaje 479,Bombas Hidráulicas,Engranaje,Webtec,Andes Motion,655124.0,551614.0,10,18.0
+SKU-00049,Casappa Recuperación 730,Winches,Recuperación,Casappa,Andes Motion,3730372.0,3032792.0,1,18.0
+SKU-00050,Danfoss Vejiga 802,Acumuladores,Vejiga,Danfoss,Industrial Flow Partners,606153.0,480073.0,5,
+SKU-00051,Bezares Accesorios Estanque 778,Filtros,Accesorios Estanque,Bezares,Hydroline Andina,52592.0,37446.0,10,
+SKU-00052,Brevini Monoblock 170,Comandos Direccionales,Monoblock,Brevini,Hydroline Andina,240377.0,192302.0,25,6.0
+SKU-00053,Marzocchi Agua-Aceite 383,Enfriadores,Agua-Aceite,Marzocchi,Maestranza Integral,1654148.0,1406026.0,25,
+SKU-00054,Casappa Reductores Planetarios 466,Mandos Finales,Reductores Planetarios,Casappa,Tecfluid Norte,6549300.0,5809229.0,2,
+SKU-00055,KTR Monoblock 863,Comandos Direccionales,Monoblock,KTR,Hydroline Andina,534706.0,450222.0,25,
+SKU-00056,FaberCom Orbitales 844,Motores Hidráulicos,Orbitales,FaberCom,Tecfluid Norte,2663542.0,2306627.0,25,
+SKU-00057,Webtec Recuperación 802,Winches,Recuperación,Webtec,Andes Motion,4038374.0,3618383.0,10,18.0
+SKU-00058,FaberCom Orbitales 739,Motores Hidráulicos,Orbitales,FaberCom,Hydroline Andina,4516480.0,3784810.0,2,12.0
+SKU-00059,Casappa Recuperación 719,Winches,Recuperación,Casappa,Industrial Flow Partners,2288520.0,1787334.0,10,24.0
+SKU-00060,Rexroth Diafragma 562,Acumuladores,Diafragma,Rexroth,Industrial Flow Partners,1004302.0,753226.0,2,18.0
+SKU-00061,KTR Proporcionales 361,Comandos Direccionales,Proporcionales,KTR,Andes Motion,1068978.0,792113.0,5,36.0
+SKU-00062,Bucher Hydraulics Presión 669,Filtros,Presión,Bucher Hydraulics,Hydroline Andina,18217.0,13353.0,5,6.0
+SKU-00063,Rexroth Pistones Axiales 714,Bombas Hidráulicas,Pistones Axiales,Rexroth,Andes Motion,1688152.0,1306630.0,1,12.0
+SKU-00064,Rexroth Control Flujo 965,Válvulas,Control Flujo,Rexroth,Pacific Seal Supply,418245.0,332087.0,1,12.0
+SKU-00065,Rexroth Agua-Aceite 791,Enfriadores,Agua-Aceite,Rexroth,Tecfluid Norte,1212085.0,939366.0,25,24.0
+SKU-00066,Parker Recuperación 819,Winches,Recuperación,Parker,Pacific Seal Supply,5609964.0,4487971.0,2,12.0
+SKU-00067,Bezares Control Flujo 858,Válvulas,Control Flujo,Bezares,Hydroline Andina,165589.0,131809.0,1,6.0
+SKU-00068,Poclain Planetarios 419,Winches,Planetarios,Poclain,Industrial Flow Partners,3417655.0,2922095.0,2,12.0
+SKU-00069,Marzocchi Control Remoto 790,Control y Electrónica,Control Remoto,Marzocchi,Pacific Seal Supply,147701.0,120081.0,25,
+SKU-00070,FaberCom Orbitales 216,Motores Hidráulicos,Orbitales,FaberCom,Industrial Flow Partners,2235271.0,1790452.0,2,24.0
+SKU-00071,Rexroth Alta Presión 325,Filtros,Alta Presión,Rexroth,Tecfluid Norte,83960.0,52979.0,5,
+SKU-00072,Danfoss Pistones 435,Acumuladores,Pistones,Danfoss,Hydroline Andina,370281.0,269194.0,5,12.0
+SKU-00073,Bucher Hydraulics Engranaje 672,Motores Hidráulicos,Engranaje,Bucher Hydraulics,Industrial Flow Partners,2267144.0,1956545.0,2,24.0
+SKU-00074,Poclain Izado 689,Winches,Izado,Poclain,Andes Motion,5239704.0,4689535.0,1,12.0
+SKU-00075,Calzoni Pistones 920,Acumuladores,Pistones,Calzoni,Industrial Flow Partners,989001.0,803069.0,5,6.0
+SKU-00076,Bezares Tomas de Fuerza 180,Accesorios y Acoples,Tomas de Fuerza,Bezares,Hydroline Andina,111994.0,85227.0,10,24.0
+SKU-00077,KTR Vejiga 622,Acumuladores,Vejiga,KTR,Maestranza Integral,552957.0,457848.0,1,24.0
+SKU-00078,Bezares Proporcionales 362,Comandos Direccionales,Proporcionales,Bezares,Industrial Flow Partners,2400572.0,1807631.0,1,6.0
+SKU-00079,Brevini Direccionales Múltiples 872,Comandos Direccionales,Direccionales Múltiples,Brevini,Maestranza Integral,1929312.0,1450843.0,10,18.0
+SKU-00080,Marzocchi Tomas de Fuerza 550,Accesorios y Acoples,Tomas de Fuerza,Marzocchi,Industrial Flow Partners,160648.0,107313.0,5,6.0
+SKU-00081,FaberCom Orbitales 417,Motores Hidráulicos,Orbitales,FaberCom,Industrial Flow Partners,1653538.0,1395586.0,25,
+SKU-00082,Danfoss Data Loggers 708,Instrumentación,Data Loggers,Danfoss,Hydroline Andina,240180.0,181816.0,1,24.0
+SKU-00083,FaberCom Agua-Aceite 767,Enfriadores,Agua-Aceite,FaberCom,Pacific Seal Supply,1175485.0,913352.0,10,24.0
+SKU-00084,Brevini Proporcionales 186,Comandos Direccionales,Proporcionales,Brevini,Andes Motion,1313254.0,927157.0,5,36.0
+SKU-00085,Danfoss Agua-Aceite 472,Enfriadores,Agua-Aceite,Danfoss,Maestranza Integral,1459100.0,1095784.0,25,6.0
+SKU-00086,Calzoni Retorno 437,Filtros,Retorno,Calzoni,Andes Motion,94740.0,58170.0,5,
+SKU-00087,Calzoni Pistones 441,Motores Hidráulicos,Pistones,Calzoni,Tecfluid Norte,1409580.0,1083967.0,25,6.0
+SKU-00088,Denison Pistones 825,Motores Hidráulicos,Pistones,Denison,Tecfluid Norte,1689112.0,1342844.0,2,24.0
+SKU-00089,Casappa Orbitales 761,Motores Hidráulicos,Orbitales,Casappa,Andes Motion,3288768.0,2752699.0,25,
+SKU-00090,Hydac Izado 296,Winches,Izado,Hydac,Tecfluid Norte,600268.0,518031.0,5,18.0
+SKU-00091,Denison Direccionales Múltiples 639,Comandos Direccionales,Direccionales Múltiples,Denison,Hydroline Andina,823985.0,603157.0,25,36.0
+SKU-00092,Brevini Pistones Axiales 838,Bombas Hidráulicas,Pistones Axiales,Brevini,Maestranza Integral,2748022.0,2349559.0,25,6.0
+SKU-00093,Scanreco Sensores Presión 902,Instrumentación,Sensores Presión,Scanreco,Tecfluid Norte,415527.0,317463.0,5,36.0
+SKU-00094,Casappa Caudalímetros 794,Instrumentación,Caudalímetros,Casappa,Maestranza Integral,206397.0,140144.0,2,12.0
+SKU-00095,FaberCom Tomas de Fuerza 920,Accesorios y Acoples,Tomas de Fuerza,FaberCom,Tecfluid Norte,195640.0,134796.0,2,6.0
+SKU-00096,Olaer Campanas 966,Accesorios y Acoples,Campanas,Olaer,Hydroline Andina,162089.0,100981.0,1,36.0
+SKU-00097,Webtec Agua-Aceite 193,Enfriadores,Agua-Aceite,Webtec,Hydroline Andina,1561766.0,1319692.0,2,18.0
+SKU-00098,Bezares Proporcionales 483,Comandos Direccionales,Proporcionales,Bezares,Hydroline Andina,1107455.0,875997.0,10,
+SKU-00099,KTR Direccionales Múltiples 393,Comandos Direccionales,Direccionales Múltiples,KTR,Hydroline Andina,2117240.0,1594282.0,2,
+SKU-00100,Bucher Hydraulics Caudalímetros 661,Instrumentación,Caudalímetros,Bucher Hydraulics,Andes Motion,380749.0,252817.0,2,6.0
+SKU-00101,Rexroth Displays 164,Control y Electrónica,Displays,Rexroth,Tecfluid Norte,323286.0,259599.0,25,18.0
+SKU-00102,Brevini Orbitales 539,Motores Hidráulicos,Orbitales,Brevini,Pacific Seal Supply,278890.0,226738.0,2,12.0
+SKU-00103,Sun Hydraulics Pistones Axiales 638,Bombas Hidráulicas,Pistones Axiales,Sun Hydraulics,Pacific Seal Supply,1962069.0,1518641.0,5,
+SKU-00104,Calzoni Agua-Aceite 907,Enfriadores,Agua-Aceite,Calzoni,Andes Motion,230539.0,191347.0,1,12.0
+SKU-00105,Sun Hydraulics Orbitales 145,Motores Hidráulicos,Orbitales,Sun Hydraulics,Industrial Flow Partners,3354101.0,2908006.0,5,6.0
+SKU-00106,KTR Accesorios Estanque 286,Filtros,Accesorios Estanque,KTR,Industrial Flow Partners,27610.0,16400.0,10,36.0
+SKU-00107,FaberCom Reductores Planetarios 417,Mandos Finales,Reductores Planetarios,FaberCom,Hydroline Andina,2912787.0,2606944.0,1,12.0
+SKU-00108,Casappa Agua-Aceite 986,Enfriadores,Agua-Aceite,Casappa,Andes Motion,618630.0,483769.0,5,
+SKU-00109,Olaer Izado 447,Winches,Izado,Olaer,Hydroline Andina,4896383.0,4152133.0,10,18.0
+SKU-00110,Bucher Hydraulics Reductores Planetarios 540,Mandos Finales,Reductores Planetarios,Bucher Hydraulics,Tecfluid Norte,7455035.0,6247319.0,10,
+SKU-00111,Casappa Campanas 717,Accesorios y Acoples,Campanas,Casappa,Tecfluid Norte,83697.0,64112.0,5,18.0
+SKU-00112,Commercial Hydraulics Displays 545,Control y Electrónica,Displays,Commercial Hydraulics,Industrial Flow Partners,560495.0,424295.0,5,24.0
+SKU-00113,Poclain Cartridge 246,Válvulas,Cartridge,Poclain,Industrial Flow Partners,519072.0,393457.0,2,
+SKU-00114,Danfoss Tomas de Fuerza 133,Accesorios y Acoples,Tomas de Fuerza,Danfoss,Maestranza Integral,21472.0,13742.0,10,24.0
+SKU-00115,FaberCom Campanas 507,Accesorios y Acoples,Campanas,FaberCom,Tecfluid Norte,96143.0,61820.0,25,12.0
+SKU-00116,Sun Hydraulics Retorno 368,Filtros,Retorno,Sun Hydraulics,Hydroline Andina,10902.0,7773.0,25,
+SKU-00117,Argo Hytos Control Presión 973,Válvulas,Control Presión,Argo Hytos,Pacific Seal Supply,246322.0,163558.0,1,6.0
+SKU-00118,Commercial Hydraulics Orbitales 455,Motores Hidráulicos,Orbitales,Commercial Hydraulics,Industrial Flow Partners,2336534.0,2030448.0,5,36.0
+SKU-00119,Casappa Joystick 620,Control y Electrónica,Joystick,Casappa,Pacific Seal Supply,383917.0,298687.0,2,12.0
+SKU-00120,Argo Hytos Direccionales Múltiples 578,Comandos Direccionales,Direccionales Múltiples,Argo Hytos,Maestranza Integral,683432.0,530343.0,25,12.0
+SKU-00121,Brevini Agua-Aceite 520,Enfriadores,Agua-Aceite,Brevini,Hydroline Andina,271634.0,224913.0,10,24.0
+SKU-00122,Poclain Pistones 231,Acumuladores,Pistones,Poclain,Maestranza Integral,1460779.0,1118957.0,25,12.0
+SKU-00123,Denison Agua-Aceite 411,Enfriadores,Agua-Aceite,Denison,Andes Motion,1080298.0,828589.0,25,6.0
+SKU-00124,KTR Reductores Planetarios 356,Mandos Finales,Reductores Planetarios,KTR,Industrial Flow Partners,2423386.0,1904781.0,5,
+SKU-00125,Casappa Monoblock 272,Comandos Direccionales,Monoblock,Casappa,Tecfluid Norte,417905.0,336414.0,25,36.0
+SKU-00126,Commercial Hydraulics Campanas 945,Accesorios y Acoples,Campanas,Commercial Hydraulics,Industrial Flow Partners,157997.0,97642.0,25,
+SKU-00127,Danfoss Engranaje 732,Bombas Hidráulicas,Engranaje,Danfoss,Industrial Flow Partners,3503947.0,2936308.0,25,18.0
+SKU-00128,Bucher Hydraulics Planetarios 515,Winches,Planetarios,Bucher Hydraulics,Industrial Flow Partners,3500676.0,2881056.0,2,36.0
+SKU-00129,Poclain Control Presión 721,Válvulas,Control Presión,Poclain,Industrial Flow Partners,71433.0,53218.0,2,12.0
+SKU-00130,KTR Reductores Planetarios 675,Mandos Finales,Reductores Planetarios,KTR,Industrial Flow Partners,7913768.0,6797927.0,5,24.0
+SKU-00131,Sun Hydraulics Orbitales 493,Motores Hidráulicos,Orbitales,Sun Hydraulics,Andes Motion,788105.0,647822.0,1,12.0
+SKU-00132,Sun Hydraulics Tomas de Fuerza 610,Accesorios y Acoples,Tomas de Fuerza,Sun Hydraulics,Maestranza Integral,204302.0,125033.0,2,6.0
+SKU-00133,Bucher Hydraulics Agua-Aceite 320,Enfriadores,Agua-Aceite,Bucher Hydraulics,Tecfluid Norte,1070135.0,928877.0,10,6.0
+SKU-00134,Danfoss Adaptadores 649,Accesorios y Acoples,Adaptadores,Danfoss,Hydroline Andina,73932.0,49682.0,10,12.0
+SKU-00135,Scanreco Engranaje 510,Bombas Hidráulicas,Engranaje,Scanreco,Maestranza Integral,3988682.0,3047353.0,5,
+SKU-00136,Bezares Paleta 945,Bombas Hidráulicas,Paleta,Bezares,Pacific Seal Supply,1405417.0,1149631.0,25,12.0
+SKU-00137,Denison Acoples Rotex 303,Accesorios y Acoples,Acoples Rotex,Denison,Hydroline Andina,101506.0,64659.0,5,6.0
+SKU-00138,Hydac Tomas de Fuerza 567,Accesorios y Acoples,Tomas de Fuerza,Hydac,Hydroline Andina,16099.0,12155.0,10,24.0
+SKU-00139,KTR Reductores Planetarios 444,Mandos Finales,Reductores Planetarios,KTR,Pacific Seal Supply,3093416.0,2638684.0,5,24.0
+SKU-00140,Marzocchi Agua-Aceite 697,Enfriadores,Agua-Aceite,Marzocchi,Tecfluid Norte,1028551.0,903068.0,1,18.0
+SKU-00141,Brevini Cartridge 333,Válvulas,Cartridge,Brevini,Andes Motion,230786.0,163627.0,25,24.0
+SKU-00142,Marzocchi Joystick 941,Control y Electrónica,Joystick,Marzocchi,Andes Motion,246089.0,180137.0,10,6.0
+SKU-00143,Danfoss Planetarios 255,Winches,Planetarios,Danfoss,Pacific Seal Supply,5715128.0,5069319.0,5,18.0
+SKU-00144,Argo Hytos Pistones 241,Acumuladores,Pistones,Argo Hytos,Andes Motion,792584.0,611082.0,1,36.0
+SKU-00145,Casappa Agua-Aceite 645,Enfriadores,Agua-Aceite,Casappa,Tecfluid Norte,1996527.0,1633159.0,2,18.0
+SKU-00146,Bezares Accesorios Estanque 595,Filtros,Accesorios Estanque,Bezares,Industrial Flow Partners,94463.0,57245.0,5,24.0
+SKU-00147,Olaer Direccionales Múltiples 312,Comandos Direccionales,Direccionales Múltiples,Olaer,Pacific Seal Supply,830428.0,588773.0,5,36.0
+SKU-00148,KTR Displays 224,Control y Electrónica,Displays,KTR,Andes Motion,451124.0,310824.0,5,12.0
+SKU-00149,Calzoni Tomas de Fuerza 180,Accesorios y Acoples,Tomas de Fuerza,Calzoni,Tecfluid Norte,238879.0,151688.0,5,36.0
+SKU-00150,Olaer Alta Presión 378,Filtros,Alta Presión,Olaer,Industrial Flow Partners,61657.0,43776.0,25,36.0
+SKU-00151,Brevini Reductores Planetarios 753,Mandos Finales,Reductores Planetarios,Brevini,Industrial Flow Partners,5025180.0,4376932.0,25,6.0
+SKU-00152,Rexroth Direccionales Múltiples 663,Comandos Direccionales,Direccionales Múltiples,Rexroth,Andes Motion,906099.0,705851.0,2,
+SKU-00153,Bucher Hydraulics Reductores Planetarios 160,Mandos Finales,Reductores Planetarios,Bucher Hydraulics,Andes Motion,5483879.0,4436458.0,5,36.0
+SKU-00154,Marzocchi Pistones 957,Motores Hidráulicos,Pistones,Marzocchi,Maestranza Integral,2768731.0,2176223.0,2,18.0
+SKU-00155,Calzoni Reductores Planetarios 109,Mandos Finales,Reductores Planetarios,Calzoni,Andes Motion,2141444.0,1734570.0,5,
+SKU-00156,Brevini Proporcionales 605,Válvulas,Proporcionales,Brevini,Hydroline Andina,744553.0,568094.0,25,24.0
+SKU-00157,Olaer Reductores Planetarios 290,Mandos Finales,Reductores Planetarios,Olaer,Maestranza Integral,6623460.0,5696176.0,5,36.0
+SKU-00158,Webtec Pistones Axiales 627,Bombas Hidráulicas,Pistones Axiales,Webtec,Pacific Seal Supply,3083645.0,2618015.0,10,18.0
+SKU-00159,Calzoni Spin-On 367,Filtros,Spin-On,Calzoni,Industrial Flow Partners,18683.0,10350.0,2,
+SKU-00160,FaberCom Diafragma 769,Acumuladores,Diafragma,FaberCom,Tecfluid Norte,1434729.0,1163565.0,1,12.0
+SKU-00161,Danfoss Presión 888,Filtros,Presión,Danfoss,Industrial Flow Partners,21241.0,14635.0,25,36.0
+SKU-00162,Webtec Cartridge 865,Válvulas,Cartridge,Webtec,Tecfluid Norte,501335.0,392545.0,2,18.0
+SKU-00163,Scanreco Adaptadores 796,Accesorios y Acoples,Adaptadores,Scanreco,Industrial Flow Partners,139562.0,96996.0,2,6.0
+SKU-00164,Hydac Acoples Rotex 948,Accesorios y Acoples,Acoples Rotex,Hydac,Andes Motion,134402.0,96097.0,1,
+SKU-00165,Marzocchi Agua-Aceite 310,Enfriadores,Agua-Aceite,Marzocchi,Pacific Seal Supply,427227.0,357589.0,1,36.0
+SKU-00166,Poclain Displays 677,Control y Electrónica,Displays,Poclain,Pacific Seal Supply,562305.0,456592.0,10,18.0
+SKU-00167,Webtec Pistones Radiales 174,Bombas Hidráulicas,Pistones Radiales,Webtec,Industrial Flow Partners,244701.0,205304.0,2,24.0
+SKU-00168,Bezares Pistones Radiales 132,Bombas Hidráulicas,Pistones Radiales,Bezares,Industrial Flow Partners,427356.0,308124.0,1,18.0
+SKU-00169,Commercial Hydraulics Control Presión 491,Válvulas,Control Presión,Commercial Hydraulics,Maestranza Integral,618516.0,404509.0,10,12.0
+SKU-00170,Calzoni Data Loggers 282,Instrumentación,Data Loggers,Calzoni,Hydroline Andina,419156.0,293828.0,5,
+SKU-00171,Hydac Agua-Aceite 574,Enfriadores,Agua-Aceite,Hydac,Maestranza Integral,1496538.0,1273554.0,1,12.0
+SKU-00172,Casappa Recuperación 382,Winches,Recuperación,Casappa,Andes Motion,3425635.0,2743934.0,5,6.0
+SKU-00173,Rexroth Monoblock 311,Comandos Direccionales,Monoblock,Rexroth,Hydroline Andina,2046558.0,1610641.0,1,6.0
+SKU-00174,Brevini Engranaje 145,Motores Hidráulicos,Engranaje,Brevini,Hydroline Andina,2342917.0,1857933.0,2,36.0
+SKU-00175,Sun Hydraulics Vejiga 339,Acumuladores,Vejiga,Sun Hydraulics,Pacific Seal Supply,388522.0,286729.0,25,12.0
+SKU-00176,Marzocchi Control Remoto 633,Control y Electrónica,Control Remoto,Marzocchi,Pacific Seal Supply,938419.0,661585.0,2,36.0
+SKU-00177,Webtec Proporcionales 795,Comandos Direccionales,Proporcionales,Webtec,Tecfluid Norte,265079.0,187676.0,2,36.0
+SKU-00178,Bucher Hydraulics Pistones 813,Acumuladores,Pistones,Bucher Hydraulics,Hydroline Andina,1460652.0,1063355.0,25,12.0
+SKU-00179,Denison Vejiga 978,Acumuladores,Vejiga,Denison,Tecfluid Norte,614573.0,462159.0,2,12.0
+SKU-00180,FaberCom Microcontroladores 348,Control y Electrónica,Microcontroladores,FaberCom,Hydroline Andina,696744.0,477270.0,2,18.0
+SKU-00181,KTR Direccional 949,Válvulas,Direccional,KTR,Industrial Flow Partners,86280.0,64192.0,25,36.0
+SKU-00182,Olaer Direccionales Múltiples 841,Comandos Direccionales,Direccionales Múltiples,Olaer,Andes Motion,1723339.0,1309738.0,2,24.0
+SKU-00183,Argo Hytos Recuperación 294,Winches,Recuperación,Argo Hytos,Andes Motion,1648890.0,1304272.0,1,6.0
+SKU-00184,Bucher Hydraulics Joystick 429,Control y Electrónica,Joystick,Bucher Hydraulics,Maestranza Integral,849970.0,612828.0,2,24.0
+SKU-00185,FaberCom Control Presión 200,Válvulas,Control Presión,FaberCom,Pacific Seal Supply,527759.0,405319.0,10,18.0
+SKU-00186,KTR Displays 249,Control y Electrónica,Displays,KTR,Maestranza Integral,476311.0,362949.0,2,36.0
+SKU-00187,Casappa Pistones Axiales 488,Bombas Hidráulicas,Pistones Axiales,Casappa,Pacific Seal Supply,2669272.0,2170118.0,5,6.0
+SKU-00188,Bucher Hydraulics Campanas 757,Accesorios y Acoples,Campanas,Bucher Hydraulics,Pacific Seal Supply,165379.0,108654.0,10,36.0
+SKU-00189,FaberCom Displays 288,Control y Electrónica,Displays,FaberCom,Maestranza Integral,892688.0,688262.0,25,18.0
+SKU-00190,Hydac Agua-Aceite 522,Enfriadores,Agua-Aceite,Hydac,Hydroline Andina,1702277.0,1480981.0,1,
+SKU-00191,Poclain Reductores Planetarios 753,Mandos Finales,Reductores Planetarios,Poclain,Industrial Flow Partners,1887413.0,1649599.0,1,24.0
+SKU-00192,Bucher Hydraulics Recuperación 642,Winches,Recuperación,Bucher Hydraulics,Industrial Flow Partners,3183199.0,2861696.0,1,
+SKU-00193,Casappa Control Remoto 198,Control y Electrónica,Control Remoto,Casappa,Tecfluid Norte,69714.0,49218.0,2,
+SKU-00194,Sun Hydraulics Agua-Aceite 482,Enfriadores,Agua-Aceite,Sun Hydraulics,Maestranza Integral,1296595.0,1098216.0,10,
+SKU-00195,Marzocchi Vejiga 978,Acumuladores,Vejiga,Marzocchi,Maestranza Integral,1486131.0,1220114.0,1,36.0
+SKU-00196,Poclain Planetarios 275,Winches,Planetarios,Poclain,Andes Motion,2585952.0,2156684.0,1,36.0
+SKU-00197,Scanreco Orbitales 143,Motores Hidráulicos,Orbitales,Scanreco,Industrial Flow Partners,3965006.0,3195795.0,1,24.0
+SKU-00198,Marzocchi Direccionales Múltiples 677,Comandos Direccionales,Direccionales Múltiples,Marzocchi,Andes Motion,765206.0,544061.0,5,24.0
+SKU-00199,Commercial Hydraulics Planetarios 406,Winches,Planetarios,Commercial Hydraulics,Tecfluid Norte,586120.0,512855.0,10,
+SKU-00200,Marzocchi Reductores Planetarios 841,Mandos Finales,Reductores Planetarios,Marzocchi,Andes Motion,5674652.0,4738334.0,2,36.0
+SKU-00201,Bezares Pistones 709,Motores Hidráulicos,Pistones,Bezares,Hydroline Andina,668892.0,568558.0,25,24.0
+SKU-00202,Parker Vejiga 484,Acumuladores,Vejiga,Parker,Industrial Flow Partners,468124.0,337517.0,5,24.0
+SKU-00203,Marzocchi Diafragma 175,Acumuladores,Diafragma,Marzocchi,Industrial Flow Partners,619703.0,464777.0,2,36.0
+SKU-00204,Denison Orbitales 209,Motores Hidráulicos,Orbitales,Denison,Andes Motion,3616050.0,2885608.0,5,12.0
+SKU-00205,Webtec Engranaje 559,Motores Hidráulicos,Engranaje,Webtec,Andes Motion,1927604.0,1628825.0,2,18.0
+SKU-00206,Rexroth Agua-Aceite 112,Enfriadores,Agua-Aceite,Rexroth,Hydroline Andina,315795.0,255162.0,5,18.0
+SKU-00207,Calzoni Control Presión 633,Válvulas,Control Presión,Calzoni,Hydroline Andina,586754.0,425397.0,2,24.0
+SKU-00208,Commercial Hydraulics Reductores Planetarios 382,Mandos Finales,Reductores Planetarios,Commercial Hydraulics,Maestranza Integral,2736217.0,2375036.0,2,18.0
+SKU-00209,Bucher Hydraulics Vejiga 731,Acumuladores,Vejiga,Bucher Hydraulics,Hydroline Andina,592797.0,430963.0,10,24.0
+SKU-00210,Rexroth Proporcionales 923,Comandos Direccionales,Proporcionales,Rexroth,Maestranza Integral,845086.0,598321.0,25,18.0
+SKU-00211,KTR Alta Presión 428,Filtros,Alta Presión,KTR,Andes Motion,99333.0,57414.0,2,12.0
+SKU-00212,Bucher Hydraulics Campanas 900,Accesorios y Acoples,Campanas,Bucher Hydraulics,Tecfluid Norte,48521.0,34353.0,10,24.0
+SKU-00213,Calzoni Proporcionales 706,Comandos Direccionales,Proporcionales,Calzoni,Tecfluid Norte,2063257.0,1632036.0,25,6.0
+SKU-00214,Casappa Agua-Aceite 951,Enfriadores,Agua-Aceite,Casappa,Hydroline Andina,1913059.0,1568708.0,10,12.0
+SKU-00215,Scanreco Joystick 533,Control y Electrónica,Joystick,Scanreco,Industrial Flow Partners,624199.0,456289.0,2,36.0
+SKU-00216,FaberCom Diafragma 137,Acumuladores,Diafragma,FaberCom,Pacific Seal Supply,760513.0,606889.0,10,24.0
+SKU-00217,Brevini Accesorios Estanque 762,Filtros,Accesorios Estanque,Brevini,Industrial Flow Partners,110413.0,80381.0,5,6.0
+SKU-00218,Marzocchi Acoples Rotex 110,Accesorios y Acoples,Acoples Rotex,Marzocchi,Industrial Flow Partners,170981.0,121055.0,10,
+SKU-00219,Sun Hydraulics Orbitales 483,Motores Hidráulicos,Orbitales,Sun Hydraulics,Pacific Seal Supply,3784895.0,3054410.0,2,18.0
+SKU-00220,Marzocchi Vejiga 525,Acumuladores,Vejiga,Marzocchi,Industrial Flow Partners,790661.0,636482.0,1,12.0
+SKU-00221,Denison Engranaje 587,Motores Hidráulicos,Engranaje,Denison,Tecfluid Norte,1697074.0,1393298.0,10,12.0
+SKU-00222,FaberCom Orbitales 763,Motores Hidráulicos,Orbitales,FaberCom,Tecfluid Norte,522437.0,456610.0,1,12.0
+SKU-00223,Commercial Hydraulics Pistones 573,Motores Hidráulicos,Pistones,Commercial Hydraulics,Industrial Flow Partners,1370782.0,1174760.0,25,18.0
+SKU-00224,Commercial Hydraulics Proporcionales 560,Comandos Direccionales,Proporcionales,Commercial Hydraulics,Maestranza Integral,1644340.0,1290807.0,25,6.0
+SKU-00225,Calzoni Tomas de Fuerza 204,Accesorios y Acoples,Tomas de Fuerza,Calzoni,Hydroline Andina,177660.0,132001.0,1,24.0
+SKU-00226,Bezares Agua-Aceite 754,Enfriadores,Agua-Aceite,Bezares,Tecfluid Norte,514587.0,445118.0,10,24.0
+SKU-00227,Calzoni Accesorios Estanque 276,Filtros,Accesorios Estanque,Calzoni,Pacific Seal Supply,51965.0,37779.0,10,24.0
+SKU-00228,Webtec Recuperación 219,Winches,Recuperación,Webtec,Pacific Seal Supply,3745926.0,3067913.0,2,12.0
+SKU-00229,Denison Reductores Planetarios 598,Mandos Finales,Reductores Planetarios,Denison,Pacific Seal Supply,3596936.0,2978263.0,10,6.0
+SKU-00230,Commercial Hydraulics Recuperación 154,Winches,Recuperación,Commercial Hydraulics,Pacific Seal Supply,1417760.0,1226362.0,10,24.0
+SKU-00231,Bucher Hydraulics Spin-On 801,Filtros,Spin-On,Bucher Hydraulics,Maestranza Integral,29854.0,20092.0,10,18.0
+SKU-00232,FaberCom Data Loggers 133,Instrumentación,Data Loggers,FaberCom,Andes Motion,125334.0,89614.0,2,12.0
+SKU-00233,Casappa Direccional 623,Válvulas,Direccional,Casappa,Tecfluid Norte,155362.0,115279.0,10,24.0
+SKU-00234,Rexroth Pistones 551,Motores Hidráulicos,Pistones,Rexroth,Tecfluid Norte,3920543.0,3030580.0,1,36.0
+SKU-00235,Scanreco Agua-Aceite 369,Enfriadores,Agua-Aceite,Scanreco,Hydroline Andina,1511579.0,1201705.0,1,18.0
+SKU-00236,FaberCom Spin-On 459,Filtros,Spin-On,FaberCom,Hydroline Andina,94871.0,66694.0,25,36.0
+SKU-00237,Commercial Hydraulics Displays 459,Control y Electrónica,Displays,Commercial Hydraulics,Pacific Seal Supply,210120.0,166205.0,1,24.0
+SKU-00238,Brevini Agua-Aceite 978,Enfriadores,Agua-Aceite,Brevini,Pacific Seal Supply,461498.0,347508.0,25,12.0
+SKU-00239,Denison Agua-Aceite 986,Enfriadores,Agua-Aceite,Denison,Andes Motion,1849722.0,1389141.0,2,36.0
+SKU-00240,Denison Reductores Planetarios 245,Mandos Finales,Reductores Planetarios,Denison,Industrial Flow Partners,3119096.0,2713614.0,10,18.0
+SKU-00241,Scanreco Adaptadores 627,Accesorios y Acoples,Adaptadores,Scanreco,Andes Motion,115738.0,77082.0,1,18.0
+SKU-00242,Bezares Control Remoto 569,Control y Electrónica,Control Remoto,Bezares,Andes Motion,1142792.0,884521.0,1,36.0
+SKU-00243,Bezares Recuperación 374,Winches,Recuperación,Bezares,Hydroline Andina,4876229.0,4154547.0,2,18.0
+SKU-00244,KTR Retorno 880,Filtros,Retorno,KTR,Pacific Seal Supply,72729.0,46328.0,5,36.0
+SKU-00245,Rexroth Engranaje 567,Bombas Hidráulicas,Engranaje,Rexroth,Industrial Flow Partners,3559920.0,2869296.0,2,18.0
+SKU-00246,Argo Hytos Pistones Radiales 770,Bombas Hidráulicas,Pistones Radiales,Argo Hytos,Industrial Flow Partners,4105921.0,3034276.0,5,
+SKU-00247,Poclain Retorno 816,Filtros,Retorno,Poclain,Tecfluid Norte,82425.0,51104.0,5,36.0
+SKU-00248,Poclain Proporcionales 631,Comandos Direccionales,Proporcionales,Poclain,Industrial Flow Partners,346537.0,283467.0,25,6.0
+SKU-00249,Parker Izado 235,Winches,Izado,Parker,Hydroline Andina,4325784.0,3469279.0,10,36.0
+SKU-00250,Sun Hydraulics Sensores Presión 240,Instrumentación,Sensores Presión,Sun Hydraulics,Andes Motion,80919.0,54944.0,5,12.0
+SKU-00251,Denison Diafragma 839,Acumuladores,Diafragma,Denison,Hydroline Andina,833322.0,707490.0,10,12.0
+SKU-00252,Denison Monoblock 870,Comandos Direccionales,Monoblock,Denison,Andes Motion,1586261.0,1243629.0,1,6.0
+SKU-00253,Calzoni Pistones 186,Motores Hidráulicos,Pistones,Calzoni,Tecfluid Norte,4823594.0,4046995.0,5,36.0
+SKU-00254,Brevini Monoblock 996,Comandos Direccionales,Monoblock,Brevini,Pacific Seal Supply,1836408.0,1481981.0,1,36.0
+SKU-00255,Hydac Direccional 606,Válvulas,Direccional,Hydac,Pacific Seal Supply,419880.0,290977.0,1,6.0
+SKU-00256,Sun Hydraulics Diafragma 424,Acumuladores,Diafragma,Sun Hydraulics,Andes Motion,986077.0,829291.0,1,12.0
+SKU-00257,Marzocchi Reductores Planetarios 701,Mandos Finales,Reductores Planetarios,Marzocchi,Andes Motion,3430970.0,2806533.0,1,
+SKU-00258,Olaer Engranaje 743,Motores Hidráulicos,Engranaje,Olaer,Maestranza Integral,391169.0,341099.0,25,12.0
+SKU-00259,Scanreco Displays 185,Control y Electrónica,Displays,Scanreco,Industrial Flow Partners,512619.0,374212.0,2,12.0
+SKU-00260,Hydac Cartridge 881,Válvulas,Cartridge,Hydac,Maestranza Integral,780093.0,619394.0,25,36.0
+SKU-00261,Poclain Recuperación 188,Winches,Recuperación,Poclain,Tecfluid Norte,4342717.0,3526286.0,1,6.0
+SKU-00262,FaberCom Diafragma 112,Acumuladores,Diafragma,FaberCom,Pacific Seal Supply,944542.0,765079.0,2,
+SKU-00263,Parker Microcontroladores 480,Control y Electrónica,Microcontroladores,Parker,Maestranza Integral,620875.0,478695.0,5,6.0
+SKU-00264,Rexroth Reductores Planetarios 690,Mandos Finales,Reductores Planetarios,Rexroth,Hydroline Andina,3212079.0,2723843.0,5,36.0
+SKU-00265,Bucher Hydraulics Planetarios 261,Winches,Planetarios,Bucher Hydraulics,Andes Motion,3309300.0,2955205.0,2,12.0
+SKU-00266,Marzocchi Cartridge 350,Válvulas,Cartridge,Marzocchi,Industrial Flow Partners,585153.0,457004.0,1,
+SKU-00267,Bezares Pistones Radiales 922,Bombas Hidráulicas,Pistones Radiales,Bezares,Andes Motion,4152985.0,3534190.0,1,24.0
+SKU-00268,Sun Hydraulics Displays 481,Control y Electrónica,Displays,Sun Hydraulics,Tecfluid Norte,335503.0,232168.0,1,24.0
+SKU-00269,Danfoss Pistones 998,Motores Hidráulicos,Pistones,Danfoss,Maestranza Integral,1271288.0,1033557.0,10,
+SKU-00270,Webtec Manómetros 903,Instrumentación,Manómetros,Webtec,Tecfluid Norte,79240.0,57924.0,5,24.0
+SKU-00271,Sun Hydraulics Proporcionales 659,Válvulas,Proporcionales,Sun Hydraulics,Andes Motion,310412.0,203320.0,2,36.0
+SKU-00272,Parker Direccionales Múltiples 101,Comandos Direccionales,Direccionales Múltiples,Parker,Andes Motion,176906.0,136041.0,1,12.0
+SKU-00273,Webtec Izado 828,Winches,Izado,Webtec,Hydroline Andina,1628569.0,1273541.0,1,6.0
+SKU-00274,Danfoss Cartridge 865,Válvulas,Cartridge,Danfoss,Maestranza Integral,720398.0,527331.0,5,18.0
+SKU-00275,Rexroth Pistones 545,Motores Hidráulicos,Pistones,Rexroth,Pacific Seal Supply,840866.0,649989.0,25,
+SKU-00276,Sun Hydraulics Planetarios 563,Winches,Planetarios,Sun Hydraulics,Tecfluid Norte,1935450.0,1668358.0,5,12.0
+SKU-00277,Poclain Direccional 560,Válvulas,Direccional,Poclain,Maestranza Integral,130487.0,89906.0,1,6.0
+SKU-00278,Scanreco Manómetros 371,Instrumentación,Manómetros,Scanreco,Hydroline Andina,335477.0,219737.0,5,18.0
+SKU-00279,Commercial Hydraulics Engranaje 251,Motores Hidráulicos,Engranaje,Commercial Hydraulics,Industrial Flow Partners,1660232.0,1308263.0,2,12.0
+SKU-00280,Sun Hydraulics Pistones 514,Motores Hidráulicos,Pistones,Sun Hydraulics,Tecfluid Norte,2101973.0,1837124.0,2,
+SKU-00281,Rexroth Caudalímetros 233,Instrumentación,Caudalímetros,Rexroth,Andes Motion,88087.0,59987.0,1,6.0
+SKU-00282,Bezares Proporcionales 122,Comandos Direccionales,Proporcionales,Bezares,Industrial Flow Partners,1620108.0,1219941.0,5,
+SKU-00283,FaberCom Engranaje 572,Motores Hidráulicos,Engranaje,FaberCom,Maestranza Integral,641497.0,493953.0,1,
+SKU-00284,Marzocchi Paleta 462,Bombas Hidráulicas,Paleta,Marzocchi,Andes Motion,3724331.0,3042778.0,10,6.0
+SKU-00285,Olaer Direccionales Múltiples 762,Comandos Direccionales,Direccionales Múltiples,Olaer,Tecfluid Norte,1181507.0,978288.0,25,6.0
+SKU-00286,Scanreco Control Presión 758,Válvulas,Control Presión,Scanreco,Pacific Seal Supply,396249.0,318980.0,10,6.0
+SKU-00287,Casappa Agua-Aceite 452,Enfriadores,Agua-Aceite,Casappa,Hydroline Andina,1980397.0,1540749.0,25,18.0
+SKU-00288,Calzoni Adaptadores 928,Accesorios y Acoples,Adaptadores,Calzoni,Tecfluid Norte,49055.0,35467.0,5,
+SKU-00289,Marzocchi Manómetros 935,Instrumentación,Manómetros,Marzocchi,Maestranza Integral,585169.0,459358.0,5,24.0
+SKU-00290,Sun Hydraulics Joystick 342,Control y Electrónica,Joystick,Sun Hydraulics,Pacific Seal Supply,1023481.0,724625.0,2,6.0
+SKU-00291,Bezares Adaptadores 676,Accesorios y Acoples,Adaptadores,Bezares,Pacific Seal Supply,11911.0,7790.0,25,6.0
+SKU-00292,Casappa Proporcionales 120,Comandos Direccionales,Proporcionales,Casappa,Tecfluid Norte,537825.0,453924.0,25,6.0
+SKU-00293,Parker Agua-Aceite 160,Enfriadores,Agua-Aceite,Parker,Tecfluid Norte,1848108.0,1578284.0,2,12.0
+SKU-00294,Marzocchi Paleta 482,Bombas Hidráulicas,Paleta,Marzocchi,Industrial Flow Partners,4139925.0,3129783.0,5,
+SKU-00295,Marzocchi Displays 598,Control y Electrónica,Displays,Marzocchi,Hydroline Andina,437045.0,338710.0,10,36.0
+SKU-00296,Commercial Hydraulics Izado 781,Winches,Izado,Commercial Hydraulics,Industrial Flow Partners,5828086.0,4761546.0,5,6.0
+SKU-00297,Calzoni Campanas 686,Accesorios y Acoples,Campanas,Calzoni,Tecfluid Norte,184829.0,134371.0,1,36.0
+SKU-00298,Danfoss Pistones 679,Acumuladores,Pistones,Danfoss,Maestranza Integral,935392.0,682836.0,2,36.0
+SKU-00299,Denison Orbitales 190,Motores Hidráulicos,Orbitales,Denison,Tecfluid Norte,3777648.0,3207223.0,2,36.0
+SKU-00300,FaberCom Control Remoto 837,Control y Electrónica,Control Remoto,FaberCom,Hydroline Andina,354994.0,278670.0,5,
+SKU-00301,Calzoni Engranaje 459,Bombas Hidráulicas,Engranaje,Calzoni,Andes Motion,3336743.0,2419139.0,10,18.0
+SKU-00302,Rexroth Agua-Aceite 562,Enfriadores,Agua-Aceite,Rexroth,Andes Motion,1609150.0,1295366.0,2,6.0
+SKU-00303,Webtec Engranaje 264,Motores Hidráulicos,Engranaje,Webtec,Hydroline Andina,1729841.0,1307760.0,2,18.0
+SKU-00304,Casappa Joystick 769,Control y Electrónica,Joystick,Casappa,Hydroline Andina,438643.0,299155.0,1,18.0
+SKU-00305,Commercial Hydraulics Reductores Planetarios 847,Mandos Finales,Reductores Planetarios,Commercial Hydraulics,Hydroline Andina,1529056.0,1337924.0,25,36.0
+SKU-00306,Webtec Agua-Aceite 155,Enfriadores,Agua-Aceite,Webtec,Tecfluid Norte,589464.0,515192.0,10,6.0
+SKU-00307,Scanreco Spin-On 126,Filtros,Spin-On,Scanreco,Hydroline Andina,40990.0,25332.0,2,
+SKU-00308,Webtec Direccionales Múltiples 776,Comandos Direccionales,Direccionales Múltiples,Webtec,Hydroline Andina,1247098.0,1038833.0,10,18.0
+SKU-00309,Casappa Cartridge 369,Válvulas,Cartridge,Casappa,Andes Motion,168283.0,112581.0,10,
+SKU-00310,Olaer Data Loggers 784,Instrumentación,Data Loggers,Olaer,Maestranza Integral,507135.0,362602.0,1,
+SKU-00311,Scanreco Accesorios Estanque 648,Filtros,Accesorios Estanque,Scanreco,Pacific Seal Supply,33481.0,24709.0,25,18.0
+SKU-00312,Marzocchi Izado 684,Winches,Izado,Marzocchi,Maestranza Integral,3119443.0,2779424.0,1,24.0
+SKU-00313,Rexroth Agua-Aceite 143,Enfriadores,Agua-Aceite,Rexroth,Andes Motion,469826.0,353309.0,2,6.0
+SKU-00314,Scanreco Diafragma 844,Acumuladores,Diafragma,Scanreco,Maestranza Integral,1496122.0,1149022.0,5,12.0
+SKU-00315,Calzoni Engranaje 905,Motores Hidráulicos,Engranaje,Calzoni,Pacific Seal Supply,2107304.0,1765921.0,10,
+SKU-00316,Rexroth Displays 676,Control y Electrónica,Displays,Rexroth,Andes Motion,222089.0,164568.0,1,
+SKU-00317,Casappa Orbitales 584,Motores Hidráulicos,Orbitales,Casappa,Tecfluid Norte,4413889.0,3734150.0,25,24.0
+SKU-00318,Olaer Paleta 439,Bombas Hidráulicas,Paleta,Olaer,Andes Motion,775759.0,607419.0,1,18.0
+SKU-00319,Danfoss Microcontroladores 418,Control y Electrónica,Microcontroladores,Danfoss,Industrial Flow Partners,596501.0,466464.0,5,12.0
+SKU-00320,Rexroth Control Presión 846,Válvulas,Control Presión,Rexroth,Maestranza Integral,129149.0,84463.0,5,12.0
+SKU-00321,Poclain Pistones 988,Acumuladores,Pistones,Poclain,Maestranza Integral,707238.0,516991.0,10,24.0
+SKU-00322,Hydac Spin-On 129,Filtros,Spin-On,Hydac,Maestranza Integral,15349.0,9332.0,25,24.0
+SKU-00323,Argo Hytos Reductores Planetarios 477,Mandos Finales,Reductores Planetarios,Argo Hytos,Hydroline Andina,2596330.0,2193899.0,2,12.0
+SKU-00324,Rexroth Data Loggers 700,Instrumentación,Data Loggers,Rexroth,Industrial Flow Partners,47421.0,35281.0,2,18.0
+SKU-00325,Bezares Agua-Aceite 128,Enfriadores,Agua-Aceite,Bezares,Maestranza Integral,1699659.0,1437912.0,1,12.0
+SKU-00326,Commercial Hydraulics Diafragma 311,Acumuladores,Diafragma,Commercial Hydraulics,Pacific Seal Supply,1187359.0,976009.0,2,36.0
+SKU-00327,Hydac Control Presión 762,Válvulas,Control Presión,Hydac,Hydroline Andina,695088.0,455978.0,10,6.0
+SKU-00328,Sun Hydraulics Reductores Planetarios 485,Mandos Finales,Reductores Planetarios,Sun Hydraulics,Tecfluid Norte,5180076.0,4076720.0,5,18.0
+SKU-00329,Olaer Alta Presión 204,Filtros,Alta Presión,Olaer,Maestranza Integral,60270.0,37066.0,10,24.0
+SKU-00330,Casappa Pistones Axiales 444,Bombas Hidráulicas,Pistones Axiales,Casappa,Industrial Flow Partners,2732911.0,2281981.0,10,
+SKU-00331,Olaer Control Flujo 629,Válvulas,Control Flujo,Olaer,Tecfluid Norte,533493.0,351038.0,2,6.0
+SKU-00332,Brevini Direccionales Múltiples 365,Comandos Direccionales,Direccionales Múltiples,Brevini,Andes Motion,1692062.0,1265662.0,10,12.0
+SKU-00333,Calzoni Vejiga 843,Acumuladores,Vejiga,Calzoni,Industrial Flow Partners,130153.0,98656.0,2,12.0
+SKU-00334,Casappa Microcontroladores 965,Control y Electrónica,Microcontroladores,Casappa,Industrial Flow Partners,952632.0,660174.0,25,12.0
+SKU-00335,Webtec Reductores Planetarios 796,Mandos Finales,Reductores Planetarios,Webtec,Hydroline Andina,4189622.0,3397783.0,25,6.0
+SKU-00336,Sun Hydraulics Spin-On 366,Filtros,Spin-On,Sun Hydraulics,Tecfluid Norte,33013.0,19015.0,5,12.0
+SKU-00337,FaberCom Adaptadores 583,Accesorios y Acoples,Adaptadores,FaberCom,Hydroline Andina,120281.0,75055.0,25,
+SKU-00338,Rexroth Monoblock 305,Comandos Direccionales,Monoblock,Rexroth,Industrial Flow Partners,1028373.0,827840.0,2,6.0
+SKU-00339,Marzocchi Alta Presión 440,Filtros,Alta Presión,Marzocchi,Andes Motion,24041.0,13896.0,1,18.0
+SKU-00340,KTR Planetarios 882,Winches,Planetarios,KTR,Industrial Flow Partners,819075.0,692937.0,2,24.0
+SKU-00341,Poclain Reductores Planetarios 104,Mandos Finales,Reductores Planetarios,Poclain,Maestranza Integral,5224254.0,4304785.0,10,18.0
+SKU-00342,Bezares Paleta 104,Bombas Hidráulicas,Paleta,Bezares,Hydroline Andina,4030228.0,3058943.0,1,36.0
+SKU-00343,Sun Hydraulics Recuperación 702,Winches,Recuperación,Sun Hydraulics,Maestranza Integral,4314386.0,3706058.0,10,24.0
+SKU-00344,Poclain Direccional 445,Válvulas,Direccional,Poclain,Hydroline Andina,256107.0,197458.0,25,24.0
+SKU-00345,Denison Pistones 119,Acumuladores,Pistones,Denison,Tecfluid Norte,1494517.0,1174690.0,2,18.0
+SKU-00346,Denison Direccionales Múltiples 766,Comandos Direccionales,Direccionales Múltiples,Denison,Maestranza Integral,1867102.0,1422732.0,5,36.0
+SKU-00347,Olaer Pistones Radiales 956,Bombas Hidráulicas,Pistones Radiales,Olaer,Pacific Seal Supply,2860636.0,2245599.0,1,36.0
+SKU-00348,Rexroth Engranaje 811,Bombas Hidráulicas,Engranaje,Rexroth,Andes Motion,2082767.0,1791180.0,2,6.0
+SKU-00349,Parker Recuperación 817,Winches,Recuperación,Parker,Tecfluid Norte,2814793.0,2499536.0,25,24.0
+SKU-00350,Rexroth Reductores Planetarios 303,Mandos Finales,Reductores Planetarios,Rexroth,Pacific Seal Supply,5975117.0,5293954.0,1,18.0
+SKU-00351,Olaer Campanas 661,Accesorios y Acoples,Campanas,Olaer,Pacific Seal Supply,243414.0,174284.0,2,
+SKU-00352,Bucher Hydraulics Caudalímetros 785,Instrumentación,Caudalímetros,Bucher Hydraulics,Tecfluid Norte,163668.0,130607.0,1,24.0
+SKU-00353,Poclain Caudalímetros 403,Instrumentación,Caudalímetros,Poclain,Pacific Seal Supply,72777.0,50289.0,2,18.0
+SKU-00354,Danfoss Control Presión 420,Válvulas,Control Presión,Danfoss,Hydroline Andina,655213.0,439648.0,5,36.0
+SKU-00355,Rexroth Pistones 762,Acumuladores,Pistones,Rexroth,Hydroline Andina,1288769.0,945956.0,2,36.0
+SKU-00356,Bezares Reductores Planetarios 287,Mandos Finales,Reductores Planetarios,Bezares,Andes Motion,7676642.0,6663325.0,5,12.0
+SKU-00357,Calzoni Orbitales 916,Motores Hidráulicos,Orbitales,Calzoni,Andes Motion,1504799.0,1248983.0,10,36.0
+SKU-00358,Denison Reductores Planetarios 704,Mandos Finales,Reductores Planetarios,Denison,Industrial Flow Partners,6030160.0,4715585.0,1,18.0
+SKU-00359,Commercial Hydraulics Data Loggers 599,Instrumentación,Data Loggers,Commercial Hydraulics,Pacific Seal Supply,246458.0,183858.0,2,18.0
+SKU-00360,FaberCom Orbitales 690,Motores Hidráulicos,Orbitales,FaberCom,Hydroline Andina,504013.0,400690.0,25,36.0
+SKU-00361,KTR Microcontroladores 454,Control y Electrónica,Microcontroladores,KTR,Pacific Seal Supply,651569.0,470433.0,2,18.0
+SKU-00362,Calzoni Recuperación 758,Winches,Recuperación,Calzoni,Maestranza Integral,5114682.0,4260530.0,1,
+SKU-00363,Bucher Hydraulics Reductores Planetarios 619,Mandos Finales,Reductores Planetarios,Bucher Hydraulics,Maestranza Integral,1339030.0,1126124.0,5,
+SKU-00364,Calzoni Monoblock 190,Comandos Direccionales,Monoblock,Calzoni,Andes Motion,2064706.0,1730224.0,25,18.0
+SKU-00365,KTR Data Loggers 136,Instrumentación,Data Loggers,KTR,Hydroline Andina,588982.0,405220.0,10,18.0
+SKU-00366,Poclain Agua-Aceite 770,Enfriadores,Agua-Aceite,Poclain,Pacific Seal Supply,1931867.0,1539698.0,25,6.0
+SKU-00367,KTR Izado 885,Winches,Izado,KTR,Tecfluid Norte,5039210.0,4041446.0,5,24.0
+SKU-00368,Bezares Tomas de Fuerza 463,Accesorios y Acoples,Tomas de Fuerza,Bezares,Industrial Flow Partners,115870.0,88293.0,1,12.0
+SKU-00369,Casappa Izado 941,Winches,Izado,Casappa,Pacific Seal Supply,2556397.0,2267524.0,10,6.0
+SKU-00370,Rexroth Displays 568,Control y Electrónica,Displays,Rexroth,Tecfluid Norte,752480.0,597469.0,10,6.0
+SKU-00371,KTR Monoblock 890,Comandos Direccionales,Monoblock,KTR,Hydroline Andina,1922015.0,1620259.0,25,
+SKU-00372,Marzocchi Data Loggers 543,Instrumentación,Data Loggers,Marzocchi,Pacific Seal Supply,106743.0,77389.0,1,24.0
+SKU-00373,Hydac Tomas de Fuerza 773,Accesorios y Acoples,Tomas de Fuerza,Hydac,Maestranza Integral,174495.0,130697.0,1,18.0
+SKU-00374,Hydac Adaptadores 507,Accesorios y Acoples,Adaptadores,Hydac,Andes Motion,107573.0,72074.0,2,12.0
+SKU-00375,FaberCom Retorno 963,Filtros,Retorno,FaberCom,Maestranza Integral,23476.0,14766.0,25,12.0
+SKU-00376,Casappa Control Remoto 235,Control y Electrónica,Control Remoto,Casappa,Industrial Flow Partners,299944.0,237256.0,5,36.0
+SKU-00377,Hydac Microcontroladores 591,Control y Electrónica,Microcontroladores,Hydac,Pacific Seal Supply,848459.0,657556.0,5,24.0
+SKU-00378,Casappa Tomas de Fuerza 490,Accesorios y Acoples,Tomas de Fuerza,Casappa,Tecfluid Norte,219982.0,154867.0,1,
+SKU-00379,Danfoss Reductores Planetarios 959,Mandos Finales,Reductores Planetarios,Danfoss,Maestranza Integral,2722244.0,2194129.0,5,6.0
+SKU-00380,Argo Hytos Pistones Axiales 860,Bombas Hidráulicas,Pistones Axiales,Argo Hytos,Pacific Seal Supply,290533.0,217900.0,25,6.0
+SKU-00381,Calzoni Recuperación 496,Winches,Recuperación,Calzoni,Maestranza Integral,3310073.0,2661299.0,1,18.0
+SKU-00382,KTR Pistones 748,Acumuladores,Pistones,KTR,Pacific Seal Supply,156399.0,117768.0,10,6.0
+SKU-00383,Marzocchi Control Remoto 559,Control y Electrónica,Control Remoto,Marzocchi,Pacific Seal Supply,899218.0,712181.0,2,12.0
+SKU-00384,Commercial Hydraulics Reductores Planetarios 370,Mandos Finales,Reductores Planetarios,Commercial Hydraulics,Maestranza Integral,6092572.0,5398019.0,5,24.0
+SKU-00385,Marzocchi Reductores Planetarios 430,Mandos Finales,Reductores Planetarios,Marzocchi,Tecfluid Norte,840645.0,709504.0,1,6.0
+SKU-00386,Brevini Acoples Rotex 425,Accesorios y Acoples,Acoples Rotex,Brevini,Industrial Flow Partners,78783.0,50264.0,1,36.0
+SKU-00387,Commercial Hydraulics Agua-Aceite 194,Enfriadores,Agua-Aceite,Commercial Hydraulics,Pacific Seal Supply,276126.0,224767.0,25,18.0
+SKU-00388,Argo Hytos Presión 586,Filtros,Presión,Argo Hytos,Industrial Flow Partners,45171.0,30626.0,25,24.0
+SKU-00389,Rexroth Agua-Aceite 140,Enfriadores,Agua-Aceite,Rexroth,Industrial Flow Partners,790113.0,670806.0,25,6.0
+SKU-00390,Calzoni Izado 626,Winches,Izado,Calzoni,Hydroline Andina,2622318.0,2189636.0,25,12.0
+SKU-00391,Bucher Hydraulics Agua-Aceite 271,Enfriadores,Agua-Aceite,Bucher Hydraulics,Hydroline Andina,698403.0,555230.0,1,
+SKU-00392,Poclain Agua-Aceite 310,Enfriadores,Agua-Aceite,Poclain,Maestranza Integral,1390120.0,1082903.0,10,
+SKU-00393,Poclain Agua-Aceite 175,Enfriadores,Agua-Aceite,Poclain,Industrial Flow Partners,1419181.0,1244622.0,1,
+SKU-00394,Olaer Paleta 561,Bombas Hidráulicas,Paleta,Olaer,Pacific Seal Supply,456423.0,341861.0,10,18.0
+SKU-00395,Scanreco Izado 874,Winches,Izado,Scanreco,Tecfluid Norte,592900.0,485585.0,25,
+SKU-00396,Poclain Joystick 188,Control y Electrónica,Joystick,Poclain,Tecfluid Norte,1117255.0,899390.0,5,24.0
+SKU-00397,Calzoni Control Presión 864,Válvulas,Control Presión,Calzoni,Andes Motion,662145.0,539648.0,2,6.0
+SKU-00398,Webtec Pistones 666,Acumuladores,Pistones,Webtec,Industrial Flow Partners,284587.0,216855.0,5,
+SKU-00399,Rexroth Agua-Aceite 315,Enfriadores,Agua-Aceite,Rexroth,Hydroline Andina,159305.0,127763.0,1,12.0
+SKU-00400,Argo Hytos Control Remoto 731,Control y Electrónica,Control Remoto,Argo Hytos,Andes Motion,1091472.0,765122.0,2,6.0
+SKU-00401,Rexroth Direccional 760,Válvulas,Direccional,Rexroth,Maestranza Integral,545008.0,394586.0,25,18.0
+SKU-00402,Webtec Agua-Aceite 465,Enfriadores,Agua-Aceite,Webtec,Industrial Flow Partners,274621.0,238096.0,10,12.0
+SKU-00403,Rexroth Reductores Planetarios 731,Mandos Finales,Reductores Planetarios,Rexroth,Tecfluid Norte,5260514.0,4166327.0,10,12.0
+SKU-00404,Marzocchi Izado 104,Winches,Izado,Marzocchi,Maestranza Integral,3610536.0,3090619.0,10,6.0
+SKU-00405,Sun Hydraulics Presión 850,Filtros,Presión,Sun Hydraulics,Industrial Flow Partners,90859.0,60240.0,2,36.0
+SKU-00406,FaberCom Alta Presión 721,Filtros,Alta Presión,FaberCom,Andes Motion,48179.0,33195.0,2,36.0
+SKU-00407,Denison Orbitales 969,Motores Hidráulicos,Orbitales,Denison,Pacific Seal Supply,1142873.0,897155.0,1,
+SKU-00408,Marzocchi Agua-Aceite 656,Enfriadores,Agua-Aceite,Marzocchi,Pacific Seal Supply,899499.0,722298.0,25,12.0
+SKU-00409,Denison Agua-Aceite 575,Enfriadores,Agua-Aceite,Denison,Tecfluid Norte,876122.0,669357.0,5,6.0
+SKU-00410,Calzoni Agua-Aceite 269,Enfriadores,Agua-Aceite,Calzoni,Tecfluid Norte,1079009.0,856733.0,25,36.0
+SKU-00411,FaberCom Agua-Aceite 849,Enfriadores,Agua-Aceite,FaberCom,Maestranza Integral,481419.0,364434.0,2,36.0
+SKU-00412,Danfoss Manómetros 784,Instrumentación,Manómetros,Danfoss,Maestranza Integral,464039.0,354990.0,2,
+SKU-00413,Bezares Monoblock 820,Comandos Direccionales,Monoblock,Bezares,Andes Motion,1237825.0,967979.0,5,
+SKU-00414,Olaer Agua-Aceite 769,Enfriadores,Agua-Aceite,Olaer,Pacific Seal Supply,1157048.0,991590.0,5,24.0
+SKU-00415,Olaer Pistones 911,Motores Hidráulicos,Pistones,Olaer,Andes Motion,4868836.0,4143379.0,5,18.0
+SKU-00416,Hydac Sensores Presión 253,Instrumentación,Sensores Presión,Hydac,Maestranza Integral,280742.0,215048.0,5,6.0
+SKU-00417,Bezares Reductores Planetarios 216,Mandos Finales,Reductores Planetarios,Bezares,Pacific Seal Supply,5964580.0,5284618.0,5,36.0
+SKU-00418,Bucher Hydraulics Data Loggers 230,Instrumentación,Data Loggers,Bucher Hydraulics,Maestranza Integral,366751.0,257826.0,2,
+SKU-00419,Denison Campanas 284,Accesorios y Acoples,Campanas,Denison,Industrial Flow Partners,130597.0,80970.0,2,12.0
+SKU-00420,Brevini Agua-Aceite 321,Enfriadores,Agua-Aceite,Brevini,Pacific Seal Supply,1329602.0,1018475.0,5,
+SKU-00421,Bucher Hydraulics Data Loggers 738,Instrumentación,Data Loggers,Bucher Hydraulics,Maestranza Integral,155037.0,114417.0,25,6.0
+SKU-00422,Olaer Recuperación 335,Winches,Recuperación,Olaer,Maestranza Integral,4483027.0,3850920.0,25,
+SKU-00423,Denison Vejiga 720,Acumuladores,Vejiga,Denison,Hydroline Andina,103519.0,80952.0,10,6.0
+SKU-00424,Bucher Hydraulics Engranaje 593,Motores Hidráulicos,Engranaje,Bucher Hydraulics,Pacific Seal Supply,3079106.0,2358595.0,1,
+SKU-00425,Brevini Planetarios 530,Winches,Planetarios,Brevini,Pacific Seal Supply,5051370.0,4000685.0,10,24.0
+SKU-00426,Hydac Spin-On 703,Filtros,Spin-On,Hydac,Andes Motion,33702.0,19884.0,10,12.0
+SKU-00427,Scanreco Joystick 712,Control y Electrónica,Joystick,Scanreco,Maestranza Integral,342696.0,244342.0,1,12.0
+SKU-00428,Olaer Agua-Aceite 632,Enfriadores,Agua-Aceite,Olaer,Maestranza Integral,160118.0,125372.0,25,
+SKU-00429,Argo Hytos Pistones Radiales 699,Bombas Hidráulicas,Pistones Radiales,Argo Hytos,Industrial Flow Partners,3648649.0,2973649.0,10,36.0
+SKU-00430,Casappa Control Flujo 523,Válvulas,Control Flujo,Casappa,Andes Motion,462619.0,331235.0,10,6.0
+SKU-00431,Commercial Hydraulics Agua-Aceite 892,Enfriadores,Agua-Aceite,Commercial Hydraulics,Tecfluid Norte,1184324.0,967593.0,25,12.0
+SKU-00432,Denison Displays 319,Control y Electrónica,Displays,Denison,Industrial Flow Partners,186949.0,147316.0,2,
+SKU-00433,KTR Agua-Aceite 105,Enfriadores,Agua-Aceite,KTR,Pacific Seal Supply,1285947.0,1017184.0,10,36.0
+SKU-00434,Bucher Hydraulics Engranaje 138,Motores Hidráulicos,Engranaje,Bucher Hydraulics,Pacific Seal Supply,2289812.0,1996716.0,1,24.0
+SKU-00435,Calzoni Displays 755,Control y Electrónica,Displays,Calzoni,Pacific Seal Supply,804602.0,627590.0,1,6.0
+SKU-00436,Parker Data Loggers 902,Instrumentación,Data Loggers,Parker,Maestranza Integral,514824.0,339784.0,2,
+SKU-00437,Brevini Campanas 382,Accesorios y Acoples,Campanas,Brevini,Maestranza Integral,170136.0,121647.0,2,
+SKU-00438,Calzoni Vejiga 662,Acumuladores,Vejiga,Calzoni,Andes Motion,912234.0,714279.0,1,
+SKU-00439,Marzocchi Proporcionales 513,Válvulas,Proporcionales,Marzocchi,Tecfluid Norte,294293.0,200414.0,2,18.0
+SKU-00440,Olaer Acoples Rotex 219,Accesorios y Acoples,Acoples Rotex,Olaer,Maestranza Integral,104748.0,79713.0,5,12.0
+SKU-00441,Casappa Agua-Aceite 875,Enfriadores,Agua-Aceite,Casappa,Pacific Seal Supply,612762.0,503690.0,10,6.0
+SKU-00442,FaberCom Alta Presión 907,Filtros,Alta Presión,FaberCom,Pacific Seal Supply,104547.0,68374.0,10,36.0
+SKU-00443,Sun Hydraulics Monoblock 394,Comandos Direccionales,Monoblock,Sun Hydraulics,Tecfluid Norte,1101574.0,877954.0,5,6.0
+SKU-00444,KTR Orbitales 375,Motores Hidráulicos,Orbitales,KTR,Hydroline Andina,2861847.0,2452603.0,2,24.0
+SKU-00445,Bucher Hydraulics Reductores Planetarios 307,Mandos Finales,Reductores Planetarios,Bucher Hydraulics,Industrial Flow Partners,2237599.0,1816930.0,2,6.0
+SKU-00446,Bezares Monoblock 106,Comandos Direccionales,Monoblock,Bezares,Maestranza Integral,1973874.0,1642263.0,10,24.0
+SKU-00447,Bucher Hydraulics Agua-Aceite 602,Enfriadores,Agua-Aceite,Bucher Hydraulics,Tecfluid Norte,1298235.0,1059360.0,25,12.0
+SKU-00448,Calzoni Reductores Planetarios 653,Mandos Finales,Reductores Planetarios,Calzoni,Maestranza Integral,6201220.0,5488080.0,10,18.0
+SKU-00449,Calzoni Pistones Axiales 423,Bombas Hidráulicas,Pistones Axiales,Calzoni,Industrial Flow Partners,3525182.0,2844822.0,25,18.0
+SKU-00450,Parker Joystick 291,Control y Electrónica,Joystick,Parker,Industrial Flow Partners,292365.0,216058.0,25,12.0
+SKU-00451,Sun Hydraulics Agua-Aceite 315,Enfriadores,Agua-Aceite,Sun Hydraulics,Tecfluid Norte,1021989.0,817591.0,10,18.0
+SKU-00452,Bezares Pistones 802,Acumuladores,Pistones,Bezares,Tecfluid Norte,1293143.0,1052618.0,2,24.0
+SKU-00453,Olaer Direccionales Múltiples 925,Comandos Direccionales,Direccionales Múltiples,Olaer,Maestranza Integral,1441709.0,1040914.0,2,18.0
+SKU-00454,Scanreco Paleta 423,Bombas Hidráulicas,Paleta,Scanreco,Andes Motion,734952.0,541660.0,25,36.0
+SKU-00455,Olaer Manómetros 320,Instrumentación,Manómetros,Olaer,Pacific Seal Supply,519346.0,411841.0,2,
+SKU-00456,Rexroth Control Presión 452,Válvulas,Control Presión,Rexroth,Andes Motion,602060.0,467199.0,25,12.0
+SKU-00457,Rexroth Pistones Radiales 764,Bombas Hidráulicas,Pistones Radiales,Rexroth,Tecfluid Norte,3923053.0,2848136.0,25,36.0
+SKU-00458,Webtec Agua-Aceite 490,Enfriadores,Agua-Aceite,Webtec,Tecfluid Norte,751417.0,611653.0,10,
+SKU-00459,FaberCom Adaptadores 746,Accesorios y Acoples,Adaptadores,FaberCom,Industrial Flow Partners,239366.0,149364.0,5,18.0
+SKU-00460,Poclain Tomas de Fuerza 373,Accesorios y Acoples,Tomas de Fuerza,Poclain,Hydroline Andina,44690.0,33026.0,5,36.0
+SKU-00461,Olaer Tomas de Fuerza 523,Accesorios y Acoples,Tomas de Fuerza,Olaer,Andes Motion,196339.0,119963.0,25,18.0
+SKU-00462,Parker Reductores Planetarios 270,Mandos Finales,Reductores Planetarios,Parker,Maestranza Integral,6039961.0,4958808.0,1,6.0
+SKU-00463,Rexroth Diafragma 883,Acumuladores,Diafragma,Rexroth,Hydroline Andina,1410247.0,1111275.0,10,24.0
+SKU-00464,Olaer Engranaje 353,Motores Hidráulicos,Engranaje,Olaer,Pacific Seal Supply,945317.0,751527.0,5,6.0
+SKU-00465,FaberCom Control Remoto 465,Control y Electrónica,Control Remoto,FaberCom,Industrial Flow Partners,195373.0,145748.0,1,36.0
+SKU-00466,FaberCom Alta Presión 705,Filtros,Alta Presión,FaberCom,Pacific Seal Supply,112704.0,72131.0,25,6.0
+SKU-00467,Marzocchi Tomas de Fuerza 652,Accesorios y Acoples,Tomas de Fuerza,Marzocchi,Andes Motion,133248.0,88610.0,5,18.0
+SKU-00468,FaberCom Direccionales Múltiples 934,Comandos Direccionales,Direccionales Múltiples,FaberCom,Tecfluid Norte,990564.0,803347.0,1,24.0
+SKU-00469,Webtec Reductores Planetarios 109,Mandos Finales,Reductores Planetarios,Webtec,Andes Motion,4652712.0,3801266.0,10,12.0
+SKU-00470,Brevini Vejiga 504,Acumuladores,Vejiga,Brevini,Maestranza Integral,1211410.0,943688.0,25,18.0
+SKU-00471,Calzoni Direccionales Múltiples 926,Comandos Direccionales,Direccionales Múltiples,Calzoni,Andes Motion,645010.0,540518.0,25,24.0
+SKU-00472,Webtec Control Remoto 239,Control y Electrónica,Control Remoto,Webtec,Industrial Flow Partners,904366.0,639387.0,1,6.0
+SKU-00473,FaberCom Cartridge 255,Válvulas,Cartridge,FaberCom,Pacific Seal Supply,375895.0,263502.0,5,
+SKU-00474,Commercial Hydraulics Engranaje 192,Bombas Hidráulicas,Engranaje,Commercial Hydraulics,Hydroline Andina,1377198.0,1184390.0,1,6.0
+SKU-00475,Bucher Hydraulics Reductores Planetarios 813,Mandos Finales,Reductores Planetarios,Bucher Hydraulics,Maestranza Integral,3261773.0,2814910.0,5,18.0
+SKU-00476,Poclain Pistones Axiales 296,Bombas Hidráulicas,Pistones Axiales,Poclain,Maestranza Integral,393767.0,297688.0,10,6.0
+SKU-00477,Parker Control Presión 855,Válvulas,Control Presión,Parker,Hydroline Andina,780314.0,545439.0,10,6.0
+SKU-00478,FaberCom Paleta 797,Bombas Hidráulicas,Paleta,FaberCom,Industrial Flow Partners,3503832.0,2792554.0,10,18.0
+SKU-00479,Commercial Hydraulics Control Flujo 592,Válvulas,Control Flujo,Commercial Hydraulics,Industrial Flow Partners,589384.0,408443.0,1,12.0
+SKU-00480,Argo Hytos Izado 748,Winches,Izado,Argo Hytos,Tecfluid Norte,5381358.0,4283561.0,1,6.0
+SKU-00481,Parker Vejiga 143,Acumuladores,Vejiga,Parker,Maestranza Integral,1208034.0,935018.0,2,
+SKU-00482,Brevini Tomas de Fuerza 733,Accesorios y Acoples,Tomas de Fuerza,Brevini,Maestranza Integral,95993.0,73339.0,1,36.0
+SKU-00483,Danfoss Spin-On 338,Filtros,Spin-On,Danfoss,Tecfluid Norte,80192.0,48917.0,2,18.0
+SKU-00484,Bezares Accesorios Estanque 140,Filtros,Accesorios Estanque,Bezares,Andes Motion,90117.0,67227.0,2,12.0
+SKU-00485,Casappa Data Loggers 431,Instrumentación,Data Loggers,Casappa,Tecfluid Norte,339358.0,246374.0,25,12.0
+SKU-00486,Olaer Displays 402,Control y Electrónica,Displays,Olaer,Pacific Seal Supply,1101645.0,817421.0,2,18.0
+SKU-00487,Bezares Proporcionales 734,Válvulas,Proporcionales,Bezares,Andes Motion,25558.0,18197.0,2,
+SKU-00488,Sun Hydraulics Accesorios Estanque 636,Filtros,Accesorios Estanque,Sun Hydraulics,Tecfluid Norte,88752.0,54849.0,10,6.0
+SKU-00489,Casappa Izado 635,Winches,Izado,Casappa,Maestranza Integral,3871716.0,3333547.0,1,
+SKU-00490,Danfoss Planetarios 132,Winches,Planetarios,Danfoss,Maestranza Integral,1482513.0,1328332.0,2,
+SKU-00491,Bucher Hydraulics Tomas de Fuerza 835,Accesorios y Acoples,Tomas de Fuerza,Bucher Hydraulics,Pacific Seal Supply,157873.0,106406.0,2,24.0
+SKU-00492,Argo Hytos Engranaje 671,Motores Hidráulicos,Engranaje,Argo Hytos,Industrial Flow Partners,2558746.0,1954882.0,1,12.0
+SKU-00493,Bezares Displays 179,Control y Electrónica,Displays,Bezares,Industrial Flow Partners,117045.0,85911.0,1,12.0
+SKU-00494,Rexroth Monoblock 354,Comandos Direccionales,Monoblock,Rexroth,Hydroline Andina,1845909.0,1421350.0,25,36.0
+SKU-00495,Casappa Campanas 790,Accesorios y Acoples,Campanas,Casappa,Industrial Flow Partners,141745.0,91567.0,25,12.0
+SKU-00496,Rexroth Data Loggers 714,Instrumentación,Data Loggers,Rexroth,Maestranza Integral,481703.0,345863.0,2,24.0
+SKU-00497,KTR Manómetros 431,Instrumentación,Manómetros,KTR,Pacific Seal Supply,595134.0,446946.0,10,36.0
+SKU-00498,Marzocchi Campanas 563,Accesorios y Acoples,Campanas,Marzocchi,Pacific Seal Supply,57412.0,36859.0,5,12.0
+SKU-00499,Parker Data Loggers 106,Instrumentación,Data Loggers,Parker,Industrial Flow Partners,49758.0,37667.0,2,12.0
+SKU-00500,Argo Hytos Direccional 623,Válvulas,Direccional,Argo Hytos,Tecfluid Norte,41819.0,28437.0,5,24.0
+SKU-00501,Rexroth Agua-Aceite 338,Enfriadores,Agua-Aceite,Rexroth,Hydroline Andina,1001684.0,861448.0,25,6.0
+SKU-00502,Poclain Control Flujo 277,Válvulas,Control Flujo,Poclain,Pacific Seal Supply,334844.0,222336.0,5,18.0
+SKU-00503,Brevini Sensores Presión 889,Instrumentación,Sensores Presión,Brevini,Industrial Flow Partners,201224.0,138845.0,1,
+SKU-00504,Scanreco Retorno 749,Filtros,Retorno,Scanreco,Andes Motion,112188.0,81448.0,25,
+SKU-00505,Danfoss Izado 814,Winches,Izado,Danfoss,Tecfluid Norte,3384108.0,2917101.0,5,24.0
+SKU-00506,Danfoss Direccionales Múltiples 616,Comandos Direccionales,Direccionales Múltiples,Danfoss,Industrial Flow Partners,1861157.0,1472175.0,25,24.0
+SKU-00507,Scanreco Engranaje 863,Motores Hidráulicos,Engranaje,Scanreco,Tecfluid Norte,3974568.0,3422103.0,10,24.0
+SKU-00508,Olaer Pistones Radiales 672,Bombas Hidráulicas,Pistones Radiales,Olaer,Hydroline Andina,1883593.0,1525710.0,2,18.0
+SKU-00509,Calzoni Proporcionales 348,Comandos Direccionales,Proporcionales,Calzoni,Industrial Flow Partners,1479767.0,1133502.0,25,6.0
+SKU-00510,Scanreco Orbitales 474,Motores Hidráulicos,Orbitales,Scanreco,Tecfluid Norte,3486742.0,2806827.0,10,18.0
+SKU-00511,KTR Presión 941,Filtros,Presión,KTR,Tecfluid Norte,74514.0,55513.0,5,24.0
+SKU-00512,FaberCom Caudalímetros 973,Instrumentación,Caudalímetros,FaberCom,Hydroline Andina,556802.0,425954.0,2,36.0
+SKU-00513,Danfoss Engranaje 451,Motores Hidráulicos,Engranaje,Danfoss,Maestranza Integral,4754916.0,3613736.0,5,
+SKU-00514,Webtec Joystick 659,Control y Electrónica,Joystick,Webtec,Andes Motion,591869.0,458107.0,2,6.0
+SKU-00515,Casappa Agua-Aceite 696,Enfriadores,Agua-Aceite,Casappa,Andes Motion,1302628.0,978274.0,1,18.0
+SKU-00516,Danfoss Recuperación 154,Winches,Recuperación,Danfoss,Tecfluid Norte,1436758.0,1244232.0,25,12.0
+SKU-00517,Poclain Sensores Presión 119,Instrumentación,Sensores Presión,Poclain,Andes Motion,406413.0,284896.0,5,
+SKU-00518,Sun Hydraulics Control Presión 644,Válvulas,Control Presión,Sun Hydraulics,Andes Motion,419119.0,292964.0,10,24.0
+SKU-00519,Argo Hytos Engranaje 642,Motores Hidráulicos,Engranaje,Argo Hytos,Pacific Seal Supply,4840599.0,3906363.0,1,6.0
+SKU-00520,Bucher Hydraulics Control Flujo 409,Válvulas,Control Flujo,Bucher Hydraulics,Andes Motion,601903.0,491755.0,5,36.0
+SKU-00521,Olaer Monoblock 386,Comandos Direccionales,Monoblock,Olaer,Hydroline Andina,1609386.0,1155539.0,1,24.0
+SKU-00522,KTR Direccionales Múltiples 802,Comandos Direccionales,Direccionales Múltiples,KTR,Andes Motion,1683498.0,1409088.0,25,36.0
+SKU-00523,Sun Hydraulics Proporcionales 655,Comandos Direccionales,Proporcionales,Sun Hydraulics,Pacific Seal Supply,483543.0,340414.0,5,18.0
+SKU-00524,Denison Reductores Planetarios 822,Mandos Finales,Reductores Planetarios,Denison,Pacific Seal Supply,4697748.0,3776989.0,5,36.0
+SKU-00525,Scanreco Agua-Aceite 645,Enfriadores,Agua-Aceite,Scanreco,Maestranza Integral,1364029.0,1100771.0,1,24.0
+SKU-00526,Commercial Hydraulics Joystick 521,Control y Electrónica,Joystick,Commercial Hydraulics,Tecfluid Norte,1015451.0,812361.0,5,18.0
+SKU-00527,Olaer Control Presión 373,Válvulas,Control Presión,Olaer,Maestranza Integral,628809.0,504305.0,25,24.0
+SKU-00528,Brevini Campanas 614,Accesorios y Acoples,Campanas,Brevini,Maestranza Integral,61574.0,47720.0,10,6.0
+SKU-00529,Bezares Tomas de Fuerza 133,Accesorios y Acoples,Tomas de Fuerza,Bezares,Maestranza Integral,213772.0,147930.0,2,6.0
+SKU-00530,Olaer Diafragma 281,Acumuladores,Diafragma,Olaer,Andes Motion,396027.0,302169.0,2,
+SKU-00531,KTR Data Loggers 944,Instrumentación,Data Loggers,KTR,Andes Motion,535925.0,394441.0,25,36.0
+SKU-00532,KTR Pistones 996,Acumuladores,Pistones,KTR,Andes Motion,948337.0,714098.0,25,36.0
+SKU-00533,Hydac Joystick 650,Control y Electrónica,Joystick,Hydac,Hydroline Andina,569351.0,400823.0,2,24.0
+SKU-00534,Danfoss Pistones 550,Acumuladores,Pistones,Danfoss,Pacific Seal Supply,630105.0,473209.0,2,12.0
+SKU-00535,Webtec Vejiga 574,Acumuladores,Vejiga,Webtec,Andes Motion,316411.0,256926.0,25,6.0
+SKU-00536,Poclain Izado 502,Winches,Izado,Poclain,Industrial Flow Partners,3253618.0,2856677.0,25,6.0
+SKU-00537,FaberCom Vejiga 192,Acumuladores,Vejiga,FaberCom,Hydroline Andina,334008.0,258188.0,2,18.0
+SKU-00538,Commercial Hydraulics Control Flujo 636,Válvulas,Control Flujo,Commercial Hydraulics,Industrial Flow Partners,593278.0,476996.0,5,
+SKU-00539,Hydac Displays 679,Control y Electrónica,Displays,Hydac,Pacific Seal Supply,1142217.0,876080.0,2,12.0
+SKU-00540,Commercial Hydraulics Planetarios 887,Winches,Planetarios,Commercial Hydraulics,Maestranza Integral,1483767.0,1209270.0,5,36.0
+SKU-00541,Commercial Hydraulics Manómetros 569,Instrumentación,Manómetros,Commercial Hydraulics,Hydroline Andina,542169.0,355663.0,5,
+SKU-00542,Casappa Data Loggers 519,Instrumentación,Data Loggers,Casappa,Hydroline Andina,376551.0,273376.0,10,18.0
+SKU-00543,Brevini Sensores Presión 150,Instrumentación,Sensores Presión,Brevini,Pacific Seal Supply,33747.0,22543.0,25,6.0
+SKU-00544,Danfoss Reductores Planetarios 405,Mandos Finales,Reductores Planetarios,Danfoss,Industrial Flow Partners,3312943.0,2925329.0,25,24.0
+SKU-00545,Danfoss Spin-On 808,Filtros,Spin-On,Danfoss,Hydroline Andina,54699.0,39055.0,25,36.0
+SKU-00546,FaberCom Microcontroladores 477,Control y Electrónica,Microcontroladores,FaberCom,Industrial Flow Partners,715811.0,493910.0,5,12.0
+SKU-00547,Scanreco Diafragma 639,Acumuladores,Diafragma,Scanreco,Pacific Seal Supply,172195.0,135862.0,5,12.0
+SKU-00548,Argo Hytos Pistones 595,Acumuladores,Pistones,Argo Hytos,Industrial Flow Partners,376852.0,317309.0,25,
+SKU-00549,Scanreco Control Remoto 232,Control y Electrónica,Control Remoto,Scanreco,Pacific Seal Supply,1024968.0,803575.0,25,12.0
+SKU-00550,Hydac Tomas de Fuerza 825,Accesorios y Acoples,Tomas de Fuerza,Hydac,Industrial Flow Partners,159805.0,110425.0,25,6.0
+SKU-00551,Parker Direccional 524,Válvulas,Direccional,Parker,Hydroline Andina,43590.0,31123.0,2,24.0
+SKU-00552,KTR Diafragma 388,Acumuladores,Diafragma,KTR,Tecfluid Norte,875790.0,671731.0,2,36.0
+SKU-00553,Webtec Cartridge 505,Válvulas,Cartridge,Webtec,Tecfluid Norte,417684.0,319528.0,5,12.0
+SKU-00554,Commercial Hydraulics Joystick 761,Control y Electrónica,Joystick,Commercial Hydraulics,Maestranza Integral,430092.0,332461.0,10,
+SKU-00555,Denison Reductores Planetarios 860,Mandos Finales,Reductores Planetarios,Denison,Industrial Flow Partners,4116449.0,3276693.0,10,18.0
+SKU-00556,Marzocchi Pistones Axiales 439,Bombas Hidráulicas,Pistones Axiales,Marzocchi,Industrial Flow Partners,3100160.0,2452227.0,25,36.0
+SKU-00557,Denison Spin-On 684,Filtros,Spin-On,Denison,Tecfluid Norte,102163.0,69675.0,25,6.0
+SKU-00558,Commercial Hydraulics Tomas de Fuerza 132,Accesorios y Acoples,Tomas de Fuerza,Commercial Hydraulics,Pacific Seal Supply,33627.0,21488.0,5,36.0
+SKU-00559,Poclain Control Presión 637,Válvulas,Control Presión,Poclain,Andes Motion,704713.0,533468.0,5,6.0
+SKU-00560,Rexroth Direccional 125,Válvulas,Direccional,Rexroth,Tecfluid Norte,633332.0,435732.0,10,24.0
+SKU-00561,Argo Hytos Caudalímetros 887,Instrumentación,Caudalímetros,Argo Hytos,Tecfluid Norte,556473.0,383966.0,5,6.0
+SKU-00562,Denison Pistones 104,Motores Hidráulicos,Pistones,Denison,Maestranza Integral,3677939.0,3015910.0,25,
+SKU-00563,Brevini Cartridge 691,Válvulas,Cartridge,Brevini,Hydroline Andina,283300.0,189528.0,5,
+SKU-00564,KTR Direccional 220,Válvulas,Direccional,KTR,Maestranza Integral,174223.0,134674.0,10,36.0
+SKU-00565,Commercial Hydraulics Direccional 655,Válvulas,Direccional,Commercial Hydraulics,Tecfluid Norte,113707.0,74705.0,1,6.0
+SKU-00566,KTR Accesorios Estanque 172,Filtros,Accesorios Estanque,KTR,Tecfluid Norte,23854.0,14527.0,2,6.0
+SKU-00567,KTR Proporcionales 492,Válvulas,Proporcionales,KTR,Pacific Seal Supply,368827.0,294324.0,1,
+SKU-00568,Scanreco Engranaje 464,Bombas Hidráulicas,Engranaje,Scanreco,Andes Motion,928576.0,728932.0,10,24.0
+SKU-00569,Argo Hytos Control Flujo 234,Válvulas,Control Flujo,Argo Hytos,Industrial Flow Partners,612762.0,417904.0,10,24.0
+SKU-00570,FaberCom Pistones 337,Motores Hidráulicos,Pistones,FaberCom,Hydroline Andina,2386804.0,1887962.0,10,18.0
+SKU-00571,Brevini Direccionales Múltiples 564,Comandos Direccionales,Direccionales Múltiples,Brevini,Tecfluid Norte,2292611.0,1813455.0,5,12.0
+SKU-00572,Poclain Sensores Presión 718,Instrumentación,Sensores Presión,Poclain,Andes Motion,94346.0,68684.0,5,12.0
+SKU-00573,Hydac Campanas 172,Accesorios y Acoples,Campanas,Hydac,Hydroline Andina,104393.0,67960.0,25,36.0
+SKU-00574,FaberCom Proporcionales 493,Válvulas,Proporcionales,FaberCom,Andes Motion,482665.0,375996.0,2,18.0
+SKU-00575,Argo Hytos Orbitales 810,Motores Hidráulicos,Orbitales,Argo Hytos,Industrial Flow Partners,3036657.0,2362519.0,5,24.0
+SKU-00576,Poclain Direccionales Múltiples 574,Comandos Direccionales,Direccionales Múltiples,Poclain,Industrial Flow Partners,2335455.0,1784288.0,25,24.0
+SKU-00577,Rexroth Accesorios Estanque 933,Filtros,Accesorios Estanque,Rexroth,Andes Motion,27731.0,15502.0,1,36.0
+SKU-00578,KTR Tomas de Fuerza 873,Accesorios y Acoples,Tomas de Fuerza,KTR,Andes Motion,163022.0,125364.0,2,24.0
+SKU-00579,Denison Planetarios 300,Winches,Planetarios,Denison,Industrial Flow Partners,1320690.0,1104097.0,25,18.0
+SKU-00580,KTR Monoblock 452,Comandos Direccionales,Monoblock,KTR,Tecfluid Norte,1477258.0,1053285.0,10,36.0
+SKU-00581,Parker Pistones 478,Motores Hidráulicos,Pistones,Parker,Pacific Seal Supply,4934824.0,4081099.0,5,
+SKU-00582,Parker Agua-Aceite 340,Enfriadores,Agua-Aceite,Parker,Industrial Flow Partners,1186056.0,893100.0,5,
+SKU-00583,Marzocchi Pistones 316,Acumuladores,Pistones,Marzocchi,Andes Motion,967804.0,732628.0,10,24.0
+SKU-00584,Bucher Hydraulics Planetarios 395,Winches,Planetarios,Bucher Hydraulics,Maestranza Integral,1535248.0,1311102.0,10,6.0
+SKU-00585,Denison Planetarios 547,Winches,Planetarios,Denison,Hydroline Andina,894603.0,803353.0,10,36.0
+SKU-00586,Denison Reductores Planetarios 738,Mandos Finales,Reductores Planetarios,Denison,Industrial Flow Partners,6602780.0,5262416.0,25,18.0
+SKU-00587,Hydac Reductores Planetarios 719,Mandos Finales,Reductores Planetarios,Hydac,Andes Motion,4774760.0,4039447.0,2,18.0
+SKU-00588,Sun Hydraulics Pistones Radiales 138,Bombas Hidráulicas,Pistones Radiales,Sun Hydraulics,Industrial Flow Partners,2332520.0,1898671.0,5,
+SKU-00589,Bezares Tomas de Fuerza 576,Accesorios y Acoples,Tomas de Fuerza,Bezares,Hydroline Andina,147166.0,89330.0,25,12.0
+SKU-00590,Hydac Agua-Aceite 748,Enfriadores,Agua-Aceite,Hydac,Pacific Seal Supply,313626.0,256860.0,1,36.0
+SKU-00591,Brevini Agua-Aceite 580,Enfriadores,Agua-Aceite,Brevini,Hydroline Andina,1821633.0,1475523.0,10,24.0
+SKU-00592,Scanreco Adaptadores 711,Accesorios y Acoples,Adaptadores,Scanreco,Tecfluid Norte,240342.0,152858.0,1,36.0
+SKU-00593,Marzocchi Control Remoto 398,Control y Electrónica,Control Remoto,Marzocchi,Tecfluid Norte,120630.0,90955.0,1,36.0
+SKU-00594,Webtec Joystick 235,Control y Electrónica,Joystick,Webtec,Andes Motion,144887.0,108520.0,5,12.0
+SKU-00595,Olaer Adaptadores 254,Accesorios y Acoples,Adaptadores,Olaer,Tecfluid Norte,8480.0,6445.0,25,36.0
+SKU-00596,Bezares Izado 451,Winches,Izado,Bezares,Maestranza Integral,1936889.0,1580501.0,25,
+SKU-00597,Brevini Engranaje 776,Motores Hidráulicos,Engranaje,Brevini,Maestranza Integral,4220548.0,3300469.0,10,6.0
+SKU-00598,Argo Hytos Caudalímetros 271,Instrumentación,Caudalímetros,Argo Hytos,Pacific Seal Supply,448586.0,335542.0,1,
+SKU-00599,Bucher Hydraulics Data Loggers 799,Instrumentación,Data Loggers,Bucher Hydraulics,Tecfluid Norte,301472.0,198369.0,2,18.0
+SKU-00600,Bucher Hydraulics Displays 794,Control y Electrónica,Displays,Bucher Hydraulics,Tecfluid Norte,216922.0,151412.0,10,18.0
+SKU-00601,Danfoss Accesorios Estanque 767,Filtros,Accesorios Estanque,Danfoss,Hydroline Andina,110784.0,69018.0,10,24.0
+SKU-00602,Olaer Control Flujo 867,Válvulas,Control Flujo,Olaer,Tecfluid Norte,646795.0,502560.0,10,36.0
+SKU-00603,Marzocchi Monoblock 110,Comandos Direccionales,Monoblock,Marzocchi,Maestranza Integral,1357487.0,1015400.0,5,24.0
+SKU-00604,Poclain Planetarios 842,Winches,Planetarios,Poclain,Hydroline Andina,2761868.0,2311684.0,5,6.0
+SKU-00605,Argo Hytos Control Flujo 753,Válvulas,Control Flujo,Argo Hytos,Hydroline Andina,43368.0,34868.0,2,24.0
+SKU-00606,Rexroth Pistones 213,Motores Hidráulicos,Pistones,Rexroth,Hydroline Andina,4310916.0,3720321.0,25,6.0
+SKU-00607,Olaer Microcontroladores 808,Control y Electrónica,Microcontroladores,Olaer,Tecfluid Norte,586999.0,404442.0,5,18.0
+SKU-00608,Olaer Izado 161,Winches,Izado,Olaer,Maestranza Integral,4794022.0,4156417.0,10,12.0
+SKU-00609,Commercial Hydraulics Control Flujo 760,Válvulas,Control Flujo,Commercial Hydraulics,Andes Motion,78784.0,51446.0,10,6.0
+SKU-00610,Denison Sensores Presión 365,Instrumentación,Sensores Presión,Denison,Pacific Seal Supply,468163.0,359081.0,10,36.0
+SKU-00611,Poclain Engranaje 768,Motores Hidráulicos,Engranaje,Poclain,Hydroline Andina,2942454.0,2492259.0,10,6.0
+SKU-00612,Danfoss Planetarios 103,Winches,Planetarios,Danfoss,Industrial Flow Partners,2647661.0,2335237.0,10,24.0
+SKU-00613,Bucher Hydraulics Agua-Aceite 331,Enfriadores,Agua-Aceite,Bucher Hydraulics,Andes Motion,897239.0,704333.0,1,24.0
+SKU-00614,Bucher Hydraulics Pistones Radiales 156,Bombas Hidráulicas,Pistones Radiales,Bucher Hydraulics,Hydroline Andina,2617511.0,1910783.0,5,18.0
+SKU-00615,Poclain Recuperación 763,Winches,Recuperación,Poclain,Tecfluid Norte,3440445.0,2700749.0,10,12.0
+SKU-00616,Casappa Direccionales Múltiples 745,Comandos Direccionales,Direccionales Múltiples,Casappa,Hydroline Andina,2422681.0,1819433.0,10,
+SKU-00617,Bucher Hydraulics Control Remoto 125,Control y Electrónica,Control Remoto,Bucher Hydraulics,Hydroline Andina,1067996.0,810609.0,1,6.0
+SKU-00618,Bucher Hydraulics Microcontroladores 116,Control y Electrónica,Microcontroladores,Bucher Hydraulics,Andes Motion,122442.0,91097.0,25,18.0
+SKU-00619,Danfoss Pistones Axiales 794,Bombas Hidráulicas,Pistones Axiales,Danfoss,Tecfluid Norte,3576837.0,3122579.0,25,18.0
+SKU-00620,Marzocchi Agua-Aceite 733,Enfriadores,Agua-Aceite,Marzocchi,Maestranza Integral,1860909.0,1628295.0,1,18.0
+SKU-00621,Denison Paleta 725,Bombas Hidráulicas,Paleta,Denison,Hydroline Andina,899283.0,784175.0,1,18.0
+SKU-00622,Rexroth Reductores Planetarios 445,Mandos Finales,Reductores Planetarios,Rexroth,Hydroline Andina,4379433.0,3521064.0,2,18.0
+SKU-00623,KTR Displays 707,Control y Electrónica,Displays,KTR,Hydroline Andina,1172231.0,866279.0,2,
+SKU-00624,Poclain Reductores Planetarios 268,Mandos Finales,Reductores Planetarios,Poclain,Hydroline Andina,2772032.0,2242574.0,5,24.0
+SKU-00625,Marzocchi Caudalímetros 116,Instrumentación,Caudalímetros,Marzocchi,Hydroline Andina,106021.0,72200.0,10,6.0
+SKU-00626,Parker Sensores Presión 810,Instrumentación,Sensores Presión,Parker,Hydroline Andina,132265.0,104093.0,5,18.0
+SKU-00627,Argo Hytos Caudalímetros 808,Instrumentación,Caudalímetros,Argo Hytos,Maestranza Integral,394701.0,284974.0,2,24.0
+SKU-00628,Bucher Hydraulics Paleta 104,Bombas Hidráulicas,Paleta,Bucher Hydraulics,Pacific Seal Supply,4283797.0,3341362.0,5,18.0
+SKU-00629,Argo Hytos Agua-Aceite 324,Enfriadores,Agua-Aceite,Argo Hytos,Hydroline Andina,1975217.0,1487338.0,25,24.0
+SKU-00630,Olaer Caudalímetros 280,Instrumentación,Caudalímetros,Olaer,Hydroline Andina,140420.0,95626.0,10,18.0
+SKU-00631,Danfoss Reductores Planetarios 144,Mandos Finales,Reductores Planetarios,Danfoss,Industrial Flow Partners,3422190.0,2994416.0,25,18.0
+SKU-00632,Danfoss Pistones 340,Motores Hidráulicos,Pistones,Danfoss,Pacific Seal Supply,1044261.0,812435.0,1,
+SKU-00633,Marzocchi Displays 897,Control y Electrónica,Displays,Marzocchi,Pacific Seal Supply,424868.0,336495.0,5,6.0
+SKU-00634,Sun Hydraulics Orbitales 582,Motores Hidráulicos,Orbitales,Sun Hydraulics,Hydroline Andina,1338168.0,1105327.0,2,
+SKU-00635,Danfoss Tomas de Fuerza 239,Accesorios y Acoples,Tomas de Fuerza,Danfoss,Andes Motion,40511.0,24833.0,10,12.0
+SKU-00636,Bezares Caudalímetros 239,Instrumentación,Caudalímetros,Bezares,Tecfluid Norte,145260.0,113448.0,1,12.0
+SKU-00637,FaberCom Orbitales 908,Motores Hidráulicos,Orbitales,FaberCom,Andes Motion,1021766.0,853175.0,25,6.0
+SKU-00638,Commercial Hydraulics Recuperación 982,Winches,Recuperación,Commercial Hydraulics,Pacific Seal Supply,5835747.0,4651090.0,25,18.0
+SKU-00639,Bucher Hydraulics Monoblock 435,Comandos Direccionales,Monoblock,Bucher Hydraulics,Andes Motion,784427.0,580476.0,2,6.0
+SKU-00640,Sun Hydraulics Pistones 141,Acumuladores,Pistones,Sun Hydraulics,Pacific Seal Supply,1423678.0,1040709.0,10,
+SKU-00641,Scanreco Sensores Presión 607,Instrumentación,Sensores Presión,Scanreco,Pacific Seal Supply,254762.0,172983.0,1,18.0
+SKU-00642,Casappa Direccionales Múltiples 344,Comandos Direccionales,Direccionales Múltiples,Casappa,Hydroline Andina,1769720.0,1396309.0,5,12.0
+SKU-00643,Parker Planetarios 697,Winches,Planetarios,Parker,Andes Motion,4179696.0,3682312.0,25,36.0
+SKU-00644,FaberCom Pistones Radiales 575,Bombas Hidráulicas,Pistones Radiales,FaberCom,Maestranza Integral,3952766.0,3221504.0,5,36.0
+SKU-00645,Poclain Joystick 814,Control y Electrónica,Joystick,Poclain,Andes Motion,1077450.0,832869.0,10,12.0
+SKU-00646,Poclain Campanas 213,Accesorios y Acoples,Campanas,Poclain,Pacific Seal Supply,220808.0,143084.0,5,
+SKU-00647,FaberCom Vejiga 826,Acumuladores,Vejiga,FaberCom,Pacific Seal Supply,138042.0,110710.0,1,24.0
+SKU-00648,KTR Direccionales Múltiples 314,Comandos Direccionales,Direccionales Múltiples,KTR,Maestranza Integral,1404329.0,1057460.0,25,36.0
+SKU-00649,KTR Microcontroladores 481,Control y Electrónica,Microcontroladores,KTR,Tecfluid Norte,1082623.0,811967.0,1,
+SKU-00650,Bucher Hydraulics Alta Presión 562,Filtros,Alta Presión,Bucher Hydraulics,Pacific Seal Supply,66988.0,48566.0,25,12.0
+SKU-00651,Poclain Adaptadores 178,Accesorios y Acoples,Adaptadores,Poclain,Maestranza Integral,223516.0,156014.0,2,12.0
+SKU-00652,Olaer Engranaje 123,Motores Hidráulicos,Engranaje,Olaer,Hydroline Andina,3545994.0,2889985.0,25,36.0
+SKU-00653,Casappa Control Presión 293,Válvulas,Control Presión,Casappa,Maestranza Integral,392276.0,293815.0,1,12.0
+SKU-00654,Sun Hydraulics Engranaje 707,Motores Hidráulicos,Engranaje,Sun Hydraulics,Pacific Seal Supply,3294426.0,2721196.0,5,18.0
+SKU-00655,Hydac Recuperación 908,Winches,Recuperación,Hydac,Pacific Seal Supply,2948910.0,2547858.0,5,6.0
+SKU-00656,Bucher Hydraulics Direccional 566,Válvulas,Direccional,Bucher Hydraulics,Tecfluid Norte,777311.0,535567.0,5,12.0
+SKU-00657,Casappa Reductores Planetarios 343,Mandos Finales,Reductores Planetarios,Casappa,Tecfluid Norte,2112420.0,1856817.0,2,6.0
+SKU-00658,KTR Engranaje 135,Motores Hidráulicos,Engranaje,KTR,Pacific Seal Supply,807073.0,682784.0,25,36.0
+SKU-00659,Bezares Izado 125,Winches,Izado,Bezares,Maestranza Integral,2551032.0,2130112.0,5,
+SKU-00660,Denison Vejiga 439,Acumuladores,Vejiga,Denison,Andes Motion,1397492.0,1159918.0,25,24.0
+SKU-00661,Webtec Recuperación 250,Winches,Recuperación,Webtec,Andes Motion,5427876.0,4255455.0,25,36.0
+SKU-00662,KTR Tomas de Fuerza 415,Accesorios y Acoples,Tomas de Fuerza,KTR,Industrial Flow Partners,32517.0,22567.0,25,
+SKU-00663,Brevini Pistones Radiales 639,Bombas Hidráulicas,Pistones Radiales,Brevini,Maestranza Integral,2089981.0,1807834.0,2,24.0
+SKU-00664,Argo Hytos Proporcionales 503,Comandos Direccionales,Proporcionales,Argo Hytos,Hydroline Andina,318943.0,230596.0,1,24.0
+SKU-00665,KTR Proporcionales 251,Comandos Direccionales,Proporcionales,KTR,Pacific Seal Supply,1560085.0,1104540.0,5,18.0
+SKU-00666,Bezares Displays 189,Control y Electrónica,Displays,Bezares,Andes Motion,478756.0,373430.0,10,24.0
+SKU-00667,FaberCom Monoblock 524,Comandos Direccionales,Monoblock,FaberCom,Industrial Flow Partners,2482381.0,1809656.0,10,36.0
+SKU-00668,Denison Reductores Planetarios 704,Mandos Finales,Reductores Planetarios,Denison,Maestranza Integral,2983264.0,2329929.0,5,
+SKU-00669,Parker Diafragma 681,Acumuladores,Diafragma,Parker,Andes Motion,987105.0,803503.0,10,36.0
+SKU-00670,Commercial Hydraulics Reductores Planetarios 411,Mandos Finales,Reductores Planetarios,Commercial Hydraulics,Andes Motion,2884135.0,2425558.0,5,24.0
+SKU-00671,Sun Hydraulics Data Loggers 769,Instrumentación,Data Loggers,Sun Hydraulics,Hydroline Andina,480995.0,373733.0,10,
+SKU-00672,Scanreco Izado 604,Winches,Izado,Scanreco,Maestranza Integral,3205376.0,2618792.0,1,12.0
+SKU-00673,Bezares Pistones 937,Motores Hidráulicos,Pistones,Bezares,Pacific Seal Supply,2506332.0,2062711.0,10,36.0
+SKU-00674,Hydac Orbitales 427,Motores Hidráulicos,Orbitales,Hydac,Industrial Flow Partners,2961266.0,2280175.0,1,6.0
+SKU-00675,Bezares Caudalímetros 396,Instrumentación,Caudalímetros,Bezares,Maestranza Integral,60146.0,44869.0,5,
+SKU-00676,Poclain Proporcionales 656,Válvulas,Proporcionales,Poclain,Pacific Seal Supply,175206.0,124922.0,25,6.0
+SKU-00677,Webtec Retorno 943,Filtros,Retorno,Webtec,Tecfluid Norte,84770.0,51879.0,25,12.0
+SKU-00678,Denison Reductores Planetarios 323,Mandos Finales,Reductores Planetarios,Denison,Pacific Seal Supply,2826208.0,2280750.0,2,
+SKU-00679,Argo Hytos Reductores Planetarios 664,Mandos Finales,Reductores Planetarios,Argo Hytos,Pacific Seal Supply,5216684.0,4173347.0,25,36.0
+SKU-00680,Scanreco Joystick 456,Control y Electrónica,Joystick,Scanreco,Andes Motion,1103436.0,887163.0,1,18.0
+SKU-00681,Denison Control Flujo 826,Válvulas,Control Flujo,Denison,Andes Motion,714538.0,513038.0,5,6.0
+SKU-00682,Rexroth Cartridge 314,Válvulas,Cartridge,Rexroth,Maestranza Integral,124754.0,87577.0,5,6.0
+SKU-00683,Scanreco Reductores Planetarios 143,Mandos Finales,Reductores Planetarios,Scanreco,Industrial Flow Partners,6293771.0,5582575.0,10,18.0
+SKU-00684,Danfoss Direccionales Múltiples 167,Comandos Direccionales,Direccionales Múltiples,Danfoss,Industrial Flow Partners,1342080.0,1128689.0,5,
+SKU-00685,Rexroth Cartridge 459,Válvulas,Cartridge,Rexroth,Hydroline Andina,738076.0,579390.0,2,36.0
+SKU-00686,Denison Engranaje 899,Bombas Hidráulicas,Engranaje,Denison,Industrial Flow Partners,4247026.0,3091835.0,2,24.0
+SKU-00687,Hydac Microcontroladores 832,Control y Electrónica,Microcontroladores,Hydac,Pacific Seal Supply,128588.0,90655.0,25,6.0
+SKU-00688,Commercial Hydraulics Proporcionales 586,Comandos Direccionales,Proporcionales,Commercial Hydraulics,Pacific Seal Supply,130303.0,96555.0,25,36.0
+SKU-00689,Commercial Hydraulics Accesorios Estanque 319,Filtros,Accesorios Estanque,Commercial Hydraulics,Andes Motion,83435.0,60824.0,10,18.0
+SKU-00690,Scanreco Agua-Aceite 607,Enfriadores,Agua-Aceite,Scanreco,Hydroline Andina,1558607.0,1307671.0,25,6.0
+SKU-00691,Casappa Retorno 714,Filtros,Retorno,Casappa,Industrial Flow Partners,12548.0,8583.0,5,18.0
+SKU-00692,FaberCom Control Remoto 961,Control y Electrónica,Control Remoto,FaberCom,Maestranza Integral,687003.0,535175.0,2,
+SKU-00693,Commercial Hydraulics Manómetros 774,Instrumentación,Manómetros,Commercial Hydraulics,Hydroline Andina,599272.0,435071.0,10,24.0
+SKU-00694,Rexroth Planetarios 472,Winches,Planetarios,Rexroth,Maestranza Integral,2671463.0,2182585.0,2,
+SKU-00695,Argo Hytos Proporcionales 611,Comandos Direccionales,Proporcionales,Argo Hytos,Pacific Seal Supply,2128790.0,1679615.0,10,36.0
+SKU-00696,Marzocchi Proporcionales 782,Válvulas,Proporcionales,Marzocchi,Tecfluid Norte,611135.0,418016.0,5,18.0
+SKU-00697,Bucher Hydraulics Tomas de Fuerza 609,Accesorios y Acoples,Tomas de Fuerza,Bucher Hydraulics,Pacific Seal Supply,73328.0,47077.0,5,18.0
+SKU-00698,Denison Monoblock 491,Comandos Direccionales,Monoblock,Denison,Hydroline Andina,357056.0,300641.0,1,6.0
+SKU-00699,Denison Adaptadores 911,Accesorios y Acoples,Adaptadores,Denison,Tecfluid Norte,157382.0,120082.0,25,18.0
+SKU-00700,Webtec Caudalímetros 118,Instrumentación,Caudalímetros,Webtec,Industrial Flow Partners,313802.0,227193.0,25,24.0
+SKU-00701,Rexroth Pistones Radiales 281,Bombas Hidráulicas,Pistones Radiales,Rexroth,Andes Motion,2108003.0,1568354.0,1,
+SKU-00702,Commercial Hydraulics Agua-Aceite 791,Enfriadores,Agua-Aceite,Commercial Hydraulics,Andes Motion,946760.0,794332.0,1,24.0
+SKU-00703,Bucher Hydraulics Data Loggers 486,Instrumentación,Data Loggers,Bucher Hydraulics,Pacific Seal Supply,516980.0,374294.0,10,24.0
+SKU-00704,Webtec Adaptadores 928,Accesorios y Acoples,Adaptadores,Webtec,Tecfluid Norte,20049.0,13513.0,5,12.0
+SKU-00705,KTR Joystick 777,Control y Electrónica,Joystick,KTR,Andes Motion,161953.0,125028.0,5,
+SKU-00706,Sun Hydraulics Direccionales Múltiples 445,Comandos Direccionales,Direccionales Múltiples,Sun Hydraulics,Industrial Flow Partners,862797.0,722161.0,5,
+SKU-00707,Casappa Reductores Planetarios 373,Mandos Finales,Reductores Planetarios,Casappa,Tecfluid Norte,1069119.0,877747.0,25,18.0
+SKU-00708,Marzocchi Pistones Radiales 927,Bombas Hidráulicas,Pistones Radiales,Marzocchi,Hydroline Andina,4438077.0,3639223.0,25,
+SKU-00709,Argo Hytos Sensores Presión 406,Instrumentación,Sensores Presión,Argo Hytos,Tecfluid Norte,313137.0,212307.0,2,24.0
+SKU-00710,Argo Hytos Alta Presión 394,Filtros,Alta Presión,Argo Hytos,Andes Motion,79170.0,43939.0,25,6.0
+SKU-00711,Webtec Cartridge 964,Válvulas,Cartridge,Webtec,Pacific Seal Supply,336571.0,263199.0,1,36.0
+SKU-00712,Marzocchi Acoples Rotex 455,Accesorios y Acoples,Acoples Rotex,Marzocchi,Tecfluid Norte,71974.0,48798.0,10,6.0
+SKU-00713,Webtec Pistones 511,Motores Hidráulicos,Pistones,Webtec,Pacific Seal Supply,4059808.0,3345282.0,2,18.0
+SKU-00714,Hydac Proporcionales 690,Válvulas,Proporcionales,Hydac,Andes Motion,545459.0,396549.0,25,6.0
+SKU-00715,FaberCom Caudalímetros 844,Instrumentación,Caudalímetros,FaberCom,Tecfluid Norte,564183.0,406212.0,10,24.0
+SKU-00716,Hydac Planetarios 520,Winches,Planetarios,Hydac,Maestranza Integral,2503511.0,2208097.0,5,18.0
+SKU-00717,Argo Hytos Spin-On 515,Filtros,Spin-On,Argo Hytos,Andes Motion,37897.0,26263.0,25,6.0
+SKU-00718,Denison Direccionales Múltiples 546,Comandos Direccionales,Direccionales Múltiples,Denison,Maestranza Integral,185936.0,135733.0,10,24.0
+SKU-00719,Danfoss Pistones 663,Acumuladores,Pistones,Danfoss,Maestranza Integral,306289.0,254832.0,5,36.0
+SKU-00720,Bucher Hydraulics Reductores Planetarios 516,Mandos Finales,Reductores Planetarios,Bucher Hydraulics,Hydroline Andina,1198356.0,949098.0,5,
+SKU-00721,Calzoni Spin-On 634,Filtros,Spin-On,Calzoni,Industrial Flow Partners,102388.0,71979.0,25,
+SKU-00722,Hydac Recuperación 952,Winches,Recuperación,Hydac,Tecfluid Norte,3230481.0,2871898.0,5,12.0
+SKU-00723,Sun Hydraulics Tomas de Fuerza 518,Accesorios y Acoples,Tomas de Fuerza,Sun Hydraulics,Andes Motion,58412.0,44452.0,5,18.0
+SKU-00724,Danfoss Proporcionales 586,Válvulas,Proporcionales,Danfoss,Andes Motion,438439.0,307346.0,25,18.0
+SKU-00725,Olaer Planetarios 720,Winches,Planetarios,Olaer,Maestranza Integral,2496489.0,2032142.0,1,36.0
+SKU-00726,Sun Hydraulics Engranaje 224,Bombas Hidráulicas,Engranaje,Sun Hydraulics,Tecfluid Norte,2554366.0,2122678.0,5,36.0
+SKU-00727,FaberCom Agua-Aceite 192,Enfriadores,Agua-Aceite,FaberCom,Andes Motion,164552.0,124237.0,5,12.0
+SKU-00728,Argo Hytos Proporcionales 380,Comandos Direccionales,Proporcionales,Argo Hytos,Maestranza Integral,2299820.0,1736364.0,10,
+SKU-00729,Bucher Hydraulics Orbitales 815,Motores Hidráulicos,Orbitales,Bucher Hydraulics,Industrial Flow Partners,2182214.0,1682487.0,1,6.0
+SKU-00730,Poclain Proporcionales 811,Válvulas,Proporcionales,Poclain,Tecfluid Norte,351175.0,244418.0,5,18.0
+SKU-00731,Commercial Hydraulics Engranaje 412,Bombas Hidráulicas,Engranaje,Commercial Hydraulics,Industrial Flow Partners,2078812.0,1615237.0,2,36.0
+SKU-00732,Poclain Accesorios Estanque 802,Filtros,Accesorios Estanque,Poclain,Hydroline Andina,25676.0,16612.0,2,24.0
+SKU-00733,FaberCom Vejiga 918,Acumuladores,Vejiga,FaberCom,Andes Motion,1320378.0,1099875.0,25,12.0
+SKU-00734,Poclain Direccional 121,Válvulas,Direccional,Poclain,Andes Motion,309890.0,233347.0,25,6.0
+SKU-00735,Poclain Paleta 539,Bombas Hidráulicas,Paleta,Poclain,Andes Motion,1012458.0,777568.0,10,24.0
+SKU-00736,Denison Adaptadores 638,Accesorios y Acoples,Adaptadores,Denison,Hydroline Andina,239718.0,179549.0,1,36.0
+SKU-00737,Bucher Hydraulics Vejiga 864,Acumuladores,Vejiga,Bucher Hydraulics,Hydroline Andina,398767.0,328584.0,5,12.0
+SKU-00738,Denison Data Loggers 793,Instrumentación,Data Loggers,Denison,Andes Motion,518113.0,367860.0,5,36.0
+SKU-00739,Commercial Hydraulics Proporcionales 561,Comandos Direccionales,Proporcionales,Commercial Hydraulics,Andes Motion,2006063.0,1697129.0,2,24.0
+SKU-00740,Marzocchi Proporcionales 507,Comandos Direccionales,Proporcionales,Marzocchi,Industrial Flow Partners,1660421.0,1389772.0,5,36.0
+SKU-00741,Calzoni Planetarios 153,Winches,Planetarios,Calzoni,Industrial Flow Partners,2828100.0,2341667.0,25,
+SKU-00742,Bucher Hydraulics Presión 866,Filtros,Presión,Bucher Hydraulics,Tecfluid Norte,119635.0,67235.0,25,36.0
+SKU-00743,Olaer Engranaje 672,Bombas Hidráulicas,Engranaje,Olaer,Pacific Seal Supply,2845512.0,2367466.0,5,6.0
+SKU-00744,Olaer Paleta 424,Bombas Hidráulicas,Paleta,Olaer,Maestranza Integral,2341298.0,1711489.0,2,
+SKU-00745,Denison Displays 469,Control y Electrónica,Displays,Denison,Tecfluid Norte,184368.0,150076.0,5,36.0
+SKU-00746,Olaer Vejiga 423,Acumuladores,Vejiga,Olaer,Pacific Seal Supply,1258017.0,918352.0,10,6.0
+SKU-00747,Denison Displays 252,Control y Electrónica,Displays,Denison,Pacific Seal Supply,1030989.0,750560.0,1,6.0
+SKU-00748,Commercial Hydraulics Paleta 141,Bombas Hidráulicas,Paleta,Commercial Hydraulics,Hydroline Andina,2195577.0,1875023.0,1,18.0
+SKU-00749,Casappa Manómetros 457,Instrumentación,Manómetros,Casappa,Andes Motion,290923.0,227793.0,2,
+SKU-00750,Webtec Engranaje 699,Motores Hidráulicos,Engranaje,Webtec,Maestranza Integral,4207778.0,3294690.0,25,36.0
+SKU-00751,Parker Monoblock 793,Comandos Direccionales,Monoblock,Parker,Pacific Seal Supply,1945097.0,1600815.0,2,18.0
+SKU-00752,Parker Orbitales 957,Motores Hidráulicos,Orbitales,Parker,Tecfluid Norte,3470299.0,2748477.0,25,
+SKU-00753,Parker Presión 773,Filtros,Presión,Parker,Hydroline Andina,59546.0,36204.0,5,24.0
+SKU-00754,Danfoss Pistones Axiales 316,Bombas Hidráulicas,Pistones Axiales,Danfoss,Industrial Flow Partners,2857287.0,2308688.0,25,6.0
+SKU-00755,KTR Pistones Axiales 361,Bombas Hidráulicas,Pistones Axiales,KTR,Hydroline Andina,3385530.0,2681340.0,1,18.0
+SKU-00756,Calzoni Reductores Planetarios 762,Mandos Finales,Reductores Planetarios,Calzoni,Hydroline Andina,947687.0,829226.0,10,12.0
+SKU-00757,Rexroth Planetarios 717,Winches,Planetarios,Rexroth,Tecfluid Norte,3199648.0,2713302.0,5,36.0
+SKU-00758,Rexroth Reductores Planetarios 676,Mandos Finales,Reductores Planetarios,Rexroth,Tecfluid Norte,4491103.0,3777018.0,10,12.0
+SKU-00759,Poclain Tomas de Fuerza 141,Accesorios y Acoples,Tomas de Fuerza,Poclain,Andes Motion,203694.0,136475.0,10,
+SKU-00760,FaberCom Agua-Aceite 744,Enfriadores,Agua-Aceite,FaberCom,Industrial Flow Partners,564826.0,446777.0,10,24.0
+SKU-00761,Poclain Recuperación 230,Winches,Recuperación,Poclain,Tecfluid Norte,3075205.0,2736932.0,5,6.0
+SKU-00762,Sun Hydraulics Izado 210,Winches,Izado,Sun Hydraulics,Pacific Seal Supply,2852525.0,2373301.0,1,24.0
+SKU-00763,Scanreco Agua-Aceite 699,Enfriadores,Agua-Aceite,Scanreco,Hydroline Andina,1009615.0,793557.0,5,12.0
+SKU-00764,Parker Pistones 185,Motores Hidráulicos,Pistones,Parker,Hydroline Andina,3754478.0,3078672.0,10,
+SKU-00765,Webtec Pistones 449,Acumuladores,Pistones,Webtec,Tecfluid Norte,913836.0,722844.0,25,12.0
+SKU-00766,Commercial Hydraulics Reductores Planetarios 647,Mandos Finales,Reductores Planetarios,Commercial Hydraulics,Hydroline Andina,6178611.0,5115890.0,1,18.0
+SKU-00767,Calzoni Engranaje 862,Bombas Hidráulicas,Engranaje,Calzoni,Hydroline Andina,207875.0,161103.0,10,36.0
+SKU-00768,Webtec Tomas de Fuerza 189,Accesorios y Acoples,Tomas de Fuerza,Webtec,Pacific Seal Supply,204217.0,136621.0,10,12.0
+SKU-00769,Parker Reductores Planetarios 592,Mandos Finales,Reductores Planetarios,Parker,Maestranza Integral,1605770.0,1441981.0,1,6.0
+SKU-00770,Sun Hydraulics Planetarios 888,Winches,Planetarios,Sun Hydraulics,Andes Motion,5131493.0,4089800.0,1,12.0
+SKU-00771,Bucher Hydraulics Caudalímetros 582,Instrumentación,Caudalímetros,Bucher Hydraulics,Andes Motion,42436.0,32888.0,10,18.0
+SKU-00772,Marzocchi Pistones Radiales 108,Bombas Hidráulicas,Pistones Radiales,Marzocchi,Maestranza Integral,1025822.0,809374.0,1,12.0
+SKU-00773,Scanreco Pistones 137,Motores Hidráulicos,Pistones,Scanreco,Andes Motion,4273358.0,3350313.0,25,12.0
+SKU-00774,Bucher Hydraulics Data Loggers 831,Instrumentación,Data Loggers,Bucher Hydraulics,Pacific Seal Supply,366892.0,259760.0,10,6.0
+SKU-00775,Scanreco Engranaje 219,Bombas Hidráulicas,Engranaje,Scanreco,Pacific Seal Supply,1523948.0,1325835.0,10,18.0
+SKU-00776,FaberCom Manómetros 548,Instrumentación,Manómetros,FaberCom,Industrial Flow Partners,278651.0,216233.0,10,12.0
+SKU-00777,Sun Hydraulics Monoblock 400,Comandos Direccionales,Monoblock,Sun Hydraulics,Pacific Seal Supply,2283587.0,1824586.0,10,6.0
+SKU-00778,Scanreco Displays 312,Control y Electrónica,Displays,Scanreco,Industrial Flow Partners,800375.0,616289.0,2,24.0
+SKU-00779,Bucher Hydraulics Cartridge 410,Válvulas,Cartridge,Bucher Hydraulics,Maestranza Integral,159301.0,126326.0,10,18.0
+SKU-00780,Casappa Direccionales Múltiples 947,Comandos Direccionales,Direccionales Múltiples,Casappa,Hydroline Andina,2498242.0,1988601.0,2,6.0
+SKU-00781,Poclain Agua-Aceite 364,Enfriadores,Agua-Aceite,Poclain,Tecfluid Norte,946648.0,757318.0,2,18.0
+SKU-00782,Danfoss Retorno 785,Filtros,Retorno,Danfoss,Pacific Seal Supply,37959.0,27330.0,25,24.0
+SKU-00783,Danfoss Pistones 724,Motores Hidráulicos,Pistones,Danfoss,Andes Motion,4035137.0,3046528.0,1,24.0
+SKU-00784,Danfoss Pistones 845,Motores Hidráulicos,Pistones,Danfoss,Pacific Seal Supply,705973.0,563366.0,5,6.0
+SKU-00785,Hydac Control Presión 225,Válvulas,Control Presión,Hydac,Andes Motion,592728.0,475961.0,5,6.0
+SKU-00786,Scanreco Proporcionales 187,Comandos Direccionales,Proporcionales,Scanreco,Hydroline Andina,703852.0,513108.0,25,6.0
+SKU-00787,Scanreco Control Flujo 906,Válvulas,Control Flujo,Scanreco,Tecfluid Norte,512816.0,398971.0,25,18.0
+SKU-00788,Scanreco Direccionales Múltiples 470,Comandos Direccionales,Direccionales Múltiples,Scanreco,Andes Motion,2304888.0,1647995.0,25,36.0
+SKU-00789,Denison Pistones Radiales 511,Bombas Hidráulicas,Pistones Radiales,Denison,Hydroline Andina,3271672.0,2607523.0,5,12.0
+SKU-00790,Danfoss Reductores Planetarios 746,Mandos Finales,Reductores Planetarios,Danfoss,Andes Motion,6266185.0,5144538.0,25,
+SKU-00791,Scanreco Control Remoto 108,Control y Electrónica,Control Remoto,Scanreco,Andes Motion,1068650.0,771565.0,5,12.0
+SKU-00792,Brevini Proporcionales 907,Válvulas,Proporcionales,Brevini,Maestranza Integral,567729.0,422390.0,25,24.0
+SKU-00793,Bezares Tomas de Fuerza 442,Accesorios y Acoples,Tomas de Fuerza,Bezares,Industrial Flow Partners,104104.0,77453.0,1,24.0
+SKU-00794,Denison Pistones 633,Acumuladores,Pistones,Denison,Pacific Seal Supply,1488532.0,1210177.0,25,12.0
+SKU-00795,Parker Presión 532,Filtros,Presión,Parker,Hydroline Andina,107716.0,69154.0,5,36.0
+SKU-00796,Danfoss Agua-Aceite 405,Enfriadores,Agua-Aceite,Danfoss,Tecfluid Norte,630549.0,513267.0,1,18.0
+SKU-00797,FaberCom Acoples Rotex 742,Accesorios y Acoples,Acoples Rotex,FaberCom,Tecfluid Norte,245823.0,156098.0,25,36.0
+SKU-00798,Brevini Recuperación 243,Winches,Recuperación,Brevini,Maestranza Integral,2426854.0,2101656.0,25,36.0
+SKU-00799,Hydac Displays 200,Control y Electrónica,Displays,Hydac,Industrial Flow Partners,334778.0,259118.0,5,18.0
+SKU-00800,Scanreco Reductores Planetarios 179,Mandos Finales,Reductores Planetarios,Scanreco,Hydroline Andina,1464190.0,1243097.0,2,18.0
