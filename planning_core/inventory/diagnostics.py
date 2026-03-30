@@ -59,6 +59,11 @@ HEALTH_BANDS: list[tuple[float, str, str]] = [
 # SKU sin movimiento > este número de días → dead_stock
 DEAD_STOCK_DAYS_THRESHOLD = 90
 
+# Valores sentinel usados para reemplazar infinito en los campos de salida
+# (evita NaN/inf en DataFrames y serialización JSON)
+_INF_COVERAGE_SENTINEL: float = 9999.0   # sustituye inf en coverage_net_days
+_INF_RATIO_SENTINEL: float = 999.0       # sustituye inf en positioning_ratio
+
 
 # ---------------------------------------------------------------------------
 # Dataclass de resultado
@@ -346,7 +351,7 @@ def diagnose_sku(
     is_dead_stock = days_since_last_movement >= DEAD_STOCK_DAYS_THRESHOLD
 
     # --- Health status y alert level ---
-    ratio_for_band = positioning_ratio if not math.isinf(positioning_ratio) else 999.0
+    ratio_for_band = positioning_ratio if not math.isinf(positioning_ratio) else _INF_RATIO_SENTINEL
     health_status, alert_level = _classify_ratio(ratio_for_band, is_dead_stock)
 
     # --- Probabilidad de quiebre ---
@@ -370,7 +375,7 @@ def diagnose_sku(
     diagnosis_text = _build_diagnosis_text(
         sku=sku,
         health_status=health_status,
-        coverage_net_days=coverage_net_days if not math.isinf(coverage_net_days) else 9999.0,
+        coverage_net_days=coverage_net_days if not math.isinf(coverage_net_days) else _INF_COVERAGE_SENTINEL,
         coverage_obj_days=coverage_obj_days,
         positioning_ratio=ratio_for_band,
         excess_units=excess_units,
@@ -386,7 +391,7 @@ def diagnose_sku(
         on_order=float(on_order),
         stock_efectivo=stock_efectivo,
         mean_demand_daily=mean_demand_daily,
-        coverage_net_days=coverage_net_days if not math.isinf(coverage_net_days) else 9999.0,
+        coverage_net_days=coverage_net_days if not math.isinf(coverage_net_days) else _INF_COVERAGE_SENTINEL,
         coverage_obj_days=coverage_obj_days,
         positioning_ratio=ratio_for_band,
         safety_stock=ss_result.safety_stock,

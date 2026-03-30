@@ -41,16 +41,17 @@
 
 ### Tests
 
-170 tests unitarios e integración, 100% passing (2026-03-27).
+El repo tiene **200+ tests** unitarios e integración. La cobertura del módulo es amplia, pero al `2026-03-27` la suite no está completamente verde: existe al menos una falla conocida en `test_backtest_selector.py` asociada al comportamiento actual del selector con `Ensemble`.
 
 | Suite | Cobertura |
 |---|---|
 | `test_metrics.py` | MASE (seasonal/lag1/mean/edge cases), WMAPE, RMSSE, WAPE, Bias, MAE, RMSE |
 | `test_models.py` | naive, ets, sba, to_nixtla_df |
-| `test_backtest_selector.py` | run_backtest, select_and_forecast (smoke tests por sb_class) |
+| `test_backtest_selector.py` | run_backtest, select_and_forecast (smoke tests por sb_class; requiere alineación con `Ensemble`) |
 | `test_services.py` | sku_forecast, clasificacion, censura, safety_stock |
 | `test_evaluation.py` | EvalConfig, CatalogEvalResult, aggregator, run_store, comparator |
 | `test_inventory.py` | params, service_level, safety_stock (compute_demand_stats, compute_safety_stock, compute_rop, compute_sku_safety_stock, PlanningService.sku_safety_stock) |
+| `test_diagnostics.py` | `diagnose_sku`, bandas de salud, sentinels y `catalog_health_report` |
 
 ---
 
@@ -66,6 +67,11 @@
 | inactive | — | Sin forecast | — |
 
 \* LightGBM solo cuando `n_obs >= 3 × season_length` (36 obs para mensual).
+
+Nota:
+
+- Para `intermittent` y `lumpy`, los candidatos base siguen siendo `CrostonSBA` y `ADIDA`.
+- El resultado final puede etiquetarse como `Ensemble` si ambos quedan suficientemente cerca según el criterio del selector.
 
 ---
 
@@ -85,7 +91,7 @@ Ver `docs/forecasting_benchmark_selection.md` para el analisis completo.
 
 ## Parametros de produccion (fijados por experimento)
 
-**Config decidida:** `h=3, n_windows=3`, granularidad mensual (`M`).
+**Config decidida para evaluación batch:** `h=3, n_windows=3`, granularidad mensual (`M`).
 
 Resultado del barrido `exp_03_param_sweep.py` sobre 6 configuraciones × 800 SKUs:
 - Mejor MASE mediana global (0.7475)
@@ -93,6 +99,11 @@ Resultado del barrido `exp_03_param_sweep.py` sobre 6 configuraciones × 800 SKU
 - Optimo para todos los segmentos excepto ABC-A, donde h3_w6 gana marginalmente (diferencia: 0.014)
 
 Ver `docs/forecasting_param_sweep_results.md` para tablas completas y justificacion.
+
+Nota operativa:
+
+- En evaluación masiva se usa `h=3` como configuración experimental fija.
+- En serving, `PlanningService.sku_forecast()` ya deriva `h` por SKU desde `lead_time_days` cuando no se entrega explícitamente.
 
 ---
 
@@ -152,12 +163,12 @@ La Fase 4 (inventario, SS, diagnóstico de salud) está completa. La Fase 5 se e
 | ID | Resumen | Prioridad |
 |----|---------|-----------|
 | D18 | Métricas operacionales para intermittent/lumpy (Fill Rate, CSL alcanzado) | Media |
-| D19 | Empate técnico en horse-race: preferir modelo más simple si delta MASE < 0.02 | Baja |
-| D20 | `h` fijo — debería derivarse del lead time real del proveedor por SKU | Baja |
 | D21 | Notebook de visualización del sweep (`03_param_sweep_analysis.ipynb`) | Baja |
 | D22 | `services.py` importa `forecasting.selector` a nivel módulo — dependencia runtime de statsforecast | Media |
+| D33 | Falta dashboard agregado de calidad de forecast en UI | Media |
+| D34 | Código, tests y documentación del selector no están completamente alineados | Alta |
 
-> Nota: el antiguo ítem "Integrar WMAPE y RMSSE en `_pick_winner`" queda diferido hasta experimentar con datos reales. WMAPE y RMSSE ya están implementados en `metrics.py`; la integración en el selector requiere validación empírica antes de activar.
+> Nota: los antiguos ítems sobre desempate por RMSSE, sesgo y horizonte `h` fijo quedaron resueltos en código. El trabajo pendiente ahora es estabilizar tests, documentación y observabilidad sobre ese comportamiento actualizado.
 
 ---
 
@@ -166,10 +177,11 @@ La Fase 4 (inventario, SS, diagnóstico de salud) está completa. La Fase 5 se e
 1. **Misma interfaz para todos los wrappers estadisticos**: `fit_predict_X(demand_df, granularity, h, unique_id, target_col) → dict`. Intercambiables en el horse-race.
 2. **LightGBM usa camino separado**: `run_backtest_lgbm()` retorna el mismo formato que `run_backtest()` y se fusiona antes de elegir el ganador.
 3. **Backtest expanding-window**: minimo `season_length + h × n_windows` observaciones. Series mas cortas devuelven `status="series_too_short"` y el sistema degrada a fallback.
-4. **MASE adaptativo como metrica primaria**: denominador correcto segun el tipo de demanda (lag-1, lag-12 o media historica). Scale-free y robusto a series con ceros.
+4. **MASE adaptativo como metrica primaria**: denominador correcto segun el tipo de demanda (lag-1, lag-12 o media historica). El selector agrega filtros y desempates por RMSSE y Bias cuando corresponde.
 5. **Fallback chain**: ganador falla → SeasonalNaive → HistoricAverage. Siempre se genera un forecast; `status` indica la degradacion.
 6. **SKUs inactivos (sin transacciones)**: `select_and_forecast` devuelve `status="no_forecast"`. `catalog_runner` los registra como `no_forecast`, no como `error`.
 7. **`return_cv=True`**: expone el DataFrame completo de cross-validation para el grafico de horse-race en la UI, sin costo adicional de computo.
+8. **Ensemble y bias correction**: cuando hay varios candidatos cercanos, el selector puede devolver `Ensemble` y luego aplicar corrección de sesgo al forecast final.
 
 ---
 

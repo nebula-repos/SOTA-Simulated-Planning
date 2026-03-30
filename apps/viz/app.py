@@ -1603,7 +1603,7 @@ def render_classification_panoramic(service: PlanningService, classification_df:
                 sel_trend = st.selectbox("Tendencia", ["Todos", "Si", "No"], key="clf_f_trend")
         with fc[5]:
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Limpiar", key="clf_reset_filters", use_container_width=True):
+            if st.button("Limpiar", key="clf_reset_filters"):
                 st.session_state["clf_f_sb"] = all_sb
                 st.session_state["clf_f_abc"] = all_abc
                 st.session_state["clf_f_xyz"] = all_xyz
@@ -1667,7 +1667,7 @@ def render_classification_panoramic(service: PlanningService, classification_df:
     if not plot_df.empty:
         scatter_mask = mask.reindex(plot_df.index, fill_value=False) if has_active_filter else None
         scatter_fig = build_sb_scatter_figure(plot_df, currency_code=currency_code, highlight_mask=scatter_mask)
-        st.plotly_chart(scatter_fig, use_container_width=True)
+        st.plotly_chart(scatter_fig)
 
     # --- Matriz ABC-XYZ + distribuciones (resaltan dimensiones filtradas) ---
     col_matrix, col_sb, col_lifecycle = st.columns(3)
@@ -1676,7 +1676,7 @@ def render_classification_panoramic(service: PlanningService, classification_df:
         hl_abc = sel_abc if len(sel_abc) < len(all_abc) else None
         hl_xyz = sel_xyz if len(sel_xyz) < len(all_xyz) else None
         matrix_fig = build_abc_xyz_matrix_figure(classification_df, highlight_abc=hl_abc, highlight_xyz=hl_xyz)
-        st.plotly_chart(matrix_fig, use_container_width=True)
+        st.plotly_chart(matrix_fig)
 
     with col_sb:
         hl_sb = sel_sb if len(sel_sb) < len(all_sb) else None
@@ -1684,7 +1684,7 @@ def render_classification_panoramic(service: PlanningService, classification_df:
             classification_df, "sb_class", "Distribucion Syntetos-Boylan", SB_COLORS,
             highlight_values=hl_sb,
         )
-        st.plotly_chart(sb_fig, use_container_width=True)
+        st.plotly_chart(sb_fig)
 
     with col_lifecycle:
         hl_lc = sel_lc if len(sel_lc) < len(all_lifecycle) else None
@@ -1692,7 +1692,7 @@ def render_classification_panoramic(service: PlanningService, classification_df:
             classification_df, "lifecycle", "Ciclo de vida", LIFECYCLE_COLORS,
             highlight_values=hl_lc,
         )
-        st.plotly_chart(lc_fig, use_container_width=True)
+        st.plotly_chart(lc_fig)
 
     # --- Tabla de clasificacion (filtrada) ---
     table_label = f"**Tabla de clasificacion** — {n_filtered} de {total} SKUs" if has_active_filter else "**Tabla de clasificacion completa**"
@@ -1785,7 +1785,7 @@ def _render_sku_section_resumen(
                 ("purchase_receipt_qty", "Recepcion compra"),
             ],
         )
-        st.plotly_chart(flow_fig, use_container_width=True)
+        st.plotly_chart(flow_fig)
 
     with chart_cols[1]:
         stock_fig = build_line_figure(
@@ -1796,7 +1796,7 @@ def _render_sku_section_resumen(
                 ("on_order_qty", "On order"),
             ],
         )
-        st.plotly_chart(stock_fig, use_container_width=True)
+        st.plotly_chart(stock_fig)
 
     supply_cols = st.columns(2)
     with supply_cols[0]:
@@ -1915,7 +1915,7 @@ def _render_sku_section_operacional(service: PlanningService, selected_sku: str,
             f"{selected_flow_metric_label} por sucursal ({sales_granularity}, {flow_temporality})",
             stockout_points=stockout_points,
         )
-        st.plotly_chart(sales_figure, use_container_width=True)
+        st.plotly_chart(sales_figure)
         if stockout_points is not None and not stockout_points.empty:
             st.caption("Marcadores rojos: periodos sin venta observada en la red con quiebre de stock.")
         render_copyable_dataframe(
@@ -1928,7 +1928,7 @@ def _render_sku_section_operacional(service: PlanningService, selected_sku: str,
             inventory_comparison,
             f"{selected_inventory_metric_label} por sucursal ({inventory_granularity}, {inventory_temporality})",
         )
-        st.plotly_chart(inventory_figure, use_container_width=True)
+        st.plotly_chart(inventory_figure)
         render_copyable_dataframe(
             inventory_comparison.tail(60),
             "sku_inventory_comparison",
@@ -1995,7 +1995,7 @@ def _render_sku_section_clasificacion(service: PlanningService, selected_sku: st
                 f"Demanda {selected_sku} (granularidad {granularity})",
                 stockout_points=stockout_points,
             )
-            st.plotly_chart(demand_fig, use_container_width=True)
+            st.plotly_chart(demand_fig)
             if not stockout_points.empty:
                 st.caption("Diamantes rojos: periodos sin venta observada con quiebre de stock.")
 
@@ -2003,7 +2003,7 @@ def _render_sku_section_clasificacion(service: PlanningService, selected_sku: st
             acf_data = service.sku_acf(selected_sku, granularity=granularity)
             if acf_data["lags"]:
                 acf_fig = build_acf_figure(acf_data, f"Autocorrelacion (ACF) — {selected_sku}")
-                st.plotly_chart(acf_fig, use_container_width=True)
+                st.plotly_chart(acf_fig)
 
         st.write("Serie temporal de demanda")
         series_display = series_df.copy().merge(
@@ -2125,7 +2125,7 @@ def _render_sku_section_forecast(service: PlanningService, selected_sku: str):
                 height=420,
                 margin=dict(l=20, r=20, t=60, b=20),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig)
 
             st.write("Pronostico por periodo")
             fc_display = forecast_df.copy()
@@ -2142,7 +2142,7 @@ def _render_sku_section_forecast(service: PlanningService, selected_sku: str):
                 backtest_metrics=result.get("backtest", {}),
                 sku=selected_sku,
             )
-            st.plotly_chart(bt_fig, use_container_width=True)
+            st.plotly_chart(bt_fig)
         else:
             st.info("No hay datos de backtest disponibles (serie muy corta o SKU en fallback).")
 
@@ -2277,7 +2277,7 @@ def _render_sku_section_inventario(
                 margin=dict(l=20, r=20, t=20, b=20),
                 legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
             )
-            st.plotly_chart(fig_stock, use_container_width=True)
+            st.plotly_chart(fig_stock)
 
     with chart_cols[1]:
         ss_method = ss_result["ss_method"]
@@ -2313,7 +2313,7 @@ def _render_sku_section_inventario(
                 margin=dict(l=10, r=20, t=10, b=40),
                 showlegend=False,
             )
-            st.plotly_chart(fig_decomp, use_container_width=True)
+            st.plotly_chart(fig_decomp)
 
             st.caption(
                 f"z={params['z_factor']:.2f} · σ_d={sigma_d:.4f} u/día · "
@@ -2333,7 +2333,6 @@ def _render_sku_section_inventario(
             ]
             st.dataframe(
                 pd.DataFrame(simple_rows),
-                use_container_width=True,
                 hide_index=True,
             )
 
@@ -2538,7 +2537,7 @@ def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFra
             y_tickformat="~s",
             y_ticksuffix=" u",
         )
-        st.plotly_chart(flow_fig, use_container_width=True)
+        st.plotly_chart(flow_fig)
 
     with chart_cols[1]:
         stock_fig = build_line_figure(
@@ -2552,7 +2551,7 @@ def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFra
             y_tickformat="~s",
             y_ticksuffix=" u",
         )
-        st.plotly_chart(stock_fig, use_container_width=True)
+        st.plotly_chart(stock_fig)
 
     dist_cols = st.columns(2)
     with dist_cols[0]:
@@ -2568,7 +2567,7 @@ def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFra
             horizontal=True,
             text_col="_label",
         )
-        st.plotly_chart(inv_fig, use_container_width=True)
+        st.plotly_chart(inv_fig)
 
     with dist_cols[1]:
         # Filtrar ventas por location al mismo período que timeline
@@ -2595,7 +2594,7 @@ def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFra
             text_col="_label",
         )
         sales_loc_fig.update_xaxes(tickformat=".1f", ticksuffix=" B")
-        st.plotly_chart(sales_loc_fig, use_container_width=True)
+        st.plotly_chart(sales_loc_fig)
 
     mix_cols = st.columns(3)
     with mix_cols[0]:
@@ -2605,7 +2604,7 @@ def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFra
             "Mix ABC (catálogo completo)",
             ABC_COLORS,
         )
-        st.plotly_chart(abc_fig, use_container_width=True)
+        st.plotly_chart(abc_fig)
     with mix_cols[1]:
         sb_fig = build_distribution_bar_figure(
             classification_df,
@@ -2613,7 +2612,7 @@ def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFra
             "Mix Syntetos-Boylan (catálogo completo)",
             SB_COLORS,
         )
-        st.plotly_chart(sb_fig, use_container_width=True)
+        st.plotly_chart(sb_fig)
     with mix_cols[2]:
         inv_val_data = dashboard["inventory_value_by_location"].copy()
         inv_val_data["_value_b"] = inv_val_data["inventory_value"] / 1_000_000_000
@@ -2629,7 +2628,7 @@ def render_dashboard_tab(service: PlanningService, classification_df: pd.DataFra
             text_col="_label",
         )
         inventory_value_fig.update_xaxes(tickformat=".1f", ticksuffix=" B")
-        st.plotly_chart(inventory_value_fig, use_container_width=True)
+        st.plotly_chart(inventory_value_fig)
 
     table_cols = st.columns(2)
     with table_cols[0]:
@@ -2786,9 +2785,9 @@ def render_catalog_tab(service: PlanningService, classification_df: pd.DataFrame
         st.rerun()
 
 
-@st.cache_data(show_spinner=False, ttl=300)
+@st.cache_data(show_spinner=False, ttl=1800)
 def _get_catalog_health(_service: PlanningService) -> "pd.DataFrame":
-    """Wrapper cacheado para catalog_health_report (TTL 5 min)."""
+    """Wrapper cacheado para catalog_health_report (TTL 30 min)."""
     return _service.catalog_health_report()
 
 
@@ -2875,7 +2874,7 @@ def _scatter_posicionamiento(filtered: "pd.DataFrame") -> None:
         height=400, margin=dict(l=0, r=0, t=10, b=0),
         legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
     if n_out > 0:
         st.caption(f"{n_out} SKU(s) con cobertura > {axis_max:.0f} días excluidos — aparecen en la tabla.")
 
@@ -2923,7 +2922,7 @@ def _histogram_ratios(filtered: "pd.DataFrame") -> None:
         legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
         showlegend=True,
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
     n_ok = int(((ratios >= 0.7) & (ratios < 1.3)).sum())
     st.caption(
         f"{n_ok} de {len(hdf)} SKUs ({n_ok/len(hdf):.0%}) en zona de equilibrio. "
@@ -3010,7 +3009,7 @@ def _radar_salud(df_full: "pd.DataFrame", group_col: str) -> None:
         legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
         showlegend=True,
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
     st.caption(
         "Cada **vértice** = grupo. Cada **polígono** = una métrica de salud (0–100%, borde = óptimo). "
         "Un grupo ideal llena el radar en todos los ejes. "
@@ -3046,7 +3045,7 @@ def _bar_health_por_grupo(df_full: "pd.DataFrame", group_col: str) -> None:
         margin=dict(l=0, r=0, t=10, b=0),
         legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
 
 
 def _bar_capital_exceso(df_full: "pd.DataFrame", group_col: str, currency: str) -> None:
@@ -3070,7 +3069,7 @@ def _bar_capital_exceso(df_full: "pd.DataFrame", group_col: str, currency: str) 
         height=max(280, len(agg) * 40 + 80),
         margin=dict(l=0, r=0, t=10, b=0),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
 
 
 def _bar_urgentes_valorizado(filtered: "pd.DataFrame", currency: str) -> None:
@@ -3100,7 +3099,7 @@ def _bar_urgentes_valorizado(filtered: "pd.DataFrame", currency: str) -> None:
         yaxis=dict(autorange="reversed"),
         height=360, margin=dict(l=0, r=0, t=10, b=0),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
 
 
 def render_health_tab(service: PlanningService) -> None:
@@ -3268,7 +3267,7 @@ def render_health_tab(service: PlanningService) -> None:
             if col in table_df:
                 table_df[col] = table_df[col].round(0).astype(int)
 
-        st.dataframe(table_df, use_container_width=True, hide_index=True, height=420)
+        st.dataframe(table_df, hide_index=True, height=420)
 
         st.caption("Selecciona un SKU para ir directo a su subsección Inventario.")
         jump_sku = st.selectbox("Ir al SKU", options=[""] + filtered["sku"].tolist(), key="h_jump")

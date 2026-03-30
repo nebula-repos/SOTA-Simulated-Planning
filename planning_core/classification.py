@@ -1071,16 +1071,17 @@ def classify_all_skus(
     # Segmentacion ABC (sobre todo el catalogo)
     abc_df = compute_abc_segmentation(transactions)
 
-    # Clasificar cada SKU
+    # Clasificar cada SKU — pre-agrupar para evitar O(n*m) scans (D24)
     all_skus = catalog["sku"].unique()
-    skus_with_tx = set(transactions["sku"].unique())
+    tx_by_sku: dict[str, pd.DataFrame] = {
+        sku: grp for sku, grp in transactions.groupby("sku")
+    }
     results: list[dict] = []
 
     for sku in all_skus:
-        if sku in skus_with_tx:
-            sku_tx = transactions[transactions["sku"] == sku]
+        if sku in tx_by_sku:
             profile = classify_sku(
-                sku_tx,
+                tx_by_sku[sku],
                 sku=sku,
                 granularity=granularity,
                 adi_cutoff=adi_cutoff,
