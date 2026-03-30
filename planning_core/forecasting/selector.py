@@ -9,9 +9,9 @@ Reglas de candidatura
 
 Fase 2 (modelos estadisticos base):
 
-| Clasificacion SB | Seasonal | Candidatos SF             |
-|------------------|----------|---------------------------|
-| smooth           | True     | AutoETS, AutoARIMA, MSTL, SeasonalNaive |
+| Clasificacion SB | Seasonal | Candidatos SF                            |
+|------------------|----------|------------------------------------------|
+| smooth           | True     | AutoETS, AutoARIMA, MSTL, SeasonalNaive  |
 | smooth           | False    | AutoETS, AutoARIMA, SeasonalNaive        |
 | erratic          | —        | AutoETS, AutoARIMA, SeasonalNaive        |
 | intermittent     | —        | CrostonSBA, ADIDA                        |
@@ -24,23 +24,29 @@ LightGBM se evalua via ``run_backtest_lgbm()`` y sus resultados se fusionan
 al backtest antes de elegir el ganador. Solo aplica a series smooth/erratic
 con suficientes datos (>= 3 * season_length).
 
-Seleccion del ganador
----------------------
-1. Filtrar candidatos con MASE valido (status="ok", no NaN).
-2. RMSSE tiebreak: si |MASE_1 - MASE_2| < 0.02, preferir menor RMSSE.
-3. Filtro de sesgo: si el ganador tiene |Bias| > 0.20 y existe un modelo
-   con MASE dentro de un 20% que tenga menor |Bias|, preferir ese modelo.
+Seleccion del ganador (``_pick_winner``)
+-----------------------------------------
+1. Filtrar candidatos validos (status="ok", MASE no NaN).
+2. Ordenar por MASE ascendente.
+3. RMSSE tiebreak: si |MASE_1 - MASE_2| < 0.02, preferir menor RMSSE.
+4. Filtro de sesgo: si el ganador tiene |Bias| > 0.20 y existe un modelo con
+   MASE dentro del 20% y menor |Bias|, preferir ese modelo.
 
-Ensemble top-k
---------------
-Si existen >= 2 modelos con MASE <= ganador * 1.25, se promedian los forecasts
-de hasta k=3 modelos para reducir varianza. El resultado se etiqueta como
-"Ensemble".
+Ensemble top-k (``_apply_ensemble``)
+--------------------------------------
+Si existen >= 2 modelos con MASE <= ganador * 1.25, se promedian sus forecasts
+hasta k=3. El resultado se etiqueta como "Ensemble".
 
-Correccion de sesgo
--------------------
-Al forecast final se aplica: yhat_corrected = yhat / (1 + bias), acotado a ±30%.
-Solo aplica si |bias| >= 0.02.
+Correccion de sesgo (``_apply_bias_correction``)
+--------------------------------------------------
+Al forecast final se aplica yhat_corrected = yhat / (1 + bias), acotado a ±30%.
+Solo aplica si |bias| >= 0.02. Siempre retorna una copia nueva del DataFrame.
+
+Retorno de ``select_and_forecast``
+------------------------------------
+dict con claves: ``status``, ``model``, ``mase``, ``bias``, ``backtest``,
+``forecast``, ``season_length``, ``granularity``, ``h``.
+``model`` puede ser ``"Ensemble"`` si se activó el promedio de modelos.
 
 Uso tipico
 ----------
@@ -197,15 +203,16 @@ def select_and_forecast(
     Returns
     -------
     dict con claves:
-        - ``status``: ``"ok"``, ``"no_forecast"``, ``"fallback"``, ``"error"``
-        - ``model``: nombre del modelo ganador (o ``"Ensemble"``)
-        - ``mase``: MASE del modelo ganador en backtest
-        - ``bias``: Bias del modelo ganador en backtest
-        - ``backtest``: dict completo del backtest (todos los candidatos)
-        - ``forecast``: pd.DataFrame con ``[ds, yhat, yhat_lo80, yhat_hi80]``
-        - ``season_length``: int
-        - ``granularity``: str
-        - ``h``: int
+        - ``status`` : ``"ok"``, ``"no_forecast"``, ``"fallback"``, ``"error"``
+        - ``model`` : nombre del modelo ganador (o ``"Ensemble"`` si aplica)
+        - ``mase`` : MASE promedio del ganador en backtest (float, puede ser NaN)
+        - ``bias`` : Bias promedio del ganador en backtest (float, puede ser NaN)
+        - ``backtest`` : dict completo con métricas de todos los candidatos
+        - ``forecast`` : pd.DataFrame ``[ds, yhat, yhat_lo80, yhat_hi80]``
+          con bias correction ya aplicado (si |bias| >= 0.02)
+        - ``season_length`` : int
+        - ``granularity`` : str
+        - ``h`` : int
     """
     raw_sb = profile.get("sb_class")
     if not raw_sb:
@@ -445,7 +452,12 @@ def _fit_predict_model(
             return fit_predict_naive(demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col)
         else:
             return None
-    except Exception:
+    except Exception as exc:
+        warnings.warn(
+            f"_fit_predict_model: fallo al predecir con {model_name!r} para {uid!r}: {exc}. "
+            "Modelo excluido del ensemble.",
+            stacklevel=2,
+        )
         return None
 
 
@@ -513,7 +525,7 @@ def _apply_bias_correction(forecast_df: pd.DataFrame, bias: float) -> pd.DataFra
     No aplica si |bias| < 0.02 (ruido insignificante).
     """
     if math.isnan(bias) or abs(bias) < _BIAS_CORRECTION_MIN_ABS:
-        return forecast_df
+        return forecast_df.copy()
 
     raw_factor = 1.0 / (1.0 + bias)
     lo = 1.0 - _BIAS_CORRECTION_MAX_ADJ

@@ -5,7 +5,7 @@
 Backlog de deuda técnica, bugs no declarados y oportunidades de mejora detectadas en inspecciones del repo.
 Solo contiene ítems **vigentes**. Lo resuelto debe eliminarse del registro.
 
-Última actualización: `2026-03-30`
+Última actualización: `2026-03-30` (sprint Opción A completo)
 
 ---
 
@@ -13,10 +13,8 @@ Solo contiene ítems **vigentes**. Lo resuelto debe eliminarse del registro.
 
 | Frente | Items vigentes | Prioridad más alta |
 |---|---|---|
-| Estado del repo / documentación | D34 | Alta |
 | Validación de datos | D08 | Alta |
-| Testing / cobertura | D09 | Alta |
-| Robustez / bugs | D35, D36, D37 | Alta / Media |
+| Testing / cobertura | D09 (parcial — API cubierta) | Media |
 | Arquitectura / performance | D14, D15 | Media |
 | Forecasting / observabilidad | D21, D33, D38 | Media / Baja |
 
@@ -27,15 +25,11 @@ Solo contiene ítems **vigentes**. Lo resuelto debe eliminarse del registro.
 | ID | Prio | Tipo | Resumen |
 |---|---|---|---|
 | D08 | Alta | Validación | `validation.py` sigue muy por debajo del framework documentado |
-| D09 | Alta | Testing | Cobertura 0 en `classification.py`, `preprocessing.py`, `validation.py` y `apps/api/` |
+| D09 | Media | Testing | Cobertura 0 en `classification.py`, `preprocessing.py`, `validation.py` (API ya cubierta) |
 | D14 | Media | Performance | `classify_catalog()` sigue sin caché en la API |
 | D15 | Media | Arquitectura | Sin capa formal para artefactos derivados persistidos |
 | D21 | Baja | Analítica | Falta notebook reproducible del sweep de parametrización |
 | D33 | Media | Forecasting | Falta dashboard agregado de calidad de forecast en UI |
-| D34 | Alta | Consistencia | Docstrings de `backtest.py` y `selector.py` desactualizados respecto al nuevo contrato |
-| D35 | Alta | Robustez | `apps/api/main.py` sin manejo de errores — excepciones del repositorio crashean todos los endpoints |
-| D36 | Media | Bug | `_fit_predict_model` en `selector.py` silencia todas las excepciones sin log ni warning |
-| D37 | Baja | Bug | `_apply_bias_correction` retorna referencia al original cuando no aplica corrección (riesgo de mutación) |
 | D38 | Media | Calidad | `fill_rate` en backtest se promedia entre ventanas; para planning debería reportarse también el mínimo |
 
 ---
@@ -79,7 +73,7 @@ Suite verde con 222 tests. Pero la cobertura es muy desigual por capa:
 | `planning_core/classification.py` | ❌ ninguno | Alto — lógica ADI-CV², ABC-XYZ, estacionalidad |
 | `planning_core/preprocessing.py` | ❌ ninguno | Medio — outliers y censura |
 | `planning_core/validation.py` | ❌ ninguno | Alto — alineado con D08 |
-| `apps/api/main.py` | ❌ ninguno | Alto — endpoints sin contrato de respuesta probado |
+| `apps/api/main.py` | ✅ 54 tests en `test_api.py` | Cubierto |
 | `planning_core/forecasting/models/mstl.py` | ❌ ninguno | Medio |
 | `planning_core/forecasting/models/lgbm.py` | ❌ ninguno | Medio |
 | `test_services.py` | Solo 4 tests | Bajo (pero insuficiente para PlanningService) |
@@ -149,88 +143,6 @@ Hoy no se puede responder fácilmente desde la UI:
 
 ---
 
-### D34. Docstrings desactualizados en forecasting
-
-**Tipo**: consistencia / mantenimiento
-**Prioridad**: alta
-
-El selector ya incorpora RMSSE tiebreak, filtro de bias, ensemble top-k, bias correction, Fill Rate y h dinámico. Los tests están alineados. Pero los docstrings y la documentación técnica describen el comportamiento anterior.
-
-Ejemplos pendientes:
-
-- `backtest.py:88` — docstring dice que retorna claves `mase, wmape, rmsse, bias, mae, rmse`; falta `fill_rate`
-- `selector.py:36` — docstring en módulo y en `select_and_forecast` no documenta el flujo de ensemble ni bias correction
-- `forecasting_models_plan.md` — no tiene sección del selector nuevo
-
-**Acción**:
-
-1. Actualizar docstrings de `run_backtest` y `select_and_forecast`
-2. Agregar sección "Selector: flujo completo" en `forecasting_models_plan.md`
-
----
-
-### D35. `apps/api/main.py` sin manejo de errores
-
-**Tipo**: robustez
-**Prioridad**: alta
-
-Todos los endpoints llaman directamente a `service.*` sin `try/except`. Cualquier falla del repositorio (archivo CSV ausente, manifest corrupto, error de I/O) propaga una excepción no manejada y devuelve un 500 sin mensaje claro.
-
-Casos de riesgo identificados:
-
-| Endpoint | Escenario de fallo | Consecuencia |
-|---|---|---|
-| `GET /health` | CSVs ausentes → `FileNotFoundError` | 500 en health check — sistema parece caído |
-| `GET /sku/{sku}/forecast` | LightGBM falla por memoria | 500 en lugar de fallback graceful |
-| `GET /classification` | Catálogo vacío | 500 o respuesta vacía sin indicación |
-| `GET /sku/{sku}/timeseries` | SKU no existe | silently retorna vacío, sin 404 |
-
-Adicionalmente, el parámetro `location` en `/sku/{sku}/forecast` no se valida contra las ubicaciones conocidas del manifest; si se pasa un valor inválido, el forecast se genera silenciosamente sobre una serie vacía.
-
-**Acción**:
-
-1. Envolver todos los endpoints en `try/except` con respuestas HTTP estandarizadas (404 para SKU no encontrado, 422 para parámetros inválidos, 503 para fallos de repositorio)
-2. Agregar validación de `location` antes de llamar `sku_forecast`
-3. Añadir tests de API con `TestClient` (alineado con D09)
-
----
-
-### D36. `_fit_predict_model` silencia todas las excepciones
-
-**Tipo**: bug / observabilidad
-**Prioridad**: media
-
-`planning_core/forecasting/selector.py` — `_fit_predict_model()` atrapa `Exception` y retorna `None` sin emitir ningún log ni warning.
-
-```python
-except Exception:
-    return None  # caller desconoce si falló o si el modelo es desconocido
-```
-
-Cuando el ensemble llama a `_fit_predict_model` para múltiples modelos y uno falla, ese modelo se descarta en silencio. En producción esto oculta bugs reales (ImportError de LightGBM, ValueError de series cortas en MSTL) y hace el diagnóstico difícil.
-
-**Acción**: reemplazar `except Exception: return None` por `except Exception as exc: warnings.warn(...)` con el nombre del modelo y la excepción, igual al patrón ya usado para LightGBM en `select_and_forecast`.
-
----
-
-### D37. `_apply_bias_correction` retorna referencia al original cuando no corrige
-
-**Tipo**: bug (bajo impacto actual, riesgo futuro)
-**Prioridad**: baja
-
-`planning_core/forecasting/selector.py` — cuando `|bias| < 0.02`, la función retorna `forecast_df` directamente sin copiar:
-
-```python
-if math.isnan(bias) or abs(bias) < _BIAS_CORRECTION_MIN_ABS:
-    return forecast_df  # referencia al original
-```
-
-Si el llamador modifica la variable retornada en el futuro, muta el objeto original inesperadamente. Hoy no causa un bug porque el llamador inmediato solo asigna la referencia, pero es una trampa al refactorizar.
-
-**Acción**: cambiar a `return forecast_df.copy()` en esa rama, o documentar explícitamente que el contrato de retorno puede ser una referencia.
-
----
-
 ### D38. `fill_rate` en backtest se promedia entre ventanas
 
 **Tipo**: calidad de métricas
@@ -265,7 +177,6 @@ Fill Rate ya está implementado en `metrics.py` y propagado al backtest. ¿La ca
 - en una vista agregada de Streamlit
 - en ambos
 
-### Q3. Manejo de errores en la API (D35)
+### Q3. Nivel de detalle de errores en la API
 
-¿El nivel de detalle de los mensajes de error debe diferenciarse por entorno (dev vs. prod)?
-Un 500 con stack trace es útil para debug pero puede exponer implementación interna en producción.
+D35 resuelto: todos los endpoints tienen `try/except` con 404/422/503 diferenciados y `_sanitize` para NaN. ¿El mensaje de detalle en 500 debe ocultarse en producción (expone implementación interna)?

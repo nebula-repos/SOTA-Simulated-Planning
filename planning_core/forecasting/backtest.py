@@ -85,8 +85,11 @@ def run_backtest(
     -------
     dict[str, dict]
         Clave: nombre del modelo.
-        Valor: dict con claves ``mase``, ``wmape``, ``rmsse``, ``bias``, ``mae``, ``rmse``,
-        ``n_windows``, ``h``, ``status``.
+        Valor: dict con claves ``mase``, ``wmape``, ``rmsse``, ``bias``, ``fill_rate``,
+        ``mae``, ``rmse``, ``n_windows``, ``h``, ``status``.
+
+        ``fill_rate`` = fracción de periodos en que yhat >= actual, promediada sobre ventanas.
+        Para series intermitentes/lumpy complementa a MASE como métrica operacional.
 
         Si la serie es demasiado corta: ``{"status": "series_too_short", ...}``.
 
