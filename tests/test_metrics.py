@@ -209,7 +209,7 @@ class TestComputeAllMetrics:
     def test_returns_all_keys(self, perfect_forecast):
         actual, forecast = perfect_forecast
         result = compute_all_metrics(actual, forecast, season_length=2)
-        assert set(result.keys()) == {"mase", "wmape", "rmsse", "bias", "mae", "rmse"}
+        assert set(result.keys()) == {"mase", "wmape", "rmsse", "bias", "fill_rate", "mae", "rmse"}
 
     def test_perfect_forecast_errors_are_zero(self, perfect_forecast):
         actual, forecast = perfect_forecast

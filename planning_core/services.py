@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import pandas as pd
 
 from planning_core.classification import (
@@ -11,7 +13,7 @@ from planning_core.classification import (
     select_granularity,
     treat_outliers,
 )
-from planning_core.forecasting.selector import select_and_forecast
+from planning_core.forecasting import selector as _forecast_selector  # lazy-loaded per call (D22)
 from planning_core.inventory.diagnostics import InventoryDiagnosis, diagnose_sku
 from planning_core.inventory.params import get_sku_params
 from planning_core.inventory.safety_stock import compute_sku_safety_stock, SafetyStockResult
@@ -23,6 +25,21 @@ from planning_core.validation import basic_health_report
 
 OFFICIAL_CLASSIFICATION_SCOPE = "network_aggregate"
 OFFICIAL_CLASSIFICATION_GRANULARITY = "M"
+
+# D20: horizonte dinamico por SKU
+_DAYS_PER_PERIOD: dict[str, float] = {"D": 1.0, "W": 7.0, "M": 30.0}
+_H_MIN = 1
+_H_MAX = 12
+
+
+def _h_from_lead_time(lead_time_days: float, granularity: str) -> int:
+    """Convierte lead_time_days a periodos de forecast redondeando hacia arriba.
+
+    Usado por ``sku_forecast`` para derivar el horizonte h por SKU en lugar
+    de usar el valor global h=3 (D20). Resultado acotado en [1, 12].
+    """
+    days = _DAYS_PER_PERIOD.get(granularity, 30.0)
+    return max(_H_MIN, min(_H_MAX, math.ceil(lead_time_days / days)))
 
 
 class PlanningService:
@@ -546,7 +563,7 @@ class PlanningService:
         sku: str,
         location: str | None = None,
         granularity: str | None = None,
-        h: int = 3,
+        h: int | None = None,
         n_windows: int = 3,
         outlier_method: str = "iqr",
         treat_strategy: str = "winsorize",
@@ -568,8 +585,10 @@ class PlanningService:
             Si es None, usa el agregado de red (clasificacion oficial).
         granularity : str, optional
             ``"D"``, ``"W"`` o ``"M"``. Si es None, usa la granularidad oficial.
-        h : int
-            Horizonte de pronostico en periodos.
+        h : int or None
+            Horizonte de pronostico en periodos. Si None (default), se deriva
+            automaticamente de ``lead_time_days / days_per_period`` del SKU
+            (D20: horizonte dinamico por SKU). Rango: [1, 12] periodos.
         n_windows : int
             Ventanas del backtest (minimo 3 para MASE estable).
         outlier_method : str
@@ -600,8 +619,16 @@ class PlanningService:
                 "backtest": {},
                 "season_length": 12,
                 "granularity": granularity,
-                "h": h,
+                "h": h or 3,
             }
+
+        # D20: horizonte dinamico por SKU si no se especifica explicitamente
+        if h is None:
+            try:
+                params = self.sku_inventory_params(sku, abc_class=profile.get("abc_class"))
+                h = _h_from_lead_time(params.get("lead_time_days", 30.0), granularity)
+            except Exception:
+                h = 3
 
         # Serie limpia (outliers tratados) para modelado
         clean_df = self.sku_clean_series(
@@ -620,7 +647,7 @@ class PlanningService:
                 columns={"demand_clean": "demand"}
             )
 
-        result = select_and_forecast(
+        result = _forecast_selector.select_and_forecast(
             profile=profile,
             demand_df=model_input,
             granularity=granularity,
@@ -879,7 +906,8 @@ class PlanningService:
             .rename(columns={"on_hand_qty": "on_hand", "on_order_qty": "on_order"})
         )
 
-        # --- 3. Última fecha de movimiento por SKU (para dead stock) ---
+        # --- 3. Última fecha de movimiento y grupos de demanda por SKU ---
+        # Pre-agrupar transactions una sola vez para evitar N+1 scans (D23)
         transactions = self.repository.load_table("transactions")
         if not transactions.empty and "date" in transactions.columns:
             last_movement = (
@@ -888,9 +916,13 @@ class PlanningService:
                 .rename("last_movement_date")
             )
             latest_tx_date = pd.to_datetime(transactions["date"]).max()
+            tx_by_sku: dict[str, pd.DataFrame] = {
+                sku: grp for sku, grp in transactions.groupby("sku")
+            }
         else:
             last_movement = pd.Series(dtype="object", name="last_movement_date")
             latest_tx_date = pd.Timestamp.now()
+            tx_by_sku = {}
 
         # --- 4. Parámetros globales compartidos (una sola carga de manifest/catalog) ---
         catalog = self.repository.load_table("product_catalog")
@@ -935,11 +967,11 @@ class PlanningService:
                 base_price = unit_cost = 0.0
 
             # Inventory params
-            sku_catalog_row = catalog.loc[catalog["sku"] == sku]
             params = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
 
-            # Safety stock
-            demand_series = self.sku_demand_series(sku, granularity=granularity)
+            # Safety stock — usar grupo pre-cargado para evitar N+1 (D23)
+            sku_tx_raw = tx_by_sku.get(sku, pd.DataFrame(columns=transactions.columns))
+            demand_series = prepare_demand_series(sku_tx_raw, granularity=granularity)
             ss_result = compute_sku_safety_stock(
                 params, demand_series, granularity=granularity, simple_safety_pct=simple_safety_pct
             )

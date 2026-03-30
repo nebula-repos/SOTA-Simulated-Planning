@@ -116,6 +116,7 @@ def run_backtest(
             "wmape": float("nan"),
             "rmsse": float("nan"),
             "bias": float("nan"),
+            "fill_rate": float("nan"),
             "mae": float("nan"),
             "rmse": float("nan"),
             "n_windows": 0,
@@ -144,7 +145,8 @@ def run_backtest(
             results[model_name] = {
                 "status": "model_column_missing",
                 "mase": float("nan"), "wmape": float("nan"), "rmsse": float("nan"),
-                "bias": float("nan"), "mae": float("nan"), "rmse": float("nan"),
+                "bias": float("nan"), "fill_rate": float("nan"),
+                "mae": float("nan"), "rmse": float("nan"),
                 "n_windows": 0, "h": h,
             }
             continue
@@ -172,9 +174,10 @@ def _aggregate_window_metrics(windows: list[dict]) -> dict:
     """Promedia metricas sobre ventanas del backtest ignorando NaN."""
     if not windows:
         return {"mase": float("nan"), "wmape": float("nan"), "rmsse": float("nan"),
-                "bias": float("nan"), "mae": float("nan"), "rmse": float("nan")}
+                "bias": float("nan"), "fill_rate": float("nan"),
+                "mae": float("nan"), "rmse": float("nan")}
 
-    keys = ["mase", "wmape", "rmsse", "bias", "mae", "rmse"]
+    keys = ["mase", "wmape", "rmsse", "bias", "fill_rate", "mae", "rmse"]
     result = {}
     for k in keys:
         values = [w[k] for w in windows if not np.isnan(w.get(k, float("nan")))]

@@ -256,6 +256,29 @@ def compute_rmse(
 # Calculo conjunto
 # ---------------------------------------------------------------------------
 
+def compute_fill_rate(
+    actual: pd.Series | np.ndarray,
+    forecast: pd.Series | np.ndarray,
+) -> float:
+    """Fill Rate del forecast: fracción de periodos donde yhat >= actual.
+
+    Proxy operacional relevante para demanda intermittent/lumpy donde MASE
+    suele ser > 1 incluso con modelos correctos. Mide qué tan frecuente el
+    modelo no subestima la demanda (conservadurismo de cobertura).
+
+    Fill Rate = P(yhat >= actual) = #{yhat >= actual} / n
+
+    Rango [0, 1]. 1.0 = el modelo nunca subestima (puede sobreestimar).
+    0.5 = subestima la mitad del tiempo.
+    """
+    actual_arr = _to_array(actual)
+    forecast_arr = _to_array(forecast)
+    _check_lengths(actual_arr, forecast_arr)
+    if len(actual_arr) == 0:
+        return float("nan")
+    return float(np.mean(forecast_arr >= actual_arr))
+
+
 def compute_all_metrics(
     actual: pd.Series | np.ndarray,
     forecast: pd.Series | np.ndarray,
@@ -274,7 +297,8 @@ def compute_all_metrics(
     Returns
     -------
     dict
-        Claves: ``mase``, ``wmape``, ``rmsse``, ``bias``, ``mae``, ``rmse``.
+        Claves: ``mase``, ``wmape``, ``rmsse``, ``bias``, ``fill_rate``,
+        ``mae``, ``rmse``.
         Los valores pueden ser ``float("nan")`` si la metrica no es calculable.
     """
     return {
@@ -292,6 +316,7 @@ def compute_all_metrics(
             naive_type=naive_type,
         ),
         "bias": compute_bias(actual, forecast),
+        "fill_rate": compute_fill_rate(actual, forecast),
         "mae": compute_mae(actual, forecast),
         "rmse": compute_rmse(actual, forecast),
     }

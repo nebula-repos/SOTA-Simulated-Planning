@@ -164,7 +164,8 @@ class TestSelectAndForecast:
             use_lgbm=False,
         )
         assert result["status"] in {"ok", "fallback"}
-        assert result["model"] in {"CrostonSBA", "ADIDA"}
+        # Ensemble de CrostonSBA+ADIDA también es válido para intermittent
+        assert result["model"] in {"CrostonSBA", "ADIDA", "Ensemble"}
 
     def test_forecast_yhat_non_negative(self):
         """Todos los valores de yhat deben ser >= 0 (demanda no negativa)."""

@@ -2,7 +2,7 @@
 
 Dado el perfil de clasificacion de un SKU, determina los modelos candidatos
 y ejecuta un horse-race empirico via backtest expanding-window para elegir
-el modelo con menor MASE.
+el mejor modelo.
 
 Reglas de candidatura
 ---------------------
@@ -24,14 +24,28 @@ LightGBM se evalua via ``run_backtest_lgbm()`` y sus resultados se fusionan
 al backtest antes de elegir el ganador. Solo aplica a series smooth/erratic
 con suficientes datos (>= 3 * season_length).
 
-El modelo ganador es el que menor MASE promedio obtiene sobre el backtest.
-Si todos los candidatos fallan (serie demasiado corta), se usa SeasonalNaive
-o HistoricAverage como fallback obligatorio.
+Seleccion del ganador
+---------------------
+1. Filtrar candidatos con MASE valido (status="ok", no NaN).
+2. RMSSE tiebreak: si |MASE_1 - MASE_2| < 0.02, preferir menor RMSSE.
+3. Filtro de sesgo: si el ganador tiene |Bias| > 0.20 y existe un modelo
+   con MASE dentro de un 20% que tenga menor |Bias|, preferir ese modelo.
+
+Ensemble top-k
+--------------
+Si existen >= 2 modelos con MASE <= ganador * 1.25, se promedian los forecasts
+de hasta k=3 modelos para reducir varianza. El resultado se etiqueta como
+"Ensemble".
+
+Correccion de sesgo
+-------------------
+Al forecast final se aplica: yhat_corrected = yhat / (1 + bias), acotado a ±30%.
+Solo aplica si |bias| >= 0.02.
 
 Uso tipico
 ----------
 >>> result = select_and_forecast(profile, demand_df, granularity="M", h=3)
->>> result["model"]      # "AutoARIMA"
+>>> result["model"]      # "AutoARIMA" o "Ensemble"
 >>> result["mase"]       # 0.68
 >>> result["forecast"]   # pd.DataFrame con [ds, yhat, yhat_lo80, yhat_hi80]
 """
@@ -42,6 +56,7 @@ import math
 import warnings
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from statsforecast.models import ADIDA, AutoARIMA, AutoETS, CrostonSBA, HistoricAverage, MSTL, SeasonalNaive
 
@@ -62,8 +77,20 @@ _INTERMITTENT_CLASSES = {"intermittent", "lumpy"}
 _NO_FORECAST_CLASSES = {"inactive"}
 
 # Minimo de observaciones para incluir LightGBM en el horse-race
-# (mas restrictivo que los modelos estadisticos — necesita datos para generalizar)
 _MIN_OBS_LGBM_FACTOR = 3
+
+# Seleccion del ganador — umbrales
+_MASE_TIE_THRESHOLD: float = 0.02          # diferencia maxima de MASE para aplicar tiebreak RMSSE
+_BIAS_HIGH_THRESHOLD: float = 0.20         # |Bias| por encima del cual se considera sesgado
+_BIAS_PREFERENCE_MASE_SLACK: float = 0.20  # MASE slack para preferir modelo menos sesgado
+
+# Ensemble
+_ENSEMBLE_MASE_THRESHOLD: float = 1.25     # modelos con MASE <= ganador * este factor entran al ensemble
+_ENSEMBLE_MAX_K: int = 3                   # numero maximo de modelos en el ensemble
+
+# Correccion de sesgo
+_BIAS_CORRECTION_MIN_ABS: float = 0.02     # no corregir si |bias| < este valor
+_BIAS_CORRECTION_MAX_ADJ: float = 0.30     # cap de ajuste en ±30%
 
 
 # ---------------------------------------------------------------------------
@@ -139,8 +166,10 @@ def select_and_forecast(
     3. Determina los modelos candidatos estadisticos por clasificacion.
     4. Corre backtest expanding-window sobre todos los candidatos estadisticos.
     5. Opcionalmente, corre backtest LightGBM y fusiona al resultado.
-    6. Elige el modelo con menor MASE sobre todos los candidatos.
-    7. Genera el forecast final con ese modelo sobre el historico completo.
+    6. Elige el modelo ganador (MASE + RMSSE tiebreak + filtro de sesgo).
+    7. Genera forecast final: ensemble top-k si hay multiples candidatos cercanos,
+       forecast individual en caso contrario.
+    8. Aplica correccion de sesgo al forecast final.
 
     Parameters
     ----------
@@ -162,13 +191,16 @@ def select_and_forecast(
     use_lgbm : bool
         Si True, incluye LightGBM en el horse-race cuando hay datos suficientes.
         Default True.
+    return_cv : bool
+        Si True, incluye el DataFrame de cross-validation en el resultado.
 
     Returns
     -------
     dict con claves:
         - ``status``: ``"ok"``, ``"no_forecast"``, ``"fallback"``, ``"error"``
-        - ``model``: nombre del modelo ganador
+        - ``model``: nombre del modelo ganador (o ``"Ensemble"``)
         - ``mase``: MASE del modelo ganador en backtest
+        - ``bias``: Bias del modelo ganador en backtest
         - ``backtest``: dict completo del backtest (todos los candidatos)
         - ``forecast``: pd.DataFrame con ``[ds, yhat, yhat_lo80, yhat_hi80]``
         - ``season_length``: int
@@ -194,6 +226,7 @@ def select_and_forecast(
             "reason": "inactive SKU",
             "model": None,
             "mase": float("nan"),
+            "bias": float("nan"),
             "forecast": pd.DataFrame(),
             "backtest": {},
             "season_length": season_length,
@@ -245,10 +278,10 @@ def select_and_forecast(
                     stacklevel=2,
                 )
 
-    # 5. Elegir ganador (menor MASE sobre todos los candidatos)
-    best_model, best_mase = _pick_winner(backtest_results)
+    # 5. Elegir ganador con criterios multi-metrica
+    best_model, best_mase, best_bias = _pick_winner(backtest_results)
 
-    # 6. Generar forecast final con el modelo ganador
+    # 6. Intentar ensemble top-k si hay multiples modelos cercanos
     status = "ok"
     try:
         if best_model is None:
@@ -258,70 +291,31 @@ def select_and_forecast(
                 demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
             )
             best_model = forecast_result["model"]
-
-        elif best_model == "CrostonSBA":
-            forecast_result = fit_predict_sba(
-                demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
-            )
-
-        elif best_model == "ADIDA":
-            forecast_result = fit_predict_adida(
-                demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
-            )
-
-        elif best_model == "AutoETS":
-            try:
-                forecast_result = fit_predict_ets(
-                    demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
-                )
-            except ValueError:
-                status = "fallback"
-                forecast_result = fit_predict_naive(
-                    demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
-                )
-                best_model = forecast_result["model"]
-
-        elif best_model == "AutoARIMA":
-            try:
-                forecast_result = fit_predict_arima(
-                    demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
-                )
-            except ValueError:
-                status = "fallback"
-                forecast_result = fit_predict_naive(
-                    demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
-                )
-                best_model = forecast_result["model"]
-
-        elif best_model == "MSTL":
-            try:
-                forecast_result = fit_predict_mstl(
-                    demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
-                )
-            except ValueError:
-                status = "fallback"
-                forecast_result = fit_predict_naive(
-                    demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
-                )
-                best_model = forecast_result["model"]
-
-        elif best_model == "LightGBM":
-            try:
-                forecast_result = fit_predict_lgbm(
-                    demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
-                )
-            except (ValueError, ImportError):
-                status = "fallback"
-                forecast_result = fit_predict_naive(
-                    demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
-                )
-                best_model = forecast_result["model"]
+            forecast_df = forecast_result["forecast"]
 
         else:
-            forecast_result = fit_predict_naive(
-                demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
+            # Intentar ensemble si hay >= 2 candidatos dentro del umbral
+            ensemble_df = _apply_ensemble(
+                backtest_results, best_mase, demand_df, granularity, h, uid, target_col
             )
-            best_model = forecast_result["model"]
+
+            if ensemble_df is not None:
+                best_model = "Ensemble"
+                forecast_df = ensemble_df
+            else:
+                forecast_result = _fit_predict_model(
+                    best_model, demand_df, granularity, h, uid, target_col
+                )
+                if forecast_result is None:
+                    status = "fallback"
+                    forecast_result = fit_predict_naive(
+                        demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col
+                    )
+                    best_model = forecast_result["model"]
+                forecast_df = forecast_result["forecast"]
+
+        # 7. Correccion de sesgo al forecast final
+        forecast_df = _apply_bias_correction(forecast_df, best_bias)
 
     except Exception as exc:
         return {
@@ -329,6 +323,7 @@ def select_and_forecast(
             "error": str(exc),
             "model": None,
             "mase": float("nan"),
+            "bias": float("nan"),
             "forecast": pd.DataFrame(),
             "backtest": backtest_results,
             "season_length": season_length,
@@ -340,8 +335,9 @@ def select_and_forecast(
         "status": status,
         "model": best_model,
         "mase": best_mase,
+        "bias": best_bias,
         "backtest": backtest_results,
-        "forecast": forecast_result["forecast"],
+        "forecast": forecast_df,
         "season_length": season_length,
         "granularity": granularity,
         "h": h,
@@ -369,23 +365,164 @@ def _get_naive_type(sb_class: str, is_seasonal: bool) -> str:
     return "lag1"
 
 
-def _pick_winner(backtest_results: dict[str, dict]) -> tuple[str | None, float]:
-    """Retorna el nombre y MASE del modelo con menor MASE en el backtest.
+def _pick_winner(
+    backtest_results: dict[str, dict],
+) -> tuple[str | None, float, float]:
+    """Retorna ``(nombre, MASE, Bias)`` del modelo ganador.
 
-    Ignora modelos con status != "ok" o con MASE = NaN.
-    Retorna (None, NaN) si ningun modelo tiene MASE valido.
+    Criterios de seleccion en orden de prioridad:
+    1. Filtrar candidatos validos (status="ok", MASE no NaN).
+    2. Ordenar por MASE ascendente.
+    3. RMSSE tiebreak: si |MASE_1 - MASE_2| < 0.02 y RMSSE_2 < RMSSE_1, preferir #2.
+    4. Filtro de sesgo: si el ganador tiene |Bias| > 0.20 y existe un modelo
+       con MASE dentro del 20% y menor |Bias|, preferir ese modelo.
+
+    Retorna (None, NaN, NaN) si ningun modelo tiene MASE valido.
     """
-    best_name = None
-    best_mase = float("nan")
+    valid = [
+        (
+            name,
+            m["mase"],
+            m.get("rmsse", float("nan")),
+            m.get("bias", float("nan")),
+        )
+        for name, m in backtest_results.items()
+        if m.get("status") == "ok" and not math.isnan(m.get("mase", float("nan")))
+    ]
 
-    for model_name, metrics in backtest_results.items():
-        if metrics.get("status") != "ok":
-            continue
-        mase = metrics.get("mase", float("nan"))
-        if math.isnan(mase):
-            continue
-        if best_name is None or mase < best_mase:
-            best_name = model_name
-            best_mase = mase
+    if not valid:
+        return None, float("nan"), float("nan")
 
-    return best_name, best_mase
+    valid.sort(key=lambda x: x[1])  # por MASE ascendente
+    best_name, best_mase, best_rmsse, best_bias = valid[0]
+
+    # RMSSE tiebreak
+    if len(valid) >= 2:
+        r_name, r_mase, r_rmsse, r_bias = valid[1]
+        if abs(best_mase - r_mase) < _MASE_TIE_THRESHOLD:
+            if not math.isnan(r_rmsse) and not math.isnan(best_rmsse) and r_rmsse < best_rmsse:
+                best_name, best_mase, best_rmsse, best_bias = r_name, r_mase, r_rmsse, r_bias
+
+    # Filtro de sesgo: si el ganador esta muy sesgado, buscar alternativa menos sesgada
+    if not math.isnan(best_bias) and abs(best_bias) > _BIAS_HIGH_THRESHOLD:
+        mase_ceiling = best_mase * (1.0 + _BIAS_PREFERENCE_MASE_SLACK)
+        for name, mase, rmsse, bias in valid[1:]:
+            if mase > mase_ceiling:
+                break
+            if not math.isnan(bias) and abs(bias) < abs(best_bias):
+                best_name, best_mase, best_rmsse, best_bias = name, mase, rmsse, bias
+                break
+
+    return best_name, best_mase, best_bias
+
+
+def _fit_predict_model(
+    model_name: str,
+    demand_df: pd.DataFrame,
+    granularity: str,
+    h: int,
+    uid: str,
+    target_col: str,
+) -> dict | None:
+    """Despacha la prediccion al modulo correcto segun el nombre del modelo.
+
+    Retorna el dict ``{"forecast": pd.DataFrame, ...}`` del modelo o None si falla.
+    """
+    try:
+        if model_name == "CrostonSBA":
+            return fit_predict_sba(demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col)
+        elif model_name == "ADIDA":
+            return fit_predict_adida(demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col)
+        elif model_name == "AutoETS":
+            return fit_predict_ets(demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col)
+        elif model_name == "AutoARIMA":
+            return fit_predict_arima(demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col)
+        elif model_name == "MSTL":
+            return fit_predict_mstl(demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col)
+        elif model_name == "LightGBM":
+            return fit_predict_lgbm(demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col)
+        elif model_name in ("SeasonalNaive", "HistoricAverage"):
+            return fit_predict_naive(demand_df, granularity=granularity, h=h, unique_id=uid, target_col=target_col)
+        else:
+            return None
+    except Exception:
+        return None
+
+
+def _apply_ensemble(
+    backtest_results: dict[str, dict],
+    best_mase: float,
+    demand_df: pd.DataFrame,
+    granularity: str,
+    h: int,
+    uid: str,
+    target_col: str,
+) -> pd.DataFrame | None:
+    """Genera forecast ensemble promediando los top-k modelos dentro del umbral MASE.
+
+    Solo activa si hay >= 2 modelos con MASE <= best_mase * 1.25.
+    Retorna None si el ensemble no aplica (candidatos insuficientes o fallos).
+    """
+    if math.isnan(best_mase):
+        return None
+
+    mase_ceiling = best_mase * _ENSEMBLE_MASE_THRESHOLD
+    candidates = [
+        name
+        for name, m in backtest_results.items()
+        if m.get("status") == "ok"
+        and not math.isnan(m.get("mase", float("nan")))
+        and m["mase"] <= mase_ceiling
+    ]
+
+    candidates.sort(key=lambda n: backtest_results[n]["mase"])
+    candidates = candidates[:_ENSEMBLE_MAX_K]
+
+    if len(candidates) < 2:
+        return None
+
+    forecasts: list[pd.DataFrame] = []
+    for name in candidates:
+        result = _fit_predict_model(name, demand_df, granularity, h, uid, target_col)
+        if result is not None and not result["forecast"].empty:
+            forecasts.append(result["forecast"])
+
+    if len(forecasts) < 2:
+        return None
+
+    base = forecasts[0].copy()
+    yhats = np.array([f["yhat"].values for f in forecasts])
+    base["yhat"] = np.mean(yhats, axis=0).clip(min=0)
+
+    for col in ("yhat_lo80", "yhat_hi80"):
+        if col in base.columns and all(col in f.columns for f in forecasts):
+            vals = np.array([f[col].values for f in forecasts])
+            base[col] = np.mean(vals, axis=0).clip(min=0)
+
+    return base
+
+
+def _apply_bias_correction(forecast_df: pd.DataFrame, bias: float) -> pd.DataFrame:
+    """Corrige el sesgo sistematico del forecast.
+
+    yhat_corrected = yhat / (1 + bias), acotado a un ajuste maximo de ±30%.
+
+    Bias positivo → modelo sobreestima → correccion reduce yhat.
+    Bias negativo → modelo subestima → correccion incrementa yhat.
+
+    No aplica si |bias| < 0.02 (ruido insignificante).
+    """
+    if math.isnan(bias) or abs(bias) < _BIAS_CORRECTION_MIN_ABS:
+        return forecast_df
+
+    raw_factor = 1.0 / (1.0 + bias)
+    lo = 1.0 - _BIAS_CORRECTION_MAX_ADJ
+    hi = 1.0 + _BIAS_CORRECTION_MAX_ADJ
+    factor = max(lo, min(hi, raw_factor))
+
+    df = forecast_df.copy()
+    df["yhat"] = (df["yhat"] * factor).clip(lower=0)
+    for col in ("yhat_lo80", "yhat_hi80"):
+        if col in df.columns:
+            df[col] = (df[col] * factor).clip(lower=0)
+    return df

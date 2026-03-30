@@ -21,26 +21,26 @@ Fases 0-4 del pipeline completadas. El repo es un sistema funcional end-to-end: 
 
 ### Qué existe hoy
 
-| Componente | Descripción | Estado |
-|---|---|---|
-| Generador de datos | Series diarias con 10 patrones de demanda, multi-perfil | Funcional |
-| Modelo de datos (7 tablas) | Catálogo, transacciones, snapshots inventario, OC, recepciones, transferencias | Funcional |
-| `planning_core` | Repository, servicios, agregaciones y health checks básicos | Funcional |
-| Clasificación de demanda | Syntetos-Boylan, ABC-XYZ, estacionalidad, tendencia, outliers, quality score, censura | Funcional |
-| Preprocessing | Limpieza de outliers (IQR/Hampel) y detección de demanda censurada por stockout | Funcional |
-| Modelos de forecast | AutoETS, AutoARIMA, MSTL, CrostonSBA, ADIDA, SeasonalNaive, LightGBM | Funcional |
-| Backtest + selector | `run_backtest` expanding-window, horse-race por MASE adaptativo, `select_and_forecast` | Funcional |
-| Evaluación de catálogo | `run_catalog_evaluation` — horse-race masivo en paralelo, checkpoints, resume | Funcional |
-| Comparación de runs | `run_store`, `aggregator`, `comparator` — persistencia y análisis multi-run | Funcional |
-| `PlanningService.sku_forecast()` | Selección automática de modelo + forecast por SKU | Funcional |
-| **Módulo de inventario** | Parámetros por SKU, Safety Stock (3 métodos), ROP, nivel de servicio CSL | **Funcional** |
-| **Diagnóstico de salud** | `diagnose_sku`, ratio de posicionamiento, P(quiebre), bandas de alerta, texto explicativo | **Funcional** |
-| **`catalog_health_report()`** | Diagnóstico masivo del catálogo con métricas financieras (capital exceso/riesgo) | **Funcional** |
-| UI | Clasificación, Forecast (IC 80%, backtest), **Inventario por SKU**, **Health tab** | Funcional |
-| API | Endpoints REST para catálogo, clasificación, timeseries, forecast e inventario por SKU | Funcional |
-| Tests | **170 tests** unitarios e integración, 100% passing | Funcional |
-| Experimentación | `exp_02_catalog_eval.py`, `exp_03_param_sweep.py` — evaluación batch + barrido h×n_windows | Funcional |
-| Notebooks | `02_catalog_evaluation.ipynb` — análisis post-evaluación batch | Funcional |
+| Componente                            | Descripción                                                                                                               | Estado              |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| Generador de datos                    | Series diarias con 10 patrones de demanda, multi-perfil                                                                    | Funcional           |
+| Modelo de datos (7 tablas)            | Catálogo, transacciones, snapshots inventario, OC, recepciones, transferencias                                            | Funcional           |
+| `planning_core`                     | Repository, servicios, agregaciones y health checks básicos                                                               | Funcional           |
+| Clasificación de demanda             | Syntetos-Boylan, ABC-XYZ, estacionalidad, tendencia, outliers, quality score, censura                                      | Funcional           |
+| Preprocessing                         | Limpieza de outliers (IQR/Hampel) y detección de demanda censurada por stockout                                           | Funcional           |
+| Modelos de forecast                   | AutoETS, AutoARIMA, MSTL, CrostonSBA, ADIDA, SeasonalNaive, LightGBM                                                       | Funcional           |
+| Backtest + selector                   | `run_backtest` expanding-window, horse-race multi-métrica (MASE + RMSSE tiebreak + filtro de sesgo), ensemble top-k, bias correction, h dinámico por SKU | Funcional           |
+| Evaluación de catálogo              | `run_catalog_evaluation` — horse-race masivo en paralelo, checkpoints, resume                                           | Funcional           |
+| Comparación de runs                  | `run_store`, `aggregator`, `comparator` — persistencia y análisis multi-run                                        | Funcional           |
+| `PlanningService.sku_forecast()`    | Selección automática de modelo + forecast por SKU                                                                        | Funcional           |
+| **Módulo de inventario**       | Parámetros por SKU, Safety Stock (3 métodos), ROP, nivel de servicio CSL                                                 | **Funcional** |
+| **Diagnóstico de salud**       | `diagnose_sku`, ratio de posicionamiento, P(quiebre), bandas de alerta, texto explicativo                                | **Funcional** |
+| **`catalog_health_report()`** | Diagnóstico masivo del catálogo con métricas financieras (capital exceso/riesgo)                                        | **Funcional** |
+| UI                                    | Clasificación, Forecast (IC 80%, backtest),**Inventario por SKU**, **Health tab**                             | Funcional           |
+| API                                   | Endpoints REST para catálogo, locations, summary, supply, clasificación, timeseries y forecast por SKU                   | Funcional           |
+| Tests                                 | **220+ tests** unitarios e integración. Suite verde. Cobertura amplia en forecasting, inventory, clasificación y servicios | Funcional           |
+| Experimentación                      | `exp_02_catalog_eval.py`, `exp_03_param_sweep.py` — evaluación batch + barrido h×n_windows                          | Funcional           |
+| Notebooks                             | `02_catalog_evaluation.ipynb` — análisis post-evaluación batch; notebook reproducible del sweep aún pendiente        | Parcial             |
 
 ### Resultado del barrido de parametrización (2026-03-25)
 
@@ -48,19 +48,25 @@ Se evaluó un grid de 6 configuraciones (h ∈ {3,6}, n_windows ∈ {3..6}) sobr
 **Config de producción decidida: `h=3, n_windows=3`** — mejor MASE global (0.7475), menor fallback (4.6%), máxima cobertura.
 Ver `docs/forecasting_param_sweep_results.md` para el análisis completo.
 
+Nota:
+
+- Esa configuración aplica al experimento batch y a la evaluación comparativa del catálogo.
+- En serving, `PlanningService.sku_forecast()` ya deriva `h` por SKU desde `lead_time_days` cuando no se entrega explícitamente.
+
 ### Qué viene a continuación
 
 - Motor de recomendación de compra (Fase 5): generación de órdenes de compra sugeridas con ROP/s-S/s-Q + MOQ + forecast
 - Prophet / NeuralProphet para estacionalidad compleja con calendarios (Fase 3.4)
 - Métricas operacionales para intermittent/lumpy: Fill Rate, Cycle Service Level (D18)
-- Fortalecimiento de `validation.py` y cobertura de tests por capa (D08, D09, D26, D27)
+- Fortalecimiento de `validation.py` y cobertura de tests por capa (D08, D09)
+- Alinear documentación, tests y selector actual para recuperar consistencia del repo (D34)
 
 ## Estructura del repositorio
 
 ```
 SOTA-Simulated-Planning/
 ├── apps/
-│   ├── api/                     # API REST (FastAPI) — catálogo, clasificación, forecast, inventario
+│   ├── api/                     # API REST (FastAPI) — catálogo, clasificación, supply y forecast
 │   ├── simulator/               # Generador del dataset canónico
 │   └── viz/                     # UI exploratoria (Streamlit) — clasificación, forecast, inventario, health
 ├── planning_core/
@@ -75,7 +81,7 @@ SOTA-Simulated-Planning/
 │   │   ├── safety_stock.py      # Safety Stock (extended/standard/simple), ROP, SafetyStockResult
 │   │   └── diagnostics.py       # diagnose_sku, InventoryDiagnosis, bandas de salud, P(quiebre)
 │   └── forecasting/
-│       ├── metrics.py           # MASE adaptativo, WMAPE, RMSSE, WAPE, Bias, MAE, RMSE
+│       ├── metrics.py           # MASE adaptativo, WMAPE, RMSSE, WAPE, Bias, Fill Rate, MAE, RMSE
 │       ├── backtest.py          # run_backtest expanding-window
 │       ├── selector.py          # select_and_forecast — horse-race completo
 │       ├── utils.py             # FREQ_MAP, to_nixtla_df
@@ -86,7 +92,7 @@ SOTA-Simulated-Planning/
 │   └── exp_03_param_sweep.py    # Barrido de parametrización h x n_windows
 ├── notebooks/
 │   └── 02_catalog_evaluation.ipynb  # Análisis post-evaluación batch
-├── tests/                       # 170 tests unitarios e integración
+├── tests/                       # 220+ tests unitarios e integración
 ├── output/                      # Datos generados (CSVs canónicos versionados)
 ├── pyproject.toml               # Dependencias por capa via extras
 └── docs/
@@ -110,44 +116,46 @@ El generador produce **3 años de datos diarios** (2022-2024) para un catálogo 
 
 **Tablas de salida** (en `output/`):
 
-| Archivo | Descripción | Clave |
-|---|---|---|
-| `product_catalog.csv` | Maestro de productos (SKU, categoría, proveedor, precio, costo, MOQ) | `sku` |
-| `transactions.csv` | Transacciones reales de salida por SKU y ubicación | `date + sku + location` |
-| `inventory_snapshot.csv` | Posición diaria de inventario por SKU y ubicación | `snapshot_date + sku + location` |
-| `internal_transfers.csv` | Traslados internos entre nodo central y sucursales | `transfer_id` |
-| `purchase_orders.csv` | Cabeceras de órdenes de compra | `po_id` |
-| `purchase_order_lines.csv` | Detalle de productos por orden de compra | `po_line_id` |
-| `purchase_receipts.csv` | Recepciones efectivas de mercadería | `receipt_id` |
+| Archivo                      | Descripción                                                          | Clave                              |
+| ---------------------------- | --------------------------------------------------------------------- | ---------------------------------- |
+| `product_catalog.csv`      | Maestro de productos (SKU, categoría, proveedor, precio, costo, MOQ) | `sku`                            |
+| `transactions.csv`         | Transacciones reales de salida por SKU y ubicación                   | `date + sku + location`          |
+| `inventory_snapshot.csv`   | Posición diaria de inventario por SKU y ubicación                   | `snapshot_date + sku + location` |
+| `internal_transfers.csv`   | Traslados internos entre nodo central y sucursales                    | `transfer_id`                    |
+| `purchase_orders.csv`      | Cabeceras de órdenes de compra                                       | `po_id`                          |
+| `purchase_order_lines.csv` | Detalle de productos por orden de compra                              | `po_line_id`                     |
+| `purchase_receipts.csv`    | Recepciones efectivas de mercadería                                  | `receipt_id`                     |
 
 ### Patrones de demanda simulados
 
 El generador cubre los cuatro cuadrantes de la clasificación Syntetos-Boylan más patrones adicionales:
 
-| Patrón | ADI | CV | Descripción |
-|---|---|---|---|
-| constant | < 1.32 | 0.05 - 0.20 | Demanda estable y predecible |
-| smooth | < 1.32 | 0.15 - 0.35 | Regular con variación moderada |
-| erratic | < 1.32 | 0.50 - 1.30 | Frecuente pero con volumen variable |
-| seasonal | < 1.32 | 0.30 - 0.65 | Con estacionalidad marcada |
-| trend_up | < 1.32 | 0.10 - 0.35 | Tendencia creciente |
-| trend_down | < 1.32 | 0.10 - 0.35 | Tendencia decreciente |
-| intermittent | >= 1.32 | 0.05 - 0.35 | Esporádica, volumen similar |
-| lumpy | >= 1.32 | 0.60 - 1.80 | Esporádica y volumen muy variable |
-| new_product | variable | 0.30 - 0.80 | Rampa de lanzamiento |
-| project_driven | variable | 0.50 - 1.20 | Demanda por proyecto |
+| Patrón        | ADI      | CV          | Descripción                        |
+| -------------- | -------- | ----------- | ----------------------------------- |
+| constant       | < 1.32   | 0.05 - 0.20 | Demanda estable y predecible        |
+| smooth         | < 1.32   | 0.15 - 0.35 | Regular con variación moderada     |
+| erratic        | < 1.32   | 0.50 - 1.30 | Frecuente pero con volumen variable |
+| seasonal       | < 1.32   | 0.30 - 0.65 | Con estacionalidad marcada          |
+| trend_up       | < 1.32   | 0.10 - 0.35 | Tendencia creciente                 |
+| trend_down     | < 1.32   | 0.10 - 0.35 | Tendencia decreciente               |
+| intermittent   | >= 1.32  | 0.05 - 0.35 | Esporádica, volumen similar        |
+| lumpy          | >= 1.32  | 0.60 - 1.80 | Esporádica y volumen muy variable  |
+| new_product    | variable | 0.30 - 0.80 | Rampa de lanzamiento                |
+| project_driven | variable | 0.50 - 1.20 | Demanda por proyecto                |
 
 ### Perfiles disponibles
 
 Se seleccionan cambiando `PROFILE` en `apps/simulator/config.py`:
 
 **Industrial** (`"industrial"`) — Oleohidráulica:
+
 - 800 productos, 6 ubicaciones (Santiago, Antofagasta, Copiapó, Concepción, Lima + CD Santiago)
 - 12 categorías (bombas hidráulicas, motores, válvulas, filtros, instrumentación, etc.)
 - Precios: 5,000 - 8,000,000 CLP
 - Lead times por proveedor: 21 - 180 días (distribuidor local → importación Asia)
 
 **Retail** (`"retail"`) — Supermercado:
+
 - 1,200 productos, 10 tiendas
 - 8 categorías (bebidas, lácteos, snacks, limpieza, etc.)
 - Precios: 300 - 15,000 CLP
@@ -230,27 +238,28 @@ Implementado en `planning_core/inventory/` siguiendo el documento "Gestión de I
 
 ### Safety Stock (3 métodos según clase ABC)
 
-| Método | Clase | Fórmula |
-|---|---|---|
-| `extended` | A | `SS = z × √((LT+R)×σ_d² + d̄²×σ_LT²)` — incorpora variabilidad de lead time |
-| `standard` | B | `SS = z × σ_d × √(LT+R)` — lead time fijo |
-| `simple_pct_lt` | C | `SS = pct × d̄ × LT` — regla simple sin factor z |
+| Método           | Clase | Fórmula                                                                                 |
+| ----------------- | ----- | ---------------------------------------------------------------------------------------- |
+| `extended`      | A     | `SS = z × √((LT+R)×σ_d² + d̄²×σ_LT²)` — incorpora variabilidad de lead time |
+| `standard`      | B     | `SS = z × σ_d × √(LT+R)` — lead time fijo                                         |
+| `simple_pct_lt` | C     | `SS = pct × d̄ × LT` — regla simple sin factor z                                   |
 
 ### Diagnóstico de salud (bandas de ratio §2.3)
 
-| Ratio (Cob. neta / Cob. objetivo) | Estado | Alerta |
-|---|---|---|
-| < 0.3 | quiebre_inminente | 🔴 rojo |
-| 0.3 – 0.7 | substock | 🟠 naranja |
-| 0.7 – 1.3 | equilibrio | ✅ none |
-| 1.3 – 2.0 | sobrestock_leve | 🟡 amarillo |
-| > 2.0 | sobrestock_crítico | ⚫ gris |
+| Ratio (Cob. neta / Cob. objetivo) | Estado              | Alerta      |
+| --------------------------------- | ------------------- | ----------- |
+| < 0.3                             | quiebre_inminente   | 🔴 rojo     |
+| 0.3 – 0.7                        | substock            | 🟠 naranja  |
+| 0.7 – 1.3                        | equilibrio          | ✅ none     |
+| 1.3 – 2.0                        | sobrestock_leve     | 🟡 amarillo |
+| > 2.0                             | sobrestock_crítico | ⚫ gris     |
 
 `P(quiebre)` calculada vía distribución Normal acumulada sobre la demanda durante el ciclo de reposición (LT+R).
 
 ### Health Status Report
 
 `catalog_health_report()` recorre todo el catálogo activo y retorna un DataFrame con:
+
 - Diagnóstico completo por SKU (ratio, estado, P(quiebre), SS, ROP)
 - Métricas financieras: `excess_capital` (capital inmovilizado) y `stockout_capital` (capital en riesgo)
 - Agrupación por proveedor, categoría, subcategoría y clase ABC
@@ -260,6 +269,7 @@ La **vista Health** en la UI muestra: KPI strip, scatter de posicionamiento, his
 ## Modelo de datos
 
 El modelo relacional sigue la convención operativa:
+
 - **Salidas** = `transactions.csv` (ventas/consumo realmente registrados)
 - **Entradas** = `purchase_receipts.csv` (recepciones de compra)
 - **Reabastecimiento interno** = `internal_transfers.csv`
@@ -306,51 +316,59 @@ Ver [docs/output_er_model.md](docs/output_er_model.md) para el diagrama E/R comp
 ## Roadmap técnico
 
 ### Fase 0 — Generación de datos ✅ Completa
-- [x] Generador de datos sintéticos multi-perfil
-- [x] Modelo de datos relacional (7 tablas)
-- [x] Documentación de esquema E/R
+
+- [X] Generador de datos sintéticos multi-perfil
+- [X] Modelo de datos relacional (7 tablas)
+- [X] Documentación de esquema E/R
 
 ### Fase 1 — Clasificación y preprocesamiento ✅ Completa
-- [x] Clasificador ADI-CV² (Syntetos-Boylan) desde `transactions`
-- [x] Segmentación ABC-XYZ calculada
-- [x] Test de estacionalidad por autocorrelación
-- [x] Test de tendencia por Mann-Kendall
-- [x] Detección y tratamiento de outliers (`IQR`, `Hampel`)
-- [x] Quality score con penalización por censura
-- [x] Detección de demanda censurada (stockout detection via inventory snapshot)
+
+- [X] Clasificador ADI-CV² (Syntetos-Boylan) desde `transactions`
+- [X] Segmentación ABC-XYZ calculada
+- [X] Test de estacionalidad por autocorrelación
+- [X] Test de tendencia por Mann-Kendall
+- [X] Detección y tratamiento de outliers (`IQR`, `Hampel`)
+- [X] Quality score con penalización por censura
+- [X] Detección de demanda censurada (stockout detection via inventory snapshot)
 
 ### Fase 2 — Forecasting base ✅ Completa
-- [x] `AutoETS`, `AutoARIMA`, `MSTL`, `CrostonSBA`, `ADIDA`, `SeasonalNaive`, `LightGBM`
-- [x] Métricas: `MASE` adaptativo (lag-1/lag-12/mean), `WMAPE`, `RMSSE`, `WAPE`, `Bias`, `MAE`, `RMSE`
-- [x] Backtest expanding-window + selector horse-race
-- [x] `PlanningService.sku_forecast()` + API + UI
+
+- [X] `AutoETS`, `AutoARIMA`, `MSTL`, `CrostonSBA`, `ADIDA`, `SeasonalNaive`, `LightGBM`
+- [X] Métricas: `MASE` adaptativo (lag-1/lag-12/mean), `WMAPE`, `RMSSE`, `WAPE`, `Bias`, `Fill Rate`, `MAE`, `RMSE`
+- [X] Backtest expanding-window + selector horse-race
+- [X] `PlanningService.sku_forecast()` + API + UI
 
 ### Fase 2.5 — Evaluación de catálogo ✅ Completa
-- [x] `run_catalog_evaluation` en paralelo con checkpoints y resume
-- [x] Persistencia de runs, aggregator, comparator
-- [x] Barrido h×n_windows; config fijada: `h=3, n_windows=3`
+
+- [X] `run_catalog_evaluation` en paralelo con checkpoints y resume
+- [X] Persistencia de runs, aggregator, comparator
+- [X] Barrido h×n_windows; config fijada: `h=3, n_windows=3`
 
 ### Fase 3 — Forecasting avanzado ✅ Parcialmente completa
-- [x] AutoARIMA / SARIMA automático
-- [x] MSTL — descomposición STL + AutoETS
-- [x] LightGBM con features temporales vía MLForecast
+
+- [X] AutoARIMA / SARIMA automático
+- [X] MSTL — descomposición STL + AutoETS
+- [X] LightGBM con features temporales vía MLForecast
 - [ ] Prophet / NeuralProphet para estacionalidad compleja con calendarios
 
 ### Fase 4 — Inventario y gestión de stock ✅ Completa
-- [x] Parámetros por SKU: lead time real por proveedor, período de revisión por ABC, σ_LT
-- [x] Nivel de servicio CSL por segmento ABC + factor z
-- [x] Safety Stock: método `extended` (A), `standard` (B), `simple_pct_lt` (C)
-- [x] ROP = DDLT + SS
-- [x] `diagnose_sku`: ratio de posicionamiento, bandas de salud, P(quiebre), textos explicativos
-- [x] `catalog_health_report()`: diagnóstico masivo con métricas financieras
-- [x] UI: subsección "Inventario" en detalle de SKU + vista "Health" con radar multidimensional
+
+- [X] Parámetros por SKU: lead time real por proveedor, período de revisión por ABC, σ_LT
+- [X] Nivel de servicio CSL por segmento ABC + factor z
+- [X] Safety Stock: método `extended` (A), `standard` (B), `simple_pct_lt` (C)
+- [X] ROP = DDLT + SS
+- [X] `diagnose_sku`: ratio de posicionamiento, bandas de salud, P(quiebre), textos explicativos
+- [X] `catalog_health_report()`: diagnóstico masivo con métricas financieras
+- [X] UI: subsección "Inventario" en detalle de SKU + vista "Health" con radar multidimensional
 
 ### Fase 5 — Motor de recomendación de compra
+
 - [ ] Generación de órdenes de compra sugeridas (ROP/s-S/s-Q + MOQ)
 - [ ] Input: diagnóstico de salud + forecast (`yhat_hi80`) + lead time + MOQ
 - [ ] Output: tabla de órdenes recomendadas por SKU con fecha y cantidad
 
 ### Fase 6 — Pipeline y producción
+
 - [ ] Orquestación end-to-end
 - [ ] Monitoreo de concept drift
 - [ ] Reconciliación jerárquica
@@ -358,17 +376,17 @@ Ver [docs/output_er_model.md](docs/output_er_model.md) para el diagrama E/R comp
 
 ## Stack tecnológico
 
-| Componente | Tecnología |
-|---|---|
-| Lenguaje | Python 3.9+ |
-| Modelos clásicos | StatsForecast (Nixtla) |
-| Modelos ML | MLForecast + LightGBM |
-| Modelos DL (futuro) | NeuralForecast (Nixtla) |
-| Detección de outliers | pyod, STL manual |
-| Datos | pandas, numpy |
-| Visualización | Streamlit + plotly |
-| API | FastAPI + uvicorn |
-| Tests | pytest (170 tests) |
+| Componente             | Tecnología             |
+| ---------------------- | ----------------------- |
+| Lenguaje               | Python 3.9+             |
+| Modelos clásicos      | StatsForecast (Nixtla)  |
+| Modelos ML             | MLForecast + LightGBM   |
+| Modelos DL (futuro)    | NeuralForecast (Nixtla) |
+| Detección de outliers | pyod, STL manual        |
+| Datos                  | pandas, numpy           |
+| Visualización         | Streamlit + plotly      |
+| API                    | FastAPI + uvicorn       |
+| Tests                  | pytest (220+ tests)     |
 
 ## Referencias
 
