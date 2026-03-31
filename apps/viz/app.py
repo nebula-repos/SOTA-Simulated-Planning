@@ -2073,7 +2073,7 @@ def _render_sku_section_forecast(service: PlanningService, selected_sku: str):
     mase_val = result.get("mase")
     mase_str = f"{mase_val:.3f}" if (mase_val is not None and not math.isnan(mase_val)) else "N/A"
     kpi_cols[2].metric("MASE", mase_str)
-    wape_val = winner_metrics.get("wape")
+    wape_val = winner_metrics.get("wmape")
     wape_str = f"{wape_val:.1%}" if (wape_val is not None and not math.isnan(wape_val)) else "N/A"
     kpi_cols[3].metric("WAPE", wape_str)
     rmse_val = winner_metrics.get("rmse")
@@ -2155,7 +2155,7 @@ def _render_sku_section_forecast(service: PlanningService, selected_sku: str):
             st.write("Comparacion de modelos (backtest)")
             summary_df = backtest_summary(backtest_data)
             summary_df = summary_df.reindex(
-                columns=["model", "mase", "wape", "rmse", "bias", "n_windows", "status"],
+                columns=["model", "mase", "wmape", "rmse", "bias", "n_windows", "status"],
                 fill_value=np.nan,
             )
             render_copyable_dataframe(

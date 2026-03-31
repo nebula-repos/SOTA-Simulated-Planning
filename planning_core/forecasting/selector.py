@@ -264,6 +264,7 @@ def select_and_forecast(
     cv_df = backtest_results.pop("__cv_df__", None)
 
     # 4. Horse-race LightGBM (camino separado, solo para series no intermitentes)
+    cv_df_lgbm = None
     if use_lgbm and sb_class not in _INTERMITTENT_CLASSES:
         n_obs = len(demand_df)
         if n_obs >= _MIN_OBS_LGBM_FACTOR * season_length:
@@ -276,7 +277,9 @@ def select_and_forecast(
                     unique_id=uid,
                     target_col=target_col,
                     naive_type=naive_type,
+                    return_cv=return_cv,
                 )
+                cv_df_lgbm = lgbm_results.pop("__cv_df_lgbm__", None)
                 backtest_results.update(lgbm_results)
             except Exception as _lgbm_exc:
                 warnings.warn(
@@ -284,6 +287,17 @@ def select_and_forecast(
                     "Continuando con candidatos estadísticos.",
                     stacklevel=2,
                 )
+
+    # Fusionar cv_df de LightGBM en el cv_df principal (para que aparezca en el horse-race)
+    if cv_df is not None and cv_df_lgbm is not None and "LightGBM" in cv_df_lgbm.columns:
+        try:
+            cv_df = cv_df.merge(
+                cv_df_lgbm[["ds", "cutoff", "LightGBM"]],
+                on=["ds", "cutoff"],
+                how="left",
+            )
+        except Exception:
+            pass  # si el merge falla, ignorar — no bloquear el flujo principal
 
     # 5. Elegir ganador con criterios multi-metrica
     best_model, best_mase, best_bias = _pick_winner(backtest_results)
@@ -302,13 +316,19 @@ def select_and_forecast(
 
         else:
             # Intentar ensemble si hay >= 2 candidatos dentro del umbral
-            ensemble_df = _apply_ensemble(
+            ensemble_df, ensemble_candidates = _apply_ensemble(
                 backtest_results, best_mase, demand_df, granularity, h, uid, target_col
             )
 
             if ensemble_df is not None:
                 best_model = "Ensemble"
                 forecast_df = ensemble_df
+                # Agregar columna "Ensemble" al cv_df promediando los candidatos constituyentes
+                if cv_df is not None and ensemble_candidates:
+                    valid_cols = [c for c in ensemble_candidates if c in cv_df.columns]
+                    if valid_cols:
+                        cv_df = cv_df.copy()
+                        cv_df["Ensemble"] = cv_df[valid_cols].clip(lower=0).mean(axis=1).clip(lower=0)
             else:
                 forecast_result = _fit_predict_model(
                     best_model, demand_df, granularity, h, uid, target_col
@@ -469,14 +489,14 @@ def _apply_ensemble(
     h: int,
     uid: str,
     target_col: str,
-) -> pd.DataFrame | None:
+) -> tuple[pd.DataFrame | None, list[str]]:
     """Genera forecast ensemble promediando los top-k modelos dentro del umbral MASE.
 
     Solo activa si hay >= 2 modelos con MASE <= best_mase * 1.25.
     Retorna None si el ensemble no aplica (candidatos insuficientes o fallos).
     """
     if math.isnan(best_mase):
-        return None
+        return None, []
 
     mase_ceiling = best_mase * _ENSEMBLE_MASE_THRESHOLD
     candidates = [
@@ -491,7 +511,7 @@ def _apply_ensemble(
     candidates = candidates[:_ENSEMBLE_MAX_K]
 
     if len(candidates) < 2:
-        return None
+        return None, []
 
     forecasts: list[pd.DataFrame] = []
     for name in candidates:
@@ -500,7 +520,7 @@ def _apply_ensemble(
             forecasts.append(result["forecast"])
 
     if len(forecasts) < 2:
-        return None
+        return None, []
 
     base = forecasts[0].copy()
     yhats = np.array([f["yhat"].values for f in forecasts])
@@ -511,7 +531,7 @@ def _apply_ensemble(
             vals = np.array([f[col].values for f in forecasts])
             base[col] = np.mean(vals, axis=0).clip(min=0)
 
-    return base
+    return base, candidates
 
 
 def _apply_bias_correction(forecast_df: pd.DataFrame, bias: float) -> pd.DataFrame:

@@ -193,6 +193,7 @@ def run_backtest_lgbm(
     unique_id: str = "SKU",
     target_col: str = "demand",
     naive_type: str = "seasonal",
+    return_cv: bool = False,
 ) -> dict:
     """Backtest expanding-window para LightGBM via MLForecast.
 
@@ -296,4 +297,7 @@ def run_backtest_lgbm(
     aggregated["n_windows"] = len(metrics_by_window)
     aggregated["h"] = h
 
-    return {MODEL_NAME: aggregated}
+    result = {MODEL_NAME: aggregated}
+    if return_cv:
+        result["__cv_df_lgbm__"] = cv_df
+    return result
