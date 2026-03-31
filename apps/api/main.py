@@ -284,6 +284,93 @@ def sku_acf(
 
 
 # ---------------------------------------------------------------------------
+# Motor de Decisión de Reposición (Fase 5)
+# ---------------------------------------------------------------------------
+
+@app.get("/purchase/summary")
+def purchase_summary(
+    granularity: Optional[str] = Query(default=None, description="Granularidad: M, W, D."),
+):
+    """KPIs ejecutivos del plan de reposición: quiebres, substocks, sobrestocks, capital en exceso."""
+    _check_granularity(granularity)
+    try:
+        return _sanitize(service.purchase_plan_summary(granularity=granularity))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=f"Repositorio no disponible: {exc}") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error al generar resumen de reposición: {exc}") from exc
+
+
+@app.get("/purchase/plan")
+def purchase_plan(
+    granularity: Optional[str] = Query(default=None, description="Granularidad: M, W, D."),
+    include_equilibrio: bool = Query(default=False, description="Incluir SKUs en equilibrio."),
+    include_sobrestock: bool = Query(default=True, description="Incluir SKUs en sobrestock."),
+    limit: int = Query(default=200, ge=1, le=1000),
+):
+    """Plan de reposición priorizado por urgency_score.
+
+    Incluye canal de compra (substock/quiebre con final_qty > 0) y
+    canal de exceso (sobrestock con excess_units, days_to_normal, excess_carrying_cost).
+    """
+    _check_granularity(granularity)
+    try:
+        return _sanitize(service.purchase_plan(
+            granularity=granularity,
+            include_equilibrio=include_equilibrio,
+            include_sobrestock=include_sobrestock,
+            limit=limit,
+        ))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=f"Repositorio no disponible: {exc}") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error al generar plan de reposición: {exc}") from exc
+
+
+@app.get("/purchase/plan/by-supplier")
+def purchase_plan_by_supplier(
+    granularity: Optional[str] = Query(default=None, description="Granularidad: M, W, D."),
+):
+    """Plan de compra consolidado por proveedor.
+
+    Solo incluye SKUs con final_qty > 0 (canal de compra activo).
+    Ordenado por urgency_score máximo del proveedor.
+    """
+    _check_granularity(granularity)
+    try:
+        return _sanitize(service.purchase_plan_by_supplier(granularity=granularity))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=f"Repositorio no disponible: {exc}") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error al agrupar plan por proveedor: {exc}") from exc
+
+
+@app.get("/sku/{sku}/purchase-recommendation")
+def sku_purchase_recommendation(
+    sku: str,
+    granularity: Optional[str] = Query(default=None, description="Granularidad: M, W, D."),
+):
+    """Recomendación de reposición individual para un SKU.
+
+    Más rápido que correr el plan completo del catálogo.
+    Retorna canal de compra o canal de exceso según el estado del SKU.
+    """
+    _check_granularity(granularity)
+    _require_sku(sku)
+    try:
+        result = service.sku_purchase_recommendation(sku, granularity=granularity)
+        if result is None:
+            raise HTTPException(status_code=404, detail=f"SKU no encontrado: {sku}")
+        return _sanitize(result)
+    except HTTPException:
+        raise
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=f"Repositorio no disponible: {exc}") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error al generar recomendación: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
 # Forecasting (Fase 2)
 # ---------------------------------------------------------------------------
 

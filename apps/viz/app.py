@@ -82,6 +82,10 @@ APP_NAV_ITEMS = {
         "label": "Alertas",
         "icon": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 21 20H3L12 4Z"/><path d="M12 9v4.5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>',
     },
+    "compras": {
+        "label": "Compras",
+        "icon": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
+    },
     "escenarios": {
         "label": "Escenarios",
         "icon": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="M12 3v18"/><path d="M4 7.5 12 12l8-4.5"/></svg>',
@@ -2791,6 +2795,24 @@ def _get_catalog_health(_service: PlanningService) -> "pd.DataFrame":
     return _service.catalog_health_report()
 
 
+@st.cache_data(show_spinner=False, ttl=1800)
+def _get_purchase_plan(_service: PlanningService) -> list[dict]:
+    """Wrapper cacheado para purchase_plan completo (incluye equilibrio y sobrestock, TTL 30 min)."""
+    return _service.purchase_plan(include_equilibrio=True, include_sobrestock=True, limit=1000)
+
+
+@st.cache_data(show_spinner=False, ttl=1800)
+def _get_purchase_plan_by_supplier(_service: PlanningService) -> list[dict]:
+    """Wrapper cacheado para purchase_plan_by_supplier (TTL 30 min)."""
+    return _service.purchase_plan_by_supplier()
+
+
+@st.cache_data(show_spinner=False, ttl=1800)
+def _get_purchase_summary(_service: PlanningService) -> dict:
+    """Wrapper cacheado para purchase_plan_summary (TTL 30 min)."""
+    return _service.purchase_plan_summary()
+
+
 _HEALTH_COLORS: dict[str, str] = {
     "quiebre_inminente": "#e74c3c",
     "substock":          "#e67e22",
@@ -3290,6 +3312,261 @@ def render_health_tab(service: PlanningService) -> None:
                 st.markdown(f"**{row['sku']}** — {row['diagnosis_text']}")
 
 
+def render_compras_tab(service: PlanningService) -> None:
+    """Vista del Motor de Decisión de Reposición (Fase 5).
+
+    Dos sub-vistas:
+    - Plan priorizado: tabla de recomendaciones con canal compra + canal exceso.
+    - Por proveedor: cards con SKUs agrupados por proveedor.
+    """
+    st.markdown("## Motor de Decisión de Reposición")
+    st.caption(
+        "Recomendaciones de compra priorizadas y alertas de exceso de inventario. "
+        "Canal compra (substock/quiebre) · Canal exceso (sobrestock). PDF §9.2, §11.3."
+    )
+
+    col_title, col_reload = st.columns([9, 1])
+    with col_reload:
+        if st.button("↺ Recargar", key="compras_reload", help="Limpia el cache y recalcula el plan"):
+            _get_purchase_plan.clear()
+            _get_purchase_plan_by_supplier.clear()
+            _get_purchase_summary.clear()
+            st.rerun()
+
+    with st.spinner("Generando plan de reposición..."):
+        summary = _get_purchase_summary(service)
+        plan_rows = _get_purchase_plan(service)
+        proposals = _get_purchase_plan_by_supplier(service)
+
+    if not plan_rows:
+        st.warning("No hay datos de catálogo disponibles para generar el plan de reposición.")
+        return
+
+    currency = service.currency_code()
+
+    def _fmt_money(v: float) -> str:
+        if v >= 1e9:
+            return f"{v/1e9:.1f}B {currency}"
+        if v >= 1e6:
+            return f"{v/1e6:.1f}M {currency}"
+        return f"{v/1e3:.0f}K {currency}"
+
+    # ------------------------------------------------------------------
+    # KPI strip
+    # ------------------------------------------------------------------
+    c0, c1, c2, c3, c4, c5, c6, c7 = st.columns(8)
+    c0.metric("Quiebre 🔴",       summary.get("sku_quiebre", 0))
+    c1.metric("Substock 🟠",      summary.get("sku_substock", 0))
+    c2.metric("Equilibrio 🟢",    summary.get("sku_equilibrio", 0))
+    c3.metric("Sobrestock 🟡⚫",  summary.get("sku_sobrestock", 0))
+    c4.metric("A ordenar",        summary.get("sku_to_order", 0),
+              help="SKUs con final_qty > 0 (canal compra activo)")
+    c5.metric("Unidades a pedir", f"{summary.get('total_units_to_order', 0):,.0f} u")
+    c6.metric("Costo estimado",   _fmt_money(summary.get("total_cost_estimate", 0)),
+              help="Estimación: final_qty × costo unitario")
+    c7.metric("Capital en exceso", _fmt_money(summary.get("total_excess_cost", 0)),
+              help="Costo de mantener exceso hasta consumo natural")
+
+    st.markdown("---")
+
+    # ------------------------------------------------------------------
+    # Sub-vista selector
+    # ------------------------------------------------------------------
+    sub_view = st.radio(
+        "Vista",
+        ["Plan priorizado", "Por proveedor"],
+        horizontal=True,
+        key="compras_sub_view",
+    )
+
+    plan_df = pd.DataFrame(plan_rows)
+
+    if sub_view == "Plan priorizado":
+        # ------------------------------------------------------------------
+        # FILTROS
+        # ------------------------------------------------------------------
+        fc0, fc1, fc2, fc3, fc4 = st.columns([1, 1, 1, 1, 2])
+
+        status_opts = ["quiebre_inminente", "substock", "equilibrio", "sobrestock_leve", "sobrestock_critico", "dead_stock"]
+        status_labels = {
+            "quiebre_inminente": "🔴 Quiebre", "substock": "🟠 Substock",
+            "equilibrio": "🟢 Equilibrio", "sobrestock_leve": "🟡 Sobrestock leve",
+            "sobrestock_critico": "⚫ Sobrestock crítico", "dead_stock": "⬛ Dead stock",
+        }
+        available_statuses = [s for s in status_opts if s in plan_df["health_status"].values]
+        default_statuses = [s for s in ["quiebre_inminente", "substock"] if s in available_statuses]
+        sel_status = fc0.multiselect(
+            "Estado",
+            available_statuses,
+            default=default_statuses,
+            format_func=lambda s: status_labels.get(s, s),
+            key="cp_status",
+        )
+        abc_opts = sorted(plan_df["abc_class"].dropna().unique().tolist())
+        sel_abc = fc1.multiselect("ABC", abc_opts, default=abc_opts, key="cp_abc")
+
+        supplier_opts = sorted(plan_df["supplier"].dropna().unique().tolist())
+        sel_supplier = fc2.multiselect("Proveedor", supplier_opts, key="cp_supplier")
+
+        only_buy = fc3.checkbox("Solo canal compra", value=True, key="cp_only_buy",
+                                help="Muestra solo SKUs con final_qty > 0")
+
+        search_sku = fc4.text_input("Buscar SKU / nombre", key="cp_search")
+
+        # Aplicar filtros
+        mask = pd.Series([True] * len(plan_df), index=plan_df.index)
+        if sel_status:
+            mask &= plan_df["health_status"].isin(sel_status)
+        if sel_abc:
+            mask &= plan_df["abc_class"].isin(sel_abc)
+        if sel_supplier:
+            mask &= plan_df["supplier"].isin(sel_supplier)
+        if only_buy:
+            mask &= plan_df["final_qty"] > 0
+        if search_sku:
+            term = search_sku.upper()
+            mask &= (
+                plan_df["sku"].str.contains(term, case=False, na=False) |
+                plan_df["name"].str.contains(term, case=False, na=False)
+            )
+        filtered = plan_df[mask].copy()
+        st.caption(f"{len(filtered)} SKUs mostrados.")
+
+        # ------------------------------------------------------------------
+        # Tabla principal
+        # ------------------------------------------------------------------
+        if filtered.empty:
+            st.info("Sin resultados con los filtros aplicados.")
+        else:
+            display_cols = {
+                "sku":                  "SKU",
+                "name":                 "Producto",
+                "supplier":             "Proveedor",
+                "abc_class":            "ABC",
+                "health_status":        "Estado",
+                "alert_level":          "Alerta",
+                "urgency_score":        "Urgencia",
+                "stockout_probability": "P(quiebre)",
+                "stock_efectivo":       "Stock ef. (u)",
+                "reorder_point":        "ROP (u)",
+                "moq":                  "MOQ",
+                "final_qty":            "A pedir (u)",
+                "order_deadline":       "Deadline",
+                "excess_units":         "Exceso (u)",
+                "days_to_normal":       "Días consumo",
+                "excess_carrying_cost": f"Costo exceso ({currency})",
+                "action":               "Acción",
+            }
+            avail = [c for c in display_cols if c in filtered.columns]
+            table_df = filtered[avail].rename(columns={c: display_cols[c] for c in avail}).copy()
+
+            if "Urgencia" in table_df:
+                table_df["Urgencia"] = table_df["Urgencia"].round(1)
+            if "P(quiebre)" in table_df:
+                table_df["P(quiebre)"] = (table_df["P(quiebre)"] * 100).round(1).astype(str) + "%"
+            if "Alerta" in table_df:
+                table_df["Alerta"] = table_df["Alerta"].map(_ALERT_EMOJI).fillna("—") + " " + table_df["Alerta"].fillna("—")
+            if "Estado" in table_df:
+                table_df["Estado"] = table_df["Estado"].map(_HEALTH_LABELS).fillna(table_df["Estado"])
+            for col in ["Stock ef. (u)", "ROP (u)", "MOQ", "A pedir (u)", "Exceso (u)"]:
+                if col in table_df:
+                    table_df[col] = table_df[col].round(0).astype("Int64")
+            if "Días consumo" in table_df:
+                table_df["Días consumo"] = table_df["Días consumo"].round(1)
+            if f"Costo exceso ({currency})" in table_df:
+                table_df[f"Costo exceso ({currency})"] = table_df[f"Costo exceso ({currency})"].round(0).astype("Int64")
+
+            st.dataframe(table_df, hide_index=True, height=460, use_container_width=True)
+
+            # Textos de acción para los 5 más urgentes
+            urgentes = filtered[filtered["final_qty"] > 0].nlargest(5, "urgency_score")
+            if not urgentes.empty:
+                with st.expander("Acciones recomendadas — top 5 más urgentes (§11.5)"):
+                    for _, row in urgentes.iterrows():
+                        emoji = _ALERT_EMOJI.get(row.get("alert_level", ""), "◦")
+                        st.markdown(f"{emoji} **{row['sku']}** — {row['action']}")
+                        st.caption(row.get("diagnosis_text", ""))
+
+            # Acceso rápido al detalle del SKU
+            st.markdown("---")
+            st.caption("Ir al detalle de inventario de un SKU:")
+            jump_sku = st.selectbox(
+                "Ir al SKU",
+                options=[""] + filtered["sku"].tolist(),
+                key="cp_jump",
+            )
+            if jump_sku:
+                st.session_state["selected_sku"] = jump_sku
+                st.session_state["sku_section"] = "inventario"
+                st.query_params["view"] = "catalogo"
+                st.rerun()
+
+    else:  # Por proveedor
+        # ------------------------------------------------------------------
+        # Cards por proveedor
+        # ------------------------------------------------------------------
+        if not proposals:
+            st.info("No hay órdenes de compra pendientes para ningún proveedor.")
+            return
+
+        st.caption(f"{len(proposals)} proveedores con órdenes pendientes.")
+
+        for prop in proposals:
+            supplier_name = prop.get("supplier") or "Sin proveedor"
+            sku_count = prop.get("sku_count", 0)
+            total_units = prop.get("total_units", 0.0)
+            total_cost = prop.get("total_cost_estimate", 0.0)
+            max_score = prop.get("max_urgency_score", 0.0)
+            alert_levels = prop.get("alert_levels", [])
+
+            # Color borde según alerta más severa
+            border_color = "#e74c3c" if "rojo" in alert_levels else (
+                "#e67e22" if "naranja" in alert_levels else "#95a5a6"
+            )
+            alert_badges = " ".join(_ALERT_EMOJI.get(a, "") for a in alert_levels)
+
+            with st.expander(
+                f"{alert_badges} **{supplier_name}** — {sku_count} SKUs · {total_units:,.0f} u · {_fmt_money(total_cost)}",
+                expanded=(max_score >= 60),
+            ):
+                skus_list = prop.get("skus", [])
+                if not skus_list:
+                    st.caption("Sin SKUs.")
+                    continue
+
+                # Mini-tabla de SKUs del proveedor
+                mini_rows = []
+                for s in skus_list:
+                    mini_rows.append({
+                        "SKU": s.get("sku", ""),
+                        "Producto": s.get("name", ""),
+                        "ABC": s.get("abc_class", ""),
+                        "Alerta": _ALERT_EMOJI.get(s.get("alert_level", ""), "—"),
+                        "P(quiebre)": f"{s.get('stockout_probability', 0)*100:.1f}%",
+                        "Stock ef.": int(s.get("stock_efectivo", 0)),
+                        "ROP": int(s.get("reorder_point", 0)),
+                        "A pedir": int(s.get("final_qty", 0)),
+                        "MOQ": int(s.get("moq", 1)),
+                        "Deadline": s.get("order_deadline") or "—",
+                        "Urgencia": round(s.get("urgency_score", 0), 1),
+                        "Acción": s.get("action", ""),
+                    })
+                mini_df = pd.DataFrame(mini_rows)
+                st.dataframe(mini_df, hide_index=True, use_container_width=True, height=min(200 + 40 * len(mini_rows), 420))
+
+                # Ir al SKU
+                sel = st.selectbox(
+                    "Ir al detalle del SKU",
+                    options=[""] + [s.get("sku", "") for s in skus_list],
+                    key=f"cp_prov_jump_{supplier_name}",
+                )
+                if sel:
+                    st.session_state["selected_sku"] = sel
+                    st.session_state["sku_section"] = "inventario"
+                    st.query_params["view"] = "catalogo"
+                    st.rerun()
+
+
 def render_future_view(title: str, description: str):
     st.markdown(f"## {title}")
     st.info(description)
@@ -3304,6 +3581,7 @@ def render_sidebar_navigation(service: PlanningService) -> str:
         "clasificacion": "◎ Clasificacion",
         "health": "◈ Health",
         "alertas": "◇ Alertas",
+        "compras": "⊡ Compras",
         "escenarios": "△ Escenarios",
     }
     nav_options_compact = {
@@ -3312,6 +3590,7 @@ def render_sidebar_navigation(service: PlanningService) -> str:
         "clasificacion": "◎",
         "health": "◈",
         "alertas": "◇",
+        "compras": "⊡",
         "escenarios": "△",
     }
     nav_options = nav_options_compact if compact else nav_options_full
@@ -3374,6 +3653,8 @@ def main():
             "Alertas",
             "Vista reservada para alertas operacionales y de calidad. Aún no está implementada en esta UI experimental.",
         )
+    elif current_view == "compras":
+        render_compras_tab(service)
     else:
         render_future_view(
             "Escenarios",

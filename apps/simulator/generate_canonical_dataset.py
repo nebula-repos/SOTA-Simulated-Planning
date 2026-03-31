@@ -20,7 +20,7 @@ from apps.simulator.config import (
     RANDOM_SEED, N_PRODUCTS, START_DATE, END_DATE, OUTPUT_DIR, PROFILE, CURRENCY,
     LOCATIONS, BRANDS, CATEGORIES, DEMAND_PATTERNS,
     ABC_RATIOS, BASE_DEMAND_RANGES,
-    SUPPLIER_PROFILES, MOQ_CHOICES, EXTRA_FIELD_NAME, EXTRA_FIELD_CHOICES,
+    SUPPLIER_PROFILES, MOQ_CHOICES, MOQ_CHOICES_BY_ABC, EXTRA_FIELD_NAME, EXTRA_FIELD_CHOICES,
     CENTRAL_NODE_SALES_MODE, CENTRAL_NODE_SALES_PROBABILITY_BY_ABC, CENTRAL_NODE_SALES_FACTOR_RANGE,
     CENTRAL_SUPPLY_MODE, CENTRAL_LOCATION, INTERNAL_TRANSFER_PROFILES,
     SEASONALITY_PROFILES, SEASON_STRENGTH_RANGES, DOW_MAP, WEEKDAY_FRACTION,
@@ -35,6 +35,13 @@ from apps.simulator.config import (
 
 np.random.seed(RANDOM_SEED)
 random.seed(RANDOM_SEED)
+
+# ---------------------------------------------------------------------------
+# Distribución de posicionamiento de inventario objetivo
+# Controla el mix de health_status en el snapshot final generado.
+# ---------------------------------------------------------------------------
+_POSITIONING_LABELS  = ["quiebre_inminente", "substock", "equilibrio", "sobrestock_leve", "sobrestock_critico"]
+_POSITIONING_WEIGHTS = [0.12,                 0.22,       0.31,         0.23,               0.12]
 
 
 def build_public_catalog(catalog):
@@ -147,8 +154,36 @@ def generate_purchase_data_direct(catalog, daily_demand_by_sku_location, daily_p
         seed_window = min(horizon_days, max(history_days, lead_time_days, 14))
         initial_forecast = max(float(np.mean(demand[:seed_window])), 0.05)
         initial_cover_days = lead_time_days + review_days + safety_days
+
+        # --- Posicionamiento de inventario objetivo (mismo esquema que central) ---
+        positioning = product.get("stock_positioning", "equilibrio")
+        _cover_days_d = lead_time_days + safety_days + review_days
+        if positioning == "quiebre_inminente":
+            _depletion_days_d = max(30, int(0.80 * _cover_days_d))
+            suppression_start_day_d = max(0, horizon_days - lead_time_days - _depletion_days_d)
+        elif positioning == "substock":
+            _depletion_days_d = max(14, int(0.40 * _cover_days_d))
+            suppression_start_day_d = max(0, horizon_days - lead_time_days - _depletion_days_d)
+        else:
+            suppression_start_day_d = horizon_days
+        extra_order_day_d = -1
+        extra_order_placed_d = False
+        extra_order_factor_d = 0.0
+        if positioning == "sobrestock_leve":
+            extra_order_day_d = max(0, horizon_days - max(lead_time_days // 2, 15) - 30)
+            extra_order_factor_d = 1.5
+        elif positioning == "sobrestock_critico":
+            extra_order_day_d = max(0, horizon_days - max(lead_time_days // 2, 15) - 20)
+            extra_order_factor_d = 3.0
+        if positioning in ("quiebre_inminente", "substock"):
+            _init_factor = random.uniform(0.85, 1.10)
+        elif positioning in ("sobrestock_leve", "sobrestock_critico"):
+            _init_factor = random.uniform(1.10, 1.40)
+        else:
+            _init_factor = random.uniform(1.05, 1.35)
+
         on_hand = ceil_to_multiple(
-            initial_forecast * initial_cover_days * random.uniform(1.05, 1.35),
+            initial_forecast * initial_cover_days * _init_factor,
             moq,
         )
         on_order = 0
@@ -184,7 +219,41 @@ def generate_purchase_data_direct(catalog, daily_demand_by_sku_location, daily_p
             target_level = forecast_daily_demand * (lead_time_days + safety_days + review_days)
             inventory_position = on_hand + on_order
 
-            if inventory_position <= reorder_point:
+            # OC extra para sobrestock
+            if not extra_order_placed_d and extra_order_day_d >= 0 and day_idx == extra_order_day_d:
+                extra_order_placed_d = True
+                eq = ceil_to_multiple(max(int(target_level * extra_order_factor_d), moq), moq)
+                uc = float(round(base_cost * random.uniform(0.97, 1.08), 0))
+                ep_id = build_document_id("PO", current_date, po_counter)
+                po_counter += 1
+                ep_line_id = f"{ep_id}-L01"
+                ep_receipt_date = current_date + pd.Timedelta(days=lead_time_days)
+                ep_actual_lt = sample_actual_lead_time(lead_time_days)
+                ep_ridx = day_idx + ep_actual_lt
+                ep_rec = {
+                    "receipt_id": build_document_id("GR", current_date + pd.Timedelta(days=ep_actual_lt), receipt_counter),
+                    "po_id": ep_id, "po_line_id": ep_line_id, "sku": sku, "supplier": supplier,
+                    "location": location, "receipt_date": current_date + pd.Timedelta(days=ep_actual_lt),
+                    "received_qty": int(eq), "unit_cost": uc, "total_cost": float(eq * uc),
+                    "receipt_status": "received" if ep_ridx < horizon_days else "open",
+                }
+                receipt_counter += 1
+                if ep_ridx < horizon_days:
+                    scheduled_receipts.setdefault(ep_ridx, []).append(ep_rec)
+                ep_status = "received" if ep_ridx < horizon_days else "open"
+                purchase_order_lines.append({
+                    "po_id": ep_id, "po_line_id": ep_line_id, "sku": sku,
+                    "ordered_qty": int(eq), "unit_cost": uc,
+                    "line_amount": float(eq * uc), "moq_applied": moq,
+                })
+                purchase_orders.append({
+                    "po_id": ep_id, "supplier": supplier, "destination_location": location,
+                    "order_date": current_date, "expected_receipt_date": ep_receipt_date,
+                    "order_status": ep_status, "currency": CURRENCY, "payment_terms_days": payment_terms_days,
+                })
+                on_order += eq
+
+            if inventory_position <= reorder_point and day_idx < suppression_start_day_d:
                 order_qty = ceil_to_multiple(max(target_level - inventory_position, moq), moq)
                 unit_cost = float(round(base_cost * random.uniform(0.97, 1.08), 0))
                 po_id = build_document_id("PO", current_date, po_counter)
@@ -347,8 +416,46 @@ def generate_purchase_data_central(catalog, daily_demand_by_sku_location, daily_
             + central_policy["review_days"]
             + central_policy["safety_days"]
         )
+        # --- Posicionamiento de inventario objetivo ---
+        positioning = product.get("stock_positioning", "equilibrio")
+
+        # Para substock/quiebre: suprimir nuevas OC en la ventana final para
+        # que la demanda deplecione el stock sin reposición.
+        # suppression_start_day = día desde el cual NO se emiten nuevas OC.
+        _cover_days = supplier_lead_time_days + central_policy["safety_days"] + central_policy["review_days"]
+        if positioning == "quiebre_inminente":
+            # ~80% de la cobertura objetivo como ventana de depleción post-último-pedido
+            _depletion_days = max(30, int(0.80 * _cover_days))
+            suppression_start_day = max(0, horizon_days - supplier_lead_time_days - _depletion_days)
+        elif positioning == "substock":
+            _depletion_days = max(14, int(0.40 * _cover_days))
+            suppression_start_day = max(0, horizon_days - supplier_lead_time_days - _depletion_days)
+        else:
+            suppression_start_day = horizon_days  # sin supresión
+
+        # Para sobrestock: emitir una OC extra grande al final para que el
+        # stock efectivo quede muy por encima del objetivo.
+        # El pedido puede quedar en tránsito (on_order) o llegar antes del fin.
+        extra_order_day = -1
+        extra_order_placed = False
+        extra_order_factor = 0.0
+        if positioning == "sobrestock_leve":
+            extra_order_day = max(0, horizon_days - max(supplier_lead_time_days // 2, 15) - 30)
+            extra_order_factor = 1.5
+        elif positioning == "sobrestock_critico":
+            extra_order_day = max(0, horizon_days - max(supplier_lead_time_days // 2, 15) - 20)
+            extra_order_factor = 3.0
+
+        # Ajuste de on_hand inicial según posicionamiento
+        if positioning in ("quiebre_inminente", "substock"):
+            initial_coverage_factor = random.uniform(0.85, 1.10)   # arrancar cerca del objetivo
+        elif positioning in ("sobrestock_leve", "sobrestock_critico"):
+            initial_coverage_factor = random.uniform(1.10, 1.40)   # arrancar algo alto
+        else:
+            initial_coverage_factor = random.uniform(1.05, 1.35)   # comportamiento original
+
         central_on_hand = ceil_to_multiple(
-            central_initial_forecast * central_initial_cover_days * random.uniform(1.05, 1.35),
+            central_initial_forecast * central_initial_cover_days * initial_coverage_factor,
             moq,
         )
         central_on_order = 0
@@ -491,7 +598,60 @@ def generate_purchase_data_central(catalog, daily_demand_by_sku_location, daily_
             )
             central_inventory_position = central_on_hand + central_on_order
 
-            if day_idx >= central_next_review_day and central_inventory_position <= central_reorder_point:
+            # ---- OC extra para sobrestock (se emite una sola vez) ----
+            if not extra_order_placed and extra_order_day >= 0 and day_idx == extra_order_day:
+                extra_order_placed = True
+                order_qty = ceil_to_multiple(max(int(central_target_level * extra_order_factor), moq), moq)
+                unit_cost = float(round(base_cost * random.uniform(0.97, 1.08), 0))
+                po_id = build_document_id("PO", current_date, po_counter)
+                po_counter += 1
+                po_line_id = f"{po_id}-L01"
+                expected_receipt_date = current_date + pd.Timedelta(days=supplier_lead_time_days)
+                actual_supplier_lead_time = sample_actual_lead_time(supplier_lead_time_days)
+                first_receipt_idx = day_idx + actual_supplier_lead_time
+                receipt_plan_extra = [(first_receipt_idx, order_qty, "received")]
+                received_within_horizon = 0
+                for receipt_day_idx, received_qty, receipt_status in receipt_plan_extra:
+                    receipt_date = current_date + pd.Timedelta(days=receipt_day_idx - day_idx)
+                    receipt_id = build_document_id("GR", receipt_date, receipt_counter)
+                    receipt_counter += 1
+                    receipt_record = {
+                        "receipt_id": receipt_id,
+                        "po_id": po_id,
+                        "po_line_id": po_line_id,
+                        "sku": sku,
+                        "supplier": supplier,
+                        "location": CENTRAL_LOCATION,
+                        "receipt_date": receipt_date,
+                        "received_qty": int(received_qty),
+                        "unit_cost": unit_cost,
+                        "total_cost": float(received_qty * unit_cost),
+                        "receipt_status": receipt_status,
+                    }
+                    if receipt_day_idx < horizon_days:
+                        scheduled_purchase_receipts.setdefault(receipt_day_idx, []).append(receipt_record)
+                        received_within_horizon += received_qty
+                    else:
+                        purchase_receipts.append(receipt_record)
+                order_status = "open" if received_within_horizon == 0 else (
+                    "partially_received" if received_within_horizon < order_qty else "received"
+                )
+                purchase_order_lines.append({
+                    "po_id": po_id, "po_line_id": po_line_id, "sku": sku,
+                    "ordered_qty": int(order_qty), "unit_cost": unit_cost,
+                    "line_amount": float(order_qty * unit_cost), "moq_applied": moq,
+                })
+                purchase_orders.append({
+                    "po_id": po_id, "supplier": supplier, "destination_location": CENTRAL_LOCATION,
+                    "order_date": current_date, "expected_receipt_date": expected_receipt_date,
+                    "order_status": order_status, "currency": CURRENCY, "payment_terms_days": payment_terms_days,
+                })
+                central_on_order += order_qty
+
+            # ---- Reorden normal (suprimido a partir de suppression_start_day) ----
+            if (day_idx >= central_next_review_day
+                    and central_inventory_position <= central_reorder_point
+                    and day_idx < suppression_start_day):
                 order_qty = ceil_to_multiple(max(central_target_level - central_inventory_position, moq), moq)
                 unit_cost = float(round(base_cost * random.uniform(0.97, 1.08), 0))
                 po_id = build_document_id("PO", current_date, po_counter)
@@ -696,8 +856,11 @@ def generate_catalog(n_products=N_PRODUCTS):
         demand_range = BASE_DEMAND_RANGES[abc_class]
         base_demand = random.uniform(*demand_range)
 
-        moq = random.choice(MOQ_CHOICES)
+        abc_moq_pool = MOQ_CHOICES_BY_ABC.get(abc_class) or MOQ_CHOICES
+        moq = random.choice(abc_moq_pool)
         extra_field_value = random.choice(EXTRA_FIELD_CHOICES)
+
+        stock_positioning = random.choices(_POSITIONING_LABELS, weights=_POSITIONING_WEIGHTS, k=1)[0]
 
         products.append({
             "sku": f"SKU-{sku_counter:05d}",
@@ -716,6 +879,7 @@ def generate_catalog(n_products=N_PRODUCTS):
             "moq": moq,
             EXTRA_FIELD_NAME: extra_field_value,
             "category_seasonality": cat["seasonality"],
+            "stock_positioning": stock_positioning,  # atributo interno — no se exporta
         })
         sku_counter += 1
 
@@ -856,6 +1020,72 @@ def generate_timeseries(product, dates):
 
 
 # ============================================================
+# 3. POST-PROCESAMIENTO DE INVENTARIO FINAL
+# ============================================================
+
+def adjust_final_snapshot_positioning(df_snapshots: pd.DataFrame, catalog: pd.DataFrame) -> pd.DataFrame:
+    """Ajusta el snapshot del último día para lograr la distribución de salud objetivo.
+
+    La simulación puede dejar stock residual en sucursales (efecto MOQ) que impide
+    alcanzar posicionamientos extremos (quiebre/sobrestock). Este paso post-proceso
+    los corrige directamente sobre el snapshot final, manteniendo consistencia:
+
+    - quiebre_inminente : on_hand = 0 en todas las locations (demanda consumió todo).
+                          on_order se conserva (representa OC pendiente en tránsito).
+    - substock          : on_hand reducido a 25-60 % del total actual, distribuido
+                          proporcionalmente entre locations.
+    - sobrestock_critico: on_hand inflado en central (si present) para forzar un ratio > 2.
+    - equilibrio / sobrestock_leve: sin cambio (la simulación ya los posiciona bien).
+    """
+    if df_snapshots.empty:
+        return df_snapshots
+
+    last_date = df_snapshots["snapshot_date"].max()
+    df = df_snapshots.copy()
+    mask_last = df["snapshot_date"] == last_date
+
+    positioning_map = catalog.set_index("sku")["stock_positioning"].to_dict()
+
+    for sku, pos in positioning_map.items():
+        if pos == "equilibrio":
+            continue
+
+        sku_mask = mask_last & (df["sku"] == sku)
+        if not sku_mask.any():
+            continue
+
+        if pos == "quiebre_inminente":
+            # Depleción total — simula demanda que consumió todo el stock físico.
+            # on_order se conserva: representa OC en camino que aún no llegó.
+            df.loc[sku_mask, "on_hand_qty"] = 0
+
+        elif pos == "substock":
+            # Reducir on_hand total al 25-60 % del actual, distribuido proporcionalmente.
+            current_oh = df.loc[sku_mask, "on_hand_qty"].values.astype(float)
+            total_oh = current_oh.sum()
+            if total_oh > 0:
+                target_factor = random.uniform(0.25, 0.60)
+                scale = (total_oh * target_factor) / total_oh
+                new_oh = np.floor(current_oh * scale).astype(int)
+                df.loc[sku_mask, "on_hand_qty"] = new_oh
+
+        elif pos == "sobrestock_critico":
+            # Inflar on_hand en la location de mayor stock (generalmente central).
+            # Simula una compra masiva anticipada que aún está sin consumir.
+            current_oh = df.loc[sku_mask, "on_hand_qty"].values.astype(float)
+            total_oh = current_oh.sum()
+            # Apuntar a ratio ~3-5× el nivel actual si no es ya muy alto
+            inflate_factor = random.uniform(3.0, 5.0)
+            delta = max(0, int(total_oh * inflate_factor) - int(total_oh))
+            if delta > 0:
+                # Añadir todo el delta a la primera location (usualmente central)
+                idxs = df.index[sku_mask].tolist()
+                df.at[idxs[0], "on_hand_qty"] = int(df.at[idxs[0], "on_hand_qty"]) + delta
+
+    return df
+
+
+# ============================================================
 # 3. GENERACIÓN PRINCIPAL
 # ============================================================
 
@@ -969,6 +1199,10 @@ def main():
     )
     df_transactions_public = build_public_transactions(df_transactions)
     df_internal_transfers_public = build_public_internal_transfers(df_internal_transfers)
+
+    # Ajustar snapshot final según posicionamiento objetivo
+    print("Ajustando snapshot final según distribución de posicionamiento...")
+    df_inventory_snapshots = adjust_final_snapshot_positioning(df_inventory_snapshots, catalog)
 
     # XYZ Classification based on CV²
     def classify_xyz(cv2):

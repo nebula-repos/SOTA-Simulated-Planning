@@ -5,7 +5,7 @@
 Backlog de deuda técnica, bugs no declarados y oportunidades de mejora detectadas en inspecciones del repo.
 Solo contiene ítems **vigentes**. Lo resuelto debe eliminarse del registro.
 
-Última actualización: `2026-03-30` (sprint Opción A completo)
+Última actualización: `2026-03-31` (Fase 5 — Motor de Decisión de Reposición completo)
 
 ---
 

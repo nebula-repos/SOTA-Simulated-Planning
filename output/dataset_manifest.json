@@ -39,11 +39,11 @@
   },
   "table_rows": {
     "product_catalog": 800,
-    "transactions": 44336,
-    "inventory_snapshot": 2216112,
-    "internal_transfers": 17613,
-    "purchase_orders": 3201,
-    "purchase_order_lines": 3201,
-    "purchase_receipts": 3213
+    "transactions": 46631,
+    "inventory_snapshot": 2178848,
+    "internal_transfers": 18094,
+    "purchase_orders": 4260,
+    "purchase_order_lines": 4260,
+    "purchase_receipts": 4551
   }
 }

@@ -19,6 +19,16 @@ from planning_core.inventory.params import get_sku_params
 from planning_core.inventory.safety_stock import compute_sku_safety_stock, SafetyStockResult
 from planning_core.inventory.service_level import get_csl_target
 from planning_core.preprocessing import censored_summary, mark_censored_demand
+from planning_core.purchase.order_proposal import (
+    PurchaseProposal,
+    aggregate_by_supplier,
+    purchase_plan_summary,
+)
+from planning_core.purchase.recommendation import (
+    PurchaseRecommendation,
+    build_purchase_recommendation,
+    generate_purchase_plan,
+)
 from planning_core.repository import CanonicalRepository
 from planning_core.validation import basic_health_report
 
@@ -1004,3 +1014,263 @@ class PlanningService:
             return pd.DataFrame()
 
         return pd.DataFrame(diagnoses)
+
+    # ---------------------------------------------------------------------------
+    # Fase 5 — Motor de Decisión de Reposición
+    # ---------------------------------------------------------------------------
+
+    def purchase_plan(
+        self,
+        granularity: str | None = None,
+        include_equilibrio: bool = False,
+        include_sobrestock: bool = True,
+        limit: int = 500,
+        simple_safety_pct: float = 0.5,
+    ) -> list[dict]:
+        """Genera el plan de reposición priorizado para el catálogo.
+
+        Ejecuta el diagnóstico completo de inventario y convierte cada fila en
+        una PurchaseRecommendation: canal de compra para substock/quiebre,
+        canal de exceso para sobrestock.
+
+        Parameters
+        ----------
+        granularity : str or None
+            Granularidad de la serie de demanda. None = oficial del manifest.
+        include_equilibrio : bool
+            Si True, incluye SKUs en equilibrio (urgency_score bajo). Default False.
+        include_sobrestock : bool
+            Si True, incluye SKUs en sobrestock con canal de exceso. Default True.
+        limit : int
+            Número máximo de recomendaciones a retornar. Default 500.
+        simple_safety_pct : float
+            Fracción del LT demand para SS de clase C. Default 0.5.
+
+        Returns
+        -------
+        list[dict]
+            Lista de PurchaseRecommendation.to_dict(), ordenada por urgency_score desc.
+        """
+        health_df = self.catalog_health_report(
+            granularity=granularity,
+            simple_safety_pct=simple_safety_pct,
+        )
+        if health_df.empty:
+            return []
+
+        if granularity is None:
+            granularity = self.official_classification_granularity()
+
+        catalog = self.repository.load_table("product_catalog")
+        manifest = self.repository.load_manifest()
+
+        # Construir params_map: sku → InventoryParams (reutiliza datos del health_df)
+        params_map: dict[str, object] = {}
+        catalog_index = catalog.set_index("sku") if "sku" in catalog.columns else catalog
+
+        for _, row in health_df.iterrows():
+            sku = row["sku"]
+            abc_class = row.get("abc_class")
+            supplier = row.get("supplier")
+            params_map[sku] = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
+
+        health_rows = health_df.to_dict(orient="records")
+
+        recommendations = generate_purchase_plan(
+            health_rows=health_rows,
+            catalog_df=catalog,
+            params_map=params_map,
+            manifest_config=manifest,
+            include_equilibrio=include_equilibrio,
+            include_sobrestock=include_sobrestock,
+        )
+
+        return [r.to_dict() for r in recommendations[:limit]]
+
+    def purchase_plan_by_supplier(
+        self,
+        granularity: str | None = None,
+        simple_safety_pct: float = 0.5,
+    ) -> list[dict]:
+        """Agrupa el plan de compra por proveedor.
+
+        Solo incluye SKUs con final_qty > 0 (canal de compra activo).
+        Los SKUs de sobrestock se excluyen de las propuestas de proveedor.
+
+        Parameters
+        ----------
+        granularity : str or None
+            Granularidad de la serie de demanda. None = oficial del manifest.
+        simple_safety_pct : float
+            Fracción del LT demand para SS de clase C. Default 0.5.
+
+        Returns
+        -------
+        list[dict]
+            Lista de PurchaseProposal.to_dict(), ordenada por max_urgency_score desc.
+        """
+        health_df = self.catalog_health_report(
+            granularity=granularity,
+            simple_safety_pct=simple_safety_pct,
+        )
+        if health_df.empty:
+            return []
+
+        if granularity is None:
+            granularity = self.official_classification_granularity()
+
+        catalog = self.repository.load_table("product_catalog")
+        manifest = self.repository.load_manifest()
+
+        params_map: dict[str, object] = {}
+        for _, row in health_df.iterrows():
+            sku = row["sku"]
+            abc_class = row.get("abc_class")
+            supplier = row.get("supplier")
+            params_map[sku] = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
+
+        health_rows = health_df.to_dict(orient="records")
+        recommendations = generate_purchase_plan(
+            health_rows=health_rows,
+            catalog_df=catalog,
+            params_map=params_map,
+            manifest_config=manifest,
+            include_equilibrio=False,
+            include_sobrestock=False,  # sobrestock no genera propuestas de compra
+        )
+
+        proposals = aggregate_by_supplier(recommendations)
+        return [p.to_dict() for p in proposals]
+
+    def purchase_plan_summary(
+        self,
+        granularity: str | None = None,
+        simple_safety_pct: float = 0.5,
+    ) -> dict:
+        """KPIs ejecutivos del plan de reposición completo.
+
+        Incluye todos los estados (quiebre, substock, equilibrio, sobrestock, dead_stock)
+        para dar una visión completa de la salud del catálogo.
+
+        Returns
+        -------
+        dict
+            KPIs: sku_quiebre, sku_substock, sku_equilibrio, sku_sobrestock,
+            sku_dead_stock, sku_to_order, total_units_to_order, total_cost_estimate,
+            total_excess_units, total_excess_cost, supplier_count.
+        """
+        health_df = self.catalog_health_report(
+            granularity=granularity,
+            simple_safety_pct=simple_safety_pct,
+        )
+        if health_df.empty:
+            return {}
+
+        if granularity is None:
+            granularity = self.official_classification_granularity()
+
+        catalog = self.repository.load_table("product_catalog")
+        manifest = self.repository.load_manifest()
+
+        params_map: dict[str, object] = {}
+        for _, row in health_df.iterrows():
+            sku = row["sku"]
+            abc_class = row.get("abc_class")
+            supplier = row.get("supplier")
+            params_map[sku] = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
+
+        health_rows = health_df.to_dict(orient="records")
+        recommendations = generate_purchase_plan(
+            health_rows=health_rows,
+            catalog_df=catalog,
+            params_map=params_map,
+            manifest_config=manifest,
+            include_equilibrio=True,
+            include_sobrestock=True,
+        )
+
+        return purchase_plan_summary(recommendations)
+
+    def sku_purchase_recommendation(
+        self,
+        sku: str,
+        abc_class: str | None = None,
+        granularity: str | None = None,
+        simple_safety_pct: float = 0.5,
+    ) -> dict | None:
+        """Genera la recomendación de reposición para un SKU individual.
+
+        Más rápido que correr el catálogo completo — útil para el detalle de SKU.
+
+        Parameters
+        ----------
+        sku : str
+            Identificador del SKU.
+        abc_class : str or None
+            Clase ABC. Si None, se deriva desde la clasificación.
+        granularity : str or None
+            Granularidad de demanda. None = oficial.
+        simple_safety_pct : float
+            Fracción del LT demand para SS de clase C. Default 0.5.
+
+        Returns
+        -------
+        dict or None
+            PurchaseRecommendation.to_dict() o None si el SKU no existe.
+        """
+        if granularity is None:
+            granularity = self.official_classification_granularity()
+
+        summary = self.sku_summary(sku)
+        if summary is None:
+            return None
+
+        if abc_class is None:
+            profile = self.classify_single_sku(sku, granularity=granularity)
+            abc_class = profile.get("abc_class") if profile else None
+
+        catalog = self.repository.load_table("product_catalog")
+        manifest = self.repository.load_manifest()
+        cat_row = catalog.loc[catalog["sku"] == sku]
+        supplier = cat_row["supplier"].iloc[0] if not cat_row.empty else None
+
+        params = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
+        demand_series = self.sku_demand_series(sku, granularity=granularity)
+        ss_result = compute_sku_safety_stock(
+            params, demand_series, granularity=granularity, simple_safety_pct=simple_safety_pct
+        )
+
+        inventory = self.repository.load_table("inventory_snapshot")
+        latest_date = inventory["snapshot_date"].max()
+        sku_inv = inventory[(inventory["snapshot_date"] == latest_date) & (inventory["sku"] == sku)]
+        on_hand = float(sku_inv["on_hand_qty"].sum()) if not sku_inv.empty else 0.0
+        on_order = float(sku_inv["on_order_qty"].sum()) if not sku_inv.empty else 0.0
+
+        transactions = self.repository.load_table("transactions")
+        sku_tx = transactions[transactions["sku"] == sku]
+        if not sku_tx.empty and "date" in sku_tx.columns:
+            last_mv = pd.to_datetime(sku_tx["date"]).max()
+            days_since = int((pd.to_datetime(transactions["date"]).max() - last_mv).days)
+        else:
+            days_since = 9999
+
+        from planning_core.inventory.diagnostics import diagnose_sku  # noqa: PLC0415
+        diagnosis = diagnose_sku(
+            sku=sku,
+            on_hand=on_hand,
+            on_order=on_order,
+            ss_result=ss_result,
+            params=params,
+            abc_class=abc_class,
+            days_since_last_movement=days_since,
+        )
+
+        catalog_row = cat_row.iloc[0] if not cat_row.empty else None
+        rec = build_purchase_recommendation(
+            sku=sku,
+            diagnosis=diagnosis,
+            params=params,
+            catalog_row=catalog_row,
+            manifest_config=manifest,
+        )
+        return rec.to_dict()

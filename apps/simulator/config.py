@@ -230,6 +230,9 @@ _INDUSTRIAL = {
         "Lima": {"avg_lead_time_days": 7},
     },
     "moq_choices": [1, 2, 5, 10, 25],
+    # MOQ por clase ABC: C sólo permite lotes pequeños para evitar sobrestock estructural
+    # (clase C tiene demanda 0.002-0.020 u/día — un MOQ=25 crea 2500 días de cobertura)
+    "moq_choices_by_abc": {"A": [1, 2, 5, 10], "B": [1, 2, 5], "C": [1, 2]},
     "extra_field_name": "warranty_months",
     "extra_field_choices": [None, 6, 12, 18, 24, 36],
 
@@ -460,6 +463,7 @@ _RETAIL = {
     },
     "internal_transfer_profiles": {},
     "moq_choices": [1, 6, 12, 24, 48],
+    "moq_choices_by_abc": {"A": [1, 6, 12, 24], "B": [1, 6, 12], "C": [1, 6]},
     "extra_field_name": "shelf_life_days",
     "extra_field_choices": [None, 7, 14, 30, 60, 90, 180, 365],
 
@@ -559,6 +563,7 @@ CENTRAL_NODE_SALES_PROBABILITY_BY_ABC = _active["central_node_sales_probability_
 CENTRAL_NODE_SALES_FACTOR_RANGE = _active["central_node_sales_factor_range"]
 INTERNAL_TRANSFER_PROFILES = _active["internal_transfer_profiles"]
 MOQ_CHOICES = _active["moq_choices"]
+MOQ_CHOICES_BY_ABC = _active.get("moq_choices_by_abc", {})
 EXTRA_FIELD_NAME = _active["extra_field_name"]
 EXTRA_FIELD_CHOICES = _active["extra_field_choices"]
 
