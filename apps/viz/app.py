@@ -21,6 +21,7 @@ from planning_core.classification import compute_acf, detect_outliers, prepare_d
 from planning_core.forecasting.backtest import backtest_summary
 from planning_core.repository import CanonicalRepository
 from planning_core.services import PlanningService
+from planning_core.system_log import EventLogger
 
 
 # Frecuencias pandas para resample directo en la capa viz
@@ -736,7 +737,7 @@ def render_sidebar_toggle_fab() -> None:
 
 @st.cache_resource
 def get_service() -> PlanningService:
-    return PlanningService(CanonicalRepository())
+    return PlanningService(CanonicalRepository(), event_logger=EventLogger.default(source="viz", enable_console=True))
 
 
 @st.cache_data(show_spinner=False)

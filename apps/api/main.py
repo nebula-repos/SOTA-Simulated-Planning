@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Query
 
 from planning_core.repository import CanonicalRepository
 from planning_core.services import PlanningService
+from planning_core.system_log import EventLogger
 
 
 app = FastAPI(
@@ -17,7 +18,7 @@ app = FastAPI(
 )
 
 repository = CanonicalRepository()
-service = PlanningService(repository)
+service = PlanningService(repository, event_logger=EventLogger.default(source="api", enable_console=True))
 
 # ---------------------------------------------------------------------------
 # Valores válidos para parámetros de query

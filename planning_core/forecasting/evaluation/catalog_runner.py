@@ -49,7 +49,7 @@ import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import IO, TYPE_CHECKING
 
 import pandas as pd
 
@@ -60,6 +60,7 @@ from planning_core.classification import (
 )
 from planning_core.forecasting.evaluation._types import CatalogEvalResult, EvalConfig
 from planning_core.forecasting.selector import select_and_forecast
+from planning_core.system_log import EventLogger
 
 if TYPE_CHECKING:
     from planning_core.services import PlanningService
@@ -88,6 +89,10 @@ def run_catalog_evaluation(
     checkpoint_every: int = 50,
     resume: bool = False,
     checkpoint_dir: str | Path | None = None,
+    event_logger: EventLogger | None = None,
+    enable_console_log: bool | None = None,
+    console_use_color: bool | None = None,
+    console_stream: IO[str] | None = None,
 ) -> CatalogEvalResult:
     """Evalúa el forecast sobre el catálogo completo o un subconjunto.
 
@@ -120,121 +125,142 @@ def run_catalog_evaluation(
 
     effective_jobs = os.cpu_count() if n_jobs == -1 else n_jobs
     effective_jobs = max(1, effective_jobs or 1)
-
-    # ── Generar run_id ───────────────────────────────────────────────────────
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    run_name_part = f"_{config.run_name}" if config.run_name else ""
-    run_id = f"{ts}{run_name_part}"
-
-    # ── Pre-carga única ──────────────────────────────────────────────────────
-    if verbose:
-        print("[eval] Pre-cargando datos y clasificando catálogo...")
-
-    transactions = service.repository.load_table("transactions")
-    inventory    = service.repository.load_table("inventory_snapshot")
-
-    catalog_df = service.classify_catalog(granularity=config.granularity)
-    catalog_index: dict[str, dict] = catalog_df.set_index("sku").to_dict(orient="index")
-
-    tx_by_sku  = {sku: df.copy() for sku, df in transactions.groupby("sku")}
-    inv_by_sku = {sku: df.copy() for sku, df in inventory.groupby("sku")}
-
-    # ── Lista de SKUs ────────────────────────────────────────────────────────
-    all_skus: list[str] = skus or catalog_df["sku"].tolist()
-
-    if config.sample_n is not None and config.sample_n < len(all_skus):
-        rng = random.Random(config.random_seed)
-        all_skus = rng.sample(all_skus, config.sample_n)
-
-    # ── Checkpoint / Resume ──────────────────────────────────────────────────
-    ckpt_base = Path(checkpoint_dir) if checkpoint_dir else Path(f"output/eval_runs/_tmp_{run_id}")
-    rows: list[dict] = []
-    done_skus: set[str] = set()
-
-    if resume:
-        ckpt_file = ckpt_base / _CKPT_FILE
-        meta_file = ckpt_base / _CKPT_META
-        if ckpt_file.exists():
-            prev_df = pd.read_parquet(ckpt_file)
-            rows = prev_df.to_dict(orient="records")
-            done_skus = set(prev_df["sku"].tolist())
-            if meta_file.exists():
-                with open(meta_file) as f:
-                    run_id = json.load(f).get("run_id", run_id)
-            if verbose:
-                print(f"[eval] Resume: {len(done_skus)} SKUs cargados de {ckpt_file}")
-
-    remaining_skus = [s for s in all_skus if s not in done_skus]
-
-    if verbose:
-        lgbm_tag = "lgbm=ON" if config.use_lgbm else "lgbm=OFF"
-        mode_tag = f"jobs={effective_jobs}" if effective_jobs > 1 else "sequential"
-        print(
-            f"[eval] {len(remaining_skus)} SKUs  "
-            f"gran={config.granularity}  h={config.h}  "
-            f"n_windows={config.n_windows}  {lgbm_tag}  {mode_tag}"
-        )
-        print("-" * 72)
-
-    t0 = time.time()
-
-    # ── Ejecución ────────────────────────────────────────────────────────────
-    if effective_jobs == 1:
-        rows = _run_sequential(
-            remaining_skus=remaining_skus,
-            catalog_index=catalog_index,
-            tx_by_sku=tx_by_sku,
-            inv_by_sku=inv_by_sku,
-            config=config,
-            verbose=verbose,
-            rows=rows,
-            checkpoint_every=checkpoint_every,
-            ckpt_base=ckpt_base,
-            run_id=run_id,
-            total=len(all_skus),
-        )
-    else:
-        rows = _run_parallel(
-            remaining_skus=remaining_skus,
-            catalog_index=catalog_index,
-            tx_by_sku=tx_by_sku,
-            inv_by_sku=inv_by_sku,
-            config=config,
-            verbose=verbose,
-            rows=rows,
-            effective_jobs=effective_jobs,
-            total=len(all_skus),
-        )
-
-    # Limpiar checkpoint al completar
-    if ckpt_base.exists():
-        shutil.rmtree(ckpt_base, ignore_errors=True)
-
-    sku_results = pd.DataFrame(rows)
-    elapsed_total = round(time.time() - t0, 1)
-    status_counts = sku_results["status"].value_counts()
-
-    # Estados conocidos de selector/backtest que se agrupan en n_error
-    _KNOWN_ERROR_STATUSES = {"error", "series_too_short", "model_column_missing"}
-    n_error = int(sum(status_counts.get(s, 0) for s in _KNOWN_ERROR_STATUSES))
-
-    result = CatalogEvalResult(
-        config=config,
-        run_id=run_id,
-        sku_results=sku_results,
-        elapsed_seconds=elapsed_total,
-        n_ok=int(status_counts.get("ok", 0)),
-        n_fallback=int(status_counts.get("fallback", 0)),
-        n_no_forecast=int(status_counts.get("no_forecast", 0)),
-        n_error=n_error,
+    logger = event_logger or EventLogger.default(
+        source="batch_eval",
+        enable_console=verbose if enable_console_log is None else enable_console_log,
+        use_color=console_use_color,
+        stream=console_stream,
     )
 
-    if verbose:
-        print()
-        print("=" * 72)
-        _print_summary(result)
+    with logger.span(
+        "forecast.batch",
+        module="forecasting",
+        entity_type="catalog",
+        entity_id="all",
+        params={
+            "granularity": config.granularity,
+            "h": config.h,
+            "n_windows": config.n_windows,
+            "use_lgbm": config.use_lgbm,
+            "n_jobs": effective_jobs,
+            "checkpoint_every": checkpoint_every,
+            "resume": resume,
+        },
+    ) as span:
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        run_name_part = f"_{config.run_name}" if config.run_name else ""
+        run_id = f"{ts}{run_name_part}"
 
-    return result
+        transactions = service.repository.load_table("transactions")
+        inventory = service.repository.load_table("inventory_snapshot")
+
+        catalog_df = service.classify_catalog(granularity=config.granularity)
+        catalog_index: dict[str, dict] = catalog_df.set_index("sku").to_dict(orient="index")
+
+        tx_by_sku = {sku: df.copy() for sku, df in transactions.groupby("sku")}
+        inv_by_sku = {sku: df.copy() for sku, df in inventory.groupby("sku")}
+
+        all_skus: list[str] = skus or catalog_df["sku"].tolist()
+
+        if config.sample_n is not None and config.sample_n < len(all_skus):
+            rng = random.Random(config.random_seed)
+            all_skus = rng.sample(all_skus, config.sample_n)
+
+        ckpt_base = Path(checkpoint_dir) if checkpoint_dir else Path(f"output/eval_runs/_tmp_{run_id}")
+        rows: list[dict] = []
+        done_skus: set[str] = set()
+
+        if resume:
+            ckpt_file = ckpt_base / _CKPT_FILE
+            meta_file = ckpt_base / _CKPT_META
+            if ckpt_file.exists():
+                prev_df = pd.read_parquet(ckpt_file)
+                rows = prev_df.to_dict(orient="records")
+                done_skus = set(prev_df["sku"].tolist())
+                if meta_file.exists():
+                    with open(meta_file) as f:
+                        run_id = json.load(f).get("run_id", run_id)
+                logger.emit(
+                    event_name="forecast.batch.resume.completed",
+                    module="forecasting",
+                    status="ok",
+                    entity_type="catalog",
+                    entity_id="all",
+                    metrics={"n_resumed": len(done_skus)},
+                    result={"run_id": run_id, "checkpoint_dir": str(ckpt_file)},
+                )
+
+        remaining_skus = [s for s in all_skus if s not in done_skus]
+        t0 = time.time()
+
+        if effective_jobs == 1:
+            rows = _run_sequential(
+                remaining_skus=remaining_skus,
+                catalog_index=catalog_index,
+                tx_by_sku=tx_by_sku,
+                inv_by_sku=inv_by_sku,
+                config=config,
+                rows=rows,
+                checkpoint_every=checkpoint_every,
+                ckpt_base=ckpt_base,
+                run_id=run_id,
+                event_logger=logger,
+            )
+        else:
+            rows = _run_parallel(
+                remaining_skus=remaining_skus,
+                catalog_index=catalog_index,
+                tx_by_sku=tx_by_sku,
+                inv_by_sku=inv_by_sku,
+                config=config,
+                rows=rows,
+                effective_jobs=effective_jobs,
+                event_logger=logger,
+            )
+
+        if ckpt_base.exists():
+            shutil.rmtree(ckpt_base, ignore_errors=True)
+
+        sku_results = pd.DataFrame(rows)
+        elapsed_total = round(time.time() - t0, 1)
+        status_counts = sku_results["status"].value_counts()
+
+        _KNOWN_ERROR_STATUSES = {"error", "series_too_short", "model_column_missing"}
+        n_error = int(sum(status_counts.get(s, 0) for s in _KNOWN_ERROR_STATUSES))
+
+        result = CatalogEvalResult(
+            config=config,
+            run_id=run_id,
+            sku_results=sku_results,
+            elapsed_seconds=elapsed_total,
+            n_ok=int(status_counts.get("ok", 0)),
+            n_fallback=int(status_counts.get("fallback", 0)),
+            n_no_forecast=int(status_counts.get("no_forecast", 0)),
+            n_error=n_error,
+        )
+
+        span.set_metrics(
+            n_skus=result.n_evaluated,
+            n_ok=result.n_ok,
+            n_fallback=result.n_fallback,
+            n_no_forecast=result.n_no_forecast,
+            n_error=result.n_error,
+            mase_global_median=result.mase_global_median,
+        )
+        span.set_result(
+            run_id=run_id,
+            granularity=config.granularity,
+            h=config.h,
+            n_windows=config.n_windows,
+            jobs=effective_jobs,
+        )
+
+        if verbose:
+            print()
+            print("=" * 72)
+            _print_summary(result)
+
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -247,16 +273,12 @@ def _run_sequential(
     tx_by_sku: dict,
     inv_by_sku: dict,
     config: EvalConfig,
-    verbose: bool,
     rows: list[dict],
     checkpoint_every: int,
     ckpt_base: Path,
     run_id: str,
-    total: int,
+    event_logger: EventLogger,
 ) -> list[dict]:
-    n_done_before = len(rows)
-    t0 = time.time()
-
     for i, sku in enumerate(remaining_skus, 1):
         t_sku = time.time()
         row = _evaluate_sku(
@@ -268,18 +290,7 @@ def _run_sequential(
         )
         row["elapsed_sku_s"] = round(time.time() - t_sku, 2)
         rows.append(row)
-
-        global_i = n_done_before + i
-
-        if verbose:
-            elapsed = time.time() - t0
-            print(
-                f"  [{global_i:4d}/{total}] {sku:<12}"
-                f"  sb={str(row.get('sb_class', '?')):<13}"
-                f"  winner={str(row.get('model_winner') or '—'):<15}"
-                f"  MASE={_fmt(row.get('mase'))}"
-                f"  ({elapsed:.0f}s)"
-            )
+        _emit_batch_sku_event(event_logger, row)
 
         if checkpoint_every and i % checkpoint_every == 0:
             _save_checkpoint(rows, ckpt_base, run_id)
@@ -297,10 +308,9 @@ def _run_parallel(
     tx_by_sku: dict,
     inv_by_sku: dict,
     config: EvalConfig,
-    verbose: bool,
     rows: list[dict],
     effective_jobs: int,
-    total: int,
+    event_logger: EventLogger,
 ) -> list[dict]:
     tasks = [
         (
@@ -312,10 +322,6 @@ def _run_parallel(
         )
         for sku in remaining_skus
     ]
-
-    n_done_before = len(rows)
-    completed = 0
-    t0 = time.time()
 
     # fork evita re-importar el módulo principal en cada worker (problema de spawn en macOS)
     _ctx = multiprocessing.get_context("fork")
@@ -330,18 +336,7 @@ def _run_parallel(
                 row = _error_row(sku_name, config, str(exc))
 
             rows.append(row)
-            completed += 1
-            global_i = n_done_before + completed
-
-            if verbose:
-                elapsed = time.time() - t0
-                print(
-                    f"  [{global_i:4d}/{total}] {sku_name:<12}"
-                    f"  sb={str(row.get('sb_class', '?')):<13}"
-                    f"  winner={str(row.get('model_winner') or '—'):<15}"
-                    f"  MASE={_fmt(row.get('mase'))}"
-                    f"  ({elapsed:.0f}s)"
-                )
+            _emit_batch_sku_event(event_logger, row)
 
     return rows
 
@@ -483,6 +478,32 @@ def _error_row(sku: str, config: EvalConfig, msg: str) -> dict:
     return row
 
 
+def _emit_batch_sku_event(event_logger: EventLogger, row: dict) -> None:
+    status = str(row.get("status") or "ok")
+    level = _level_from_status(status)
+    event_logger.emit(
+        event_name="forecast.batch.sku.completed",
+        module="forecasting",
+        level=level,
+        status=status,
+        entity_type="sku",
+        entity_id=str(row.get("sku")),
+        duration_ms=int(float(row.get("elapsed_sku_s") or 0.0) * 1000),
+        metrics={
+            "mase": row.get("mase"),
+            "bias": row.get("bias"),
+            "elapsed_sku_s": row.get("elapsed_sku_s"),
+        },
+        result={
+            "model": row.get("model_winner"),
+            "sb_class": row.get("sb_class"),
+            "granularity": row.get("granularity"),
+            "h": row.get("h"),
+        },
+        error={"message": row.get("error_msg")} if row.get("error_msg") else None,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Checkpoint helpers
 # ---------------------------------------------------------------------------
@@ -502,6 +523,14 @@ def _fmt(v) -> str:
     if v is None or (isinstance(v, float) and math.isnan(v)):
         return " N/A  "
     return f"{v:.3f} "
+
+
+def _level_from_status(status: str) -> str:
+    if status in {"error", "failed"}:
+        return "ERROR"
+    if status in {"fallback", "no_forecast", "series_too_short", "model_column_missing"}:
+        return "WARN"
+    return "INFO"
 
 
 def _print_summary(result: CatalogEvalResult) -> None:

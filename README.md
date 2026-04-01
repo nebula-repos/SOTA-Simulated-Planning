@@ -33,6 +33,7 @@ Fases 0-4 del pipeline completadas. El repo es un sistema funcional end-to-end: 
 | Evaluación de catálogo              | `run_catalog_evaluation` — horse-race masivo en paralelo, checkpoints, resume                                           | Funcional           |
 | Comparación de runs                  | `run_store`, `aggregator`, `comparator` — persistencia y análisis multi-run                                        | Funcional           |
 | `PlanningService.sku_forecast()`    | Selección automática de modelo + forecast por SKU                                                                        | Funcional           |
+| System Log                           | JSONL estructurado + correlación por `execution_id` + salida legible en terminal para UI/API/batch                    | Funcional           |
 | **Módulo de inventario**       | Parámetros por SKU, Safety Stock (3 métodos), ROP, nivel de servicio CSL                                                 | **Funcional** |
 | **Diagnóstico de salud**       | `diagnose_sku`, ratio de posicionamiento, P(quiebre), bandas de alerta, texto explicativo                                | **Funcional** |
 | **`catalog_health_report()`** | Diagnóstico masivo del catálogo con métricas financieras (capital exceso/riesgo)                                        | **Funcional** |
@@ -74,6 +75,7 @@ SOTA-Simulated-Planning/
 │   ├── preprocessing.py         # Outliers + demanda censurada
 │   ├── services.py              # PlanningService — punto de entrada principal
 │   ├── repository.py            # Carga del dataset canónico
+│   ├── system_log.py            # Event logger estructurado + JSONL + consola
 │   ├── validation.py            # Health checks básicos
 │   ├── inventory/
 │   │   ├── params.py            # InventoryParams, lead times por proveedor, períodos de revisión
@@ -101,6 +103,7 @@ SOTA-Simulated-Planning/
     ├── forecasting_param_sweep_plan.md     # Diseño del experimento de sweep
     ├── forecasting_benchmark_selection.md  # MASE adaptativo por tipo de producto
     ├── forecasting_parametrizacion.md      # Guía de parámetros h, n_windows, granularity
+    ├── system_log_module.md                # Estado actual y roadmap del system log
     ├── technical_debt_register.md          # Backlog de deuda técnica priorizada
     ├── business_logic_simulation.md
     ├── data_health_checks.md
@@ -179,6 +182,8 @@ Los archivos CSV se generan en el directorio `output/`.
 ### Capas livianas del monorepo
 
 La arquitectura modular del repo está documentada en [docs/lightweight_monorepo_architecture.md](docs/lightweight_monorepo_architecture.md).
+
+El estado actual y backlog del system log está documentado en [docs/system_log_module.md](docs/system_log_module.md).
 
 Los criterios de calidad y auditoría del dato están documentados en [docs/data_health_checks.md](docs/data_health_checks.md).
 
