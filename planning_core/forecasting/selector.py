@@ -304,6 +304,7 @@ def select_and_forecast(
 
     # 6. Intentar ensemble top-k si hay multiples modelos cercanos
     status = "ok"
+    ensemble_candidates: list[str] = []
     try:
         if best_model is None:
             # Fallback: serie muy corta para backtest
@@ -368,6 +369,7 @@ def select_and_forecast(
         "season_length": season_length,
         "granularity": granularity,
         "h": h,
+        "ensemble_models": ensemble_candidates if ensemble_candidates else None,
     }
     if cv_df is not None:
         result["cv_df"] = cv_df
