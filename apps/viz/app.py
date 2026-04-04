@@ -3334,6 +3334,29 @@ def render_compras_tab(service: PlanningService) -> None:
             _get_purchase_summary.clear()
             st.rerun()
 
+    # Badge de frescura del artefacto de forecast (Opción C)
+    try:
+        _fc_status = service.catalog_forecast_status()
+        if _fc_status["status"] == "missing":
+            st.warning(
+                "Sin forecast materializado — Safety Stock usa señal histórica. "
+                f"Ejecutar: `python apps/batch_forecast.py --granularity {_fc_status['granularity']} --jobs 4`"
+            )
+        elif _fc_status["status"] == "stale":
+            st.warning(
+                f"Forecast desactualizado ({_fc_status.get('run_date', '?')}) — "
+                "considera re-ejecutar el batch para actualizar SS y ROP. "
+                f"`python apps/batch_forecast.py --granularity {_fc_status['granularity']} --jobs 4`"
+            )
+        else:
+            _cov = _fc_status.get("coverage_pct") or 0.0
+            st.caption(
+                f"Forecast activo · {_fc_status.get('run_date', '?')} · "
+                f"{_cov:.0%} cobertura · modelo dominante: {_fc_status.get('top_model', '?')}"
+            )
+    except Exception:
+        pass  # No interrumpir la UI si el status falla
+
     with st.spinner("Generando plan de reposición..."):
         summary = _get_purchase_summary(service)
         plan_rows = _get_purchase_plan(service)

@@ -93,6 +93,8 @@ def run_catalog_evaluation(
     enable_console_log: bool | None = None,
     console_use_color: bool | None = None,
     console_stream: IO[str] | None = None,
+    save_to_derived: bool = False,
+    derived_dir: Path | None = None,
 ) -> CatalogEvalResult:
     """Evalúa el forecast sobre el catálogo completo o un subconjunto.
 
@@ -255,6 +257,15 @@ def run_catalog_evaluation(
             jobs=effective_jobs,
         )
 
+        if save_to_derived:
+            from planning_core.forecasting.evaluation.forecast_store import (
+                ForecastStore,
+                build_store_entries,
+            )
+            _output_dir = derived_dir or (Path("output") / "derived")
+            entries = build_store_entries(sku_results, config.granularity)
+            ForecastStore.save(entries, _output_dir, config.granularity)
+
         if verbose:
             print()
             print("=" * 72)
@@ -392,6 +403,7 @@ def _evaluate_sku(
                 "bias": float("nan"), "mae": float("nan"), "rmse": float("nan"),
                 "granularity": config.granularity, "h": config.h,
                 "season_length": None, "n_obs": 0, "error_msg": None,
+                "forecast_mean_daily": None, "forecast_sigma_daily": None,
             })
             return row
 
@@ -421,6 +433,18 @@ def _evaluate_sku(
         backtest = result.get("backtest", {})
         winner   = result.get("model")
         winner_metrics = backtest.get(winner, {}) if winner else {}
+
+        # Capturar señal forward-looking para ForecastStore (Opción C)
+        forecast_df = result.get("forecast")
+        rmse = winner_metrics.get("rmse")
+        if forecast_df is not None and not forecast_df.empty and result.get("status") == "ok":
+            _days = {"M": 365.25 / 12, "W": 7.0, "D": 1.0}.get(config.granularity, 365.25 / 12)
+            row["forecast_mean_daily"] = float(forecast_df["yhat"].mean()) / _days
+            _raw_rmse = float(rmse) if rmse is not None and not math.isnan(float(rmse)) else None
+            row["forecast_sigma_daily"] = (_raw_rmse / math.sqrt(_days)) if _raw_rmse is not None else None
+        else:
+            row["forecast_mean_daily"] = None
+            row["forecast_sigma_daily"] = None
 
         row.update({
             "status":        result.get("status"),

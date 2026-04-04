@@ -286,6 +286,8 @@ def compute_sku_safety_stock(
     demand_series: pd.DataFrame,
     granularity: str = "M",
     simple_safety_pct: float = 0.5,
+    forecast_mean_daily: float | None = None,
+    forecast_sigma_daily: float | None = None,
 ) -> SafetyStockResult:
     """Calcula safety stock y ROP completos para un SKU.
 
@@ -302,12 +304,35 @@ def compute_sku_safety_stock(
         Granularidad de la serie: ``"D"``, ``"W"`` o ``"M"``.
     simple_safety_pct : float
         Fracción del LT demand usada como SS para clase C. Default 0.5.
+    forecast_mean_daily : float, optional
+        Media diaria derivada del forecast (mean(yhat) / días_período). Si se provee
+        y es positiva, reemplaza la media histórica en el cálculo del ROP.
+        Permite que el ROP refleje la demanda esperada futura en lugar del promedio
+        histórico, capturando tendencia y estacionalidad.
+    forecast_sigma_daily : float, optional
+        Desviación estándar diaria derivada del RMSE del backtest
+        (rmse / sqrt(días_período)). Si se provee y es positiva, reemplaza la σ
+        histórica en el cálculo del Safety Stock.
 
     Returns
     -------
     SafetyStockResult
+        El campo ``ss_method`` lleva el sufijo ``"_forecast"`` cuando se usó
+        señal de forecast, y ``"_historical"`` cuando se usó la señal histórica,
+        para trazabilidad en logs y reportes.
     """
     mean_daily, sigma_daily, n_periods = compute_demand_stats(demand_series, granularity)
+
+    # Override con señal forward-looking del forecast si está disponible y es válida
+    using_forecast = False
+    if forecast_mean_daily is not None and forecast_mean_daily > 0:
+        mean_daily = forecast_mean_daily
+        using_forecast = True
+    if forecast_sigma_daily is not None and forecast_sigma_daily > 0:
+        sigma_daily = forecast_sigma_daily
+        using_forecast = True
+
+    ss_method = f"{params.ss_method}_forecast" if using_forecast else f"{params.ss_method}_historical"
 
     ss = compute_safety_stock(params, mean_daily, sigma_daily, simple_safety_pct)
     rop = compute_rop(mean_daily, params.lead_time_days, ss)
@@ -325,6 +350,6 @@ def compute_sku_safety_stock(
         safety_stock=ss,
         reorder_point=rop,
         coverage_ss_days=coverage_ss_days,
-        ss_method=params.ss_method,
+        ss_method=ss_method,
         n_periods=n_periods,
     )

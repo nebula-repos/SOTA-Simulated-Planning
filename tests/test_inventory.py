@@ -755,7 +755,8 @@ class TestComputeSkuSafetyStock:
         params = _make_params(ss_method="simple_pct_lt")
         df = _make_demand_df([50.0, 60.0, 70.0, 80.0])
         result = compute_sku_safety_stock(params, df)
-        assert result.ss_method == "simple_pct_lt"
+        # ss_method lleva sufijo _historical o _forecast para trazabilidad
+        assert result.ss_method.startswith("simple_pct_lt")
 
     def test_n_periods_matches_series_length(self):
         params = _make_params()
@@ -839,17 +840,17 @@ class TestPlanningServiceSafetyStock:
             assert result["safety_stock"] >= 0.0
 
     def test_ss_method_extended_for_class_a(self):
-        """SKU clase A debe usar método 'extended'."""
+        """SKU clase A debe usar método 'extended' (con sufijo _historical o _forecast)."""
         df = _svc.classify_catalog()
         a_skus = df[df["abc_class"] == "A"]["sku"].head(1).tolist()
         if a_skus:
             result = _svc.sku_safety_stock(a_skus[0], abc_class="A")
-            assert result["ss_method"] == "extended"
+            assert result["ss_method"].startswith("extended")
 
     def test_ss_method_simple_for_class_c(self):
-        """SKU clase C debe usar método 'simple_pct_lt'."""
+        """SKU clase C debe usar método 'simple_pct_lt' (con sufijo _historical o _forecast)."""
         df = _svc.classify_catalog()
         c_skus = df[df["abc_class"] == "C"]["sku"].head(1).tolist()
         if c_skus:
             result = _svc.sku_safety_stock(c_skus[0], abc_class="C")
-            assert result["ss_method"] == "simple_pct_lt"
+            assert result["ss_method"].startswith("simple_pct_lt")

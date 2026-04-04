@@ -5,7 +5,7 @@
 Backlog de deuda técnica, bugs no declarados y oportunidades de mejora detectadas en inspecciones del repo.
 Solo contiene ítems **vigentes**. Lo resuelto debe eliminarse del registro.
 
-Última actualización: `2026-03-31` (Fase 5 — Motor de Decisión de Reposición completo)
+Última actualización: `2026-04-04` (Opción C + Refactor services.py en pipelines)
 
 ---
 
@@ -15,7 +15,7 @@ Solo contiene ítems **vigentes**. Lo resuelto debe eliminarse del registro.
 |---|---|---|
 | Validación de datos | D08 | Alta |
 | Testing / cobertura | D09 (parcial — API cubierta) | Media |
-| Arquitectura / performance | D14, D15 | Media |
+| Arquitectura / performance | D14, D15 (parcial) | Media |
 | Forecasting / observabilidad | D21, D33, D38 | Media / Baja |
 
 ---
@@ -97,21 +97,24 @@ La UI mitiga esto con `@st.cache_data`, pero la API recalcula la clasificación 
 
 ---
 
-### D15. Sin capa formal para artefactos derivados persistidos
+### D15. Sin capa formal para artefactos derivados persistidos (parcialmente resuelto)
 
 **Tipo**: arquitectura
 **Prioridad**: media
 
-No existe contrato formal para persistir y versionar:
+**Resuelto parcialmente** (2026-04-04): `ForecastStore` en
+`planning_core/forecasting/evaluation/forecast_store.py` define el contrato
+de persistencia para forecasts. Los artefactos viven en `output/derived/`
+con metadata JSON + parquet por granularidad. CLI `apps/batch_forecast.py`
+para materializarlos. `catalog_health_report` los consume automáticamente.
 
-- clasificaciones
-- health reports
-- diagnósticos por SKU
-- forecasts servidos
+Pendiente:
+- Clasificaciones: aún se recalculan on-demand sin persistencia (D14).
+- Health reports: sin store propio.
+- Diagnósticos por SKU: sin store propio.
 
-El módulo de evaluación de forecasting sí tiene su propio store, pero no hay una estrategia transversal para derivados analíticos.
-
-**Acción**: decidir si los derivados viven como vistas on-demand, en `output/derived/`, o en una capa separada.
+**Acción residual**: extender el patrón `ForecastStore` a clasificaciones
+si el costo de recalcular en la API se vuelve inaceptable (D14).
 
 ---
 

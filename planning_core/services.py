@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from pathlib import Path
 from typing import IO
 
@@ -15,44 +14,23 @@ from planning_core.classification import (
     select_granularity,
     treat_outliers,
 )
-from planning_core.forecasting import selector as _forecast_selector  # lazy-loaded per call (D22)
 from planning_core.inventory.diagnostics import InventoryDiagnosis, diagnose_sku
 from planning_core.inventory.params import get_sku_params
 from planning_core.inventory.safety_stock import compute_sku_safety_stock, SafetyStockResult
 from planning_core.inventory.service_level import get_csl_target
 from planning_core.preprocessing import censored_summary, mark_censored_demand
-from planning_core.purchase.order_proposal import (
-    PurchaseProposal,
-    aggregate_by_supplier,
-    purchase_plan_summary,
-)
-from planning_core.purchase.recommendation import (
-    PurchaseRecommendation,
-    build_purchase_recommendation,
-    generate_purchase_plan,
-)
+from planning_core.purchase.order_proposal import PurchaseProposal
+from planning_core.purchase.recommendation import PurchaseRecommendation
 from planning_core.repository import CanonicalRepository
 from planning_core.system_log import EventLogger
 from planning_core.validation import basic_health_report
+import planning_core.pipelines.forecast as _forecast_pipeline
+import planning_core.pipelines.inventory as _inventory_pipeline
+import planning_core.pipelines.purchase as _purchase_pipeline
 
 
 OFFICIAL_CLASSIFICATION_SCOPE = "network_aggregate"
 OFFICIAL_CLASSIFICATION_GRANULARITY = "M"
-
-# D20: horizonte dinamico por SKU
-_DAYS_PER_PERIOD: dict[str, float] = {"D": 1.0, "W": 7.0, "M": 30.0}
-_H_MIN = 1
-_H_MAX = 12
-
-
-def _h_from_lead_time(lead_time_days: float, granularity: str) -> int:
-    """Convierte lead_time_days a periodos de forecast redondeando hacia arriba.
-
-    Usado por ``sku_forecast`` para derivar el horizonte h por SKU en lugar
-    de usar el valor global h=3 (D20). Resultado acotado en [1, 12].
-    """
-    days = _DAYS_PER_PERIOD.get(granularity, 30.0)
-    return max(_H_MIN, min(_H_MAX, math.ceil(lead_time_days / days)))
 
 
 def _counts_dict(values: pd.Series) -> dict[str, int]:
@@ -851,115 +829,17 @@ class PlanningService:
             ``forecast`` es un pd.DataFrame con ``[ds, yhat, yhat_lo80, yhat_hi80]``.
             ``status`` puede ser: ``"ok"``, ``"no_forecast"``, ``"fallback"``, ``"error"``.
         """
-        if granularity is None:
-            granularity = self.official_classification_granularity()
-
-        with self.event_logger.span(
-            "forecast.sku",
-            module="forecasting",
-            entity_type="sku",
-            entity_id=sku,
-            params={
-                "location": location,
-                "granularity": granularity,
-                "h": h,
-                "n_windows": n_windows,
-                "outlier_method": outlier_method,
-                "treat_strategy": treat_strategy,
-                "use_lgbm": use_lgbm,
-                "return_cv": return_cv,
-            },
-        ) as span:
-            profile = self.classify_single_sku(sku, location=location, granularity=granularity)
-            if profile is None:
-                result = {
-                    "status": "no_data",
-                    "model": None,
-                    "mase": float("nan"),
-                    "forecast": pd.DataFrame(),
-                    "backtest": {},
-                    "season_length": 12,
-                    "granularity": granularity,
-                    "h": h or 3,
-                }
-                span.set_status("no_data")
-                span.set_result(model=None, sb_class=None, abc_class=None, candidate_models=[])
-                return result
-
-            self._log_forecast_profile(sku, location, granularity, profile)
-
-            horizon_resolution = "explicit" if h is not None else "derived"
-            lead_time_days: float | None = None
-            if h is None:
-                try:
-                    params = self.sku_inventory_params(sku, abc_class=profile.get("abc_class"))
-                    lead_time_days = float(params.get("lead_time_days", 30.0))
-                    h = _h_from_lead_time(lead_time_days, granularity)
-                except Exception:
-                    h = 3
-                    horizon_resolution = "fallback_default"
-            self._log_forecast_horizon(sku, granularity, int(h), horizon_resolution, lead_time_days)
-
-            clean_df = self.sku_clean_series(
-                sku,
-                location=location,
-                granularity=granularity,
-                outlier_method=outlier_method,
-                treat_strategy=treat_strategy,
-            )
-
-            if clean_df.empty or "demand_clean" not in clean_df.columns:
-                model_input = clean_df[["period", "demand"]].copy()
-            else:
-                model_input = clean_df[["period", "demand_clean"]].rename(
-                    columns={"demand_clean": "demand"}
-                )
-            self._log_forecast_series(sku, granularity, model_input, clean_df, treat_strategy)
-
-            result = _forecast_selector.select_and_forecast(
-                profile=profile,
-                demand_df=model_input,
-                granularity=granularity,
-                h=h,
-                n_windows=n_windows,
-                unique_id=sku,
-                use_lgbm=use_lgbm,
-                return_cv=return_cv,
-            )
-            result["demand_series"] = model_input
-
-            status = str(result.get("status") or "ok")
-            if status != "ok":
-                span.set_status(status)
-
-            self._log_forecast_selection(sku, status, result)
-
-            backtest = result.get("backtest", {})
-            winner = result.get("model")
-            winner_metrics = backtest.get(winner, {}) if winner else {}
-            candidate_models = [
-                model_name
-                for model_name in backtest.keys()
-                if isinstance(model_name, str) and not model_name.startswith("__")
-            ]
-            span.set_metrics(
-                mase=result.get("mase"),
-                bias=result.get("bias"),
-                wmape=winner_metrics.get("wmape"),
-                rmsse=winner_metrics.get("rmsse"),
-                n_obs=int(len(model_input)),
-                n_candidates=int(len(candidate_models)),
-            )
-            span.set_result(
-                model=winner,
-                sb_class=profile.get("sb_class"),
-                abc_class=profile.get("abc_class"),
-                season_length=result.get("season_length"),
-                granularity=result.get("granularity"),
-                h=result.get("h"),
-                candidate_models=candidate_models,
-            )
-            return result
+        return _forecast_pipeline.run_sku_forecast(
+            self, sku,
+            location=location,
+            granularity=granularity,
+            h=h,
+            n_windows=n_windows,
+            outlier_method=outlier_method,
+            treat_strategy=treat_strategy,
+            use_lgbm=use_lgbm,
+            return_cv=return_cv,
+        )
 
     def classification_summary(self, granularity: str | None = None) -> dict:
         """Resumen agregado de la clasificacion del catalogo."""
@@ -1212,124 +1092,11 @@ class PlanningService:
             Una fila por SKU activo. Columnas: todos los campos de
             ``InventoryDiagnosis`` más ``days_since_last_movement``.
         """
-        if granularity is None:
-            granularity = self.official_classification_granularity()
-        with self.event_logger.span(
-            "inventory.health_report",
-            module="inventory",
-            entity_type="catalog",
-            entity_id="all",
-            params={"granularity": granularity, "simple_safety_pct": simple_safety_pct},
-        ) as span:
-            classification_df = self.classify_catalog(granularity=granularity)
-
-            inventory = self.repository.load_table("inventory_snapshot")
-            latest_date = inventory["snapshot_date"].max()
-            latest_inv = inventory[inventory["snapshot_date"] == latest_date]
-
-            stock_by_sku = (
-                latest_inv.groupby("sku")[["on_hand_qty", "on_order_qty"]]
-                .sum()
-                .rename(columns={"on_hand_qty": "on_hand", "on_order_qty": "on_order"})
-            )
-
-            transactions = self.repository.load_table("transactions")
-            if not transactions.empty and "date" in transactions.columns:
-                last_movement = (
-                    transactions.groupby("sku")["date"]
-                    .max()
-                    .rename("last_movement_date")
-                )
-                latest_tx_date = pd.to_datetime(transactions["date"]).max()
-                tx_by_sku: dict[str, pd.DataFrame] = {
-                    sku: grp for sku, grp in transactions.groupby("sku")
-                }
-            else:
-                last_movement = pd.Series(dtype="object", name="last_movement_date")
-                latest_tx_date = pd.Timestamp.now()
-                tx_by_sku = {}
-
-            catalog = self.repository.load_table("product_catalog")
-            manifest = self.repository.load_manifest()
-
-            _CAT_COLS = ["sku", "category", "subcategory", "supplier", "brand", "base_price", "cost"]
-            _available_cat_cols = [c for c in _CAT_COLS if c in catalog.columns]
-            catalog_index = catalog[_available_cat_cols].set_index("sku")
-
-            diagnoses: list[dict] = []
-            for _, row in classification_df.iterrows():
-                sku = row["sku"]
-                abc_class = row.get("abc_class")
-
-                if sku in stock_by_sku.index:
-                    on_hand = float(stock_by_sku.loc[sku, "on_hand"])
-                    on_order = float(stock_by_sku.loc[sku, "on_order"])
-                else:
-                    on_hand, on_order = 0.0, 0.0
-
-                if sku in last_movement.index and pd.notna(last_movement[sku]):
-                    last_mv = pd.to_datetime(last_movement[sku])
-                    days_since = int((latest_tx_date - last_mv).days)
-                else:
-                    days_since = 9999
-
-                if sku in catalog_index.index:
-                    cat_row = catalog_index.loc[sku]
-                    supplier = cat_row.get("supplier") if "supplier" in catalog_index.columns else None
-                    category = cat_row.get("category")
-                    subcategory = cat_row.get("subcategory")
-                    brand = cat_row.get("brand")
-                    base_price = float(cat_row.get("base_price") or 0.0)
-                    unit_cost = float(cat_row.get("cost") or 0.0)
-                else:
-                    supplier = category = subcategory = brand = None
-                    base_price = unit_cost = 0.0
-
-                params = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
-
-                sku_tx_raw = tx_by_sku.get(sku, pd.DataFrame(columns=transactions.columns))
-                demand_series = prepare_demand_series(sku_tx_raw, granularity=granularity)
-                ss_result = compute_sku_safety_stock(
-                    params, demand_series, granularity=granularity, simple_safety_pct=simple_safety_pct
-                )
-
-                diagnosis = diagnose_sku(
-                    sku=sku,
-                    on_hand=on_hand,
-                    on_order=on_order,
-                    ss_result=ss_result,
-                    params=params,
-                    abc_class=abc_class,
-                    days_since_last_movement=days_since,
-                )
-                d = diagnosis.to_dict()
-                d["days_since_last_movement"] = days_since
-                d["category"] = category
-                d["subcategory"] = subcategory
-                d["supplier"] = supplier
-                d["brand"] = brand
-                d["base_price"] = base_price
-                d["unit_cost"] = unit_cost
-                d["excess_capital"] = diagnosis.excess_units * unit_cost
-                d["stockout_capital"] = diagnosis.suggested_order_qty * unit_cost
-                diagnoses.append(d)
-
-            if not diagnoses:
-                span.set_status("empty")
-                span.set_result(health_status_distribution={}, alert_level_distribution={})
-                return pd.DataFrame()
-
-            report_df = pd.DataFrame(diagnoses)
-            span.set_metrics(
-                n_skus=int(len(report_df)),
-                total_excess_capital=float(report_df["excess_capital"].sum()) if "excess_capital" in report_df else 0.0,
-                total_stockout_capital=float(report_df["stockout_capital"].sum()) if "stockout_capital" in report_df else 0.0,
-            )
-            span.set_result(
-                health_status_distribution=_counts_dict(report_df["health_status"]) if "health_status" in report_df else {},
-                alert_level_distribution=_counts_dict(report_df["alert_level"]) if "alert_level" in report_df else {},
-            )
-            return report_df
+        return _inventory_pipeline.run_catalog_health_report(
+            self,
+            granularity=granularity,
+            simple_safety_pct=simple_safety_pct,
+        )
 
     # ---------------------------------------------------------------------------
     # Fase 5 — Motor de Decisión de Reposición
@@ -1367,60 +1134,14 @@ class PlanningService:
         list[dict]
             Lista de PurchaseRecommendation.to_dict(), ordenada por urgency_score desc.
         """
-        with self.event_logger.span(
-            "purchase.plan",
-            module="purchase",
-            entity_type="catalog",
-            entity_id="all",
-            params={
-                "granularity": granularity,
-                "include_equilibrio": include_equilibrio,
-                "include_sobrestock": include_sobrestock,
-                "limit": limit,
-                "simple_safety_pct": simple_safety_pct,
-            },
-        ) as span:
-            health_df = self.catalog_health_report(
-                granularity=granularity,
-                simple_safety_pct=simple_safety_pct,
-            )
-            if health_df.empty:
-                span.set_status("empty")
-                span.set_result(n_items=0, n_actionable=0)
-                return []
-
-            if granularity is None:
-                granularity = self.official_classification_granularity()
-
-            catalog = self.repository.load_table("product_catalog")
-            manifest = self.repository.load_manifest()
-
-            params_map: dict[str, object] = {}
-            for _, row in health_df.iterrows():
-                sku = row["sku"]
-                abc_class = row.get("abc_class")
-                supplier = row.get("supplier")
-                params_map[sku] = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
-
-            health_rows = health_df.to_dict(orient="records")
-
-            recommendations = generate_purchase_plan(
-                health_rows=health_rows,
-                catalog_df=catalog,
-                params_map=params_map,
-                manifest_config=manifest,
-                include_equilibrio=include_equilibrio,
-                include_sobrestock=include_sobrestock,
-            )
-
-            recommendation_dicts = [r.to_dict() for r in recommendations[:limit]]
-            actionable = sum(1 for item in recommendation_dicts if float(item.get("final_qty") or 0.0) > 0.0)
-            span.set_metrics(n_items=len(recommendation_dicts), n_actionable=actionable)
-            span.set_result(
-                health_status_distribution=_counts_dict(pd.Series([item.get("health_status") for item in recommendation_dicts])),
-                max_urgency_score=max((float(item.get("urgency_score") or 0.0) for item in recommendation_dicts), default=0.0),
-            )
-            return recommendation_dicts
+        return _purchase_pipeline.run_purchase_plan(
+            self,
+            granularity=granularity,
+            include_equilibrio=include_equilibrio,
+            include_sobrestock=include_sobrestock,
+            limit=limit,
+            simple_safety_pct=simple_safety_pct,
+        )
 
     def purchase_plan_by_supplier(
         self,
@@ -1444,53 +1165,11 @@ class PlanningService:
         list[dict]
             Lista de PurchaseProposal.to_dict(), ordenada por max_urgency_score desc.
         """
-        with self.event_logger.span(
-            "purchase.plan_by_supplier",
-            module="purchase",
-            entity_type="catalog",
-            entity_id="all",
-            params={"granularity": granularity, "simple_safety_pct": simple_safety_pct},
-        ) as span:
-            health_df = self.catalog_health_report(
-                granularity=granularity,
-                simple_safety_pct=simple_safety_pct,
-            )
-            if health_df.empty:
-                span.set_status("empty")
-                span.set_result(n_suppliers=0, n_items=0)
-                return []
-
-            if granularity is None:
-                granularity = self.official_classification_granularity()
-
-            catalog = self.repository.load_table("product_catalog")
-            manifest = self.repository.load_manifest()
-
-            params_map: dict[str, object] = {}
-            for _, row in health_df.iterrows():
-                sku = row["sku"]
-                abc_class = row.get("abc_class")
-                supplier = row.get("supplier")
-                params_map[sku] = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
-
-            health_rows = health_df.to_dict(orient="records")
-            recommendations = generate_purchase_plan(
-                health_rows=health_rows,
-                catalog_df=catalog,
-                params_map=params_map,
-                manifest_config=manifest,
-                include_equilibrio=False,
-                include_sobrestock=False,
-            )
-
-            proposals = aggregate_by_supplier(recommendations)
-            proposal_dicts = [p.to_dict() for p in proposals]
-            span.set_metrics(n_suppliers=len(proposal_dicts), n_items=len(recommendations))
-            span.set_result(
-                supplier_count=len(proposal_dicts),
-                max_urgency_score=max((float(item.get("max_urgency_score") or 0.0) for item in proposal_dicts), default=0.0),
-            )
-            return proposal_dicts
+        return _purchase_pipeline.run_purchase_plan_by_supplier(
+            self,
+            granularity=granularity,
+            simple_safety_pct=simple_safety_pct,
+        )
 
     def purchase_plan_summary(
         self,
@@ -1509,53 +1188,11 @@ class PlanningService:
             sku_dead_stock, sku_to_order, total_units_to_order, total_cost_estimate,
             total_excess_units, total_excess_cost, supplier_count.
         """
-        with self.event_logger.span(
-            "purchase.plan_summary",
-            module="purchase",
-            entity_type="catalog",
-            entity_id="all",
-            params={"granularity": granularity, "simple_safety_pct": simple_safety_pct},
-        ) as span:
-            health_df = self.catalog_health_report(
-                granularity=granularity,
-                simple_safety_pct=simple_safety_pct,
-            )
-            if health_df.empty:
-                span.set_status("empty")
-                span.set_result(summary={})
-                return {}
-
-            if granularity is None:
-                granularity = self.official_classification_granularity()
-
-            catalog = self.repository.load_table("product_catalog")
-            manifest = self.repository.load_manifest()
-
-            params_map: dict[str, object] = {}
-            for _, row in health_df.iterrows():
-                sku = row["sku"]
-                abc_class = row.get("abc_class")
-                supplier = row.get("supplier")
-                params_map[sku] = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
-
-            health_rows = health_df.to_dict(orient="records")
-            recommendations = generate_purchase_plan(
-                health_rows=health_rows,
-                catalog_df=catalog,
-                params_map=params_map,
-                manifest_config=manifest,
-                include_equilibrio=True,
-                include_sobrestock=True,
-            )
-
-            summary = purchase_plan_summary(recommendations)
-            span.set_metrics(
-                sku_to_order=summary.get("sku_to_order"),
-                total_units_to_order=summary.get("total_units_to_order"),
-                total_cost_estimate=summary.get("total_cost_estimate"),
-            )
-            span.set_result(summary=summary)
-            return summary
+        return _purchase_pipeline.run_purchase_plan_summary(
+            self,
+            granularity=granularity,
+            simple_safety_pct=simple_safety_pct,
+        )
 
     def sku_purchase_recommendation(
         self,
@@ -1584,83 +1221,49 @@ class PlanningService:
         dict or None
             PurchaseRecommendation.to_dict() o None si el SKU no existe.
         """
-        if granularity is None:
-            granularity = self.official_classification_granularity()
+        return _purchase_pipeline.run_sku_purchase_recommendation(
+            self, sku,
+            abc_class=abc_class,
+            granularity=granularity,
+            simple_safety_pct=simple_safety_pct,
+        )
 
-        summary = self.sku_summary(sku)
-        if summary is None:
-            return None
+    # ---------------------------------------------------------------------------
+    # Opción C — batch forecast + status  (nuevos métodos)
+    # ---------------------------------------------------------------------------
 
-        if abc_class is None:
-            profile = self.classify_single_sku(sku, granularity=granularity)
-            abc_class = profile.get("abc_class") if profile else None
+    def run_catalog_forecast(
+        self,
+        granularity: str | None = None,
+        n_jobs: int = 1,
+        use_lgbm: bool = False,
+        n_windows: int = 3,
+        h: int = 3,
+    ) -> object:
+        """Ejecuta el horse-race sobre el catálogo completo y persiste el artefacto.
 
-        catalog = self.repository.load_table("product_catalog")
-        manifest = self.repository.load_manifest()
-        cat_row = catalog.loc[catalog["sku"] == sku]
-        supplier = cat_row["supplier"].iloc[0] if not cat_row.empty else None
+        El artefacto resultante es consumido automáticamente por
+        ``catalog_health_report`` en el próximo cálculo de safety stock.
+        Ver ``pipelines/forecast.py`` para detalles.
+        """
+        return _forecast_pipeline.run_catalog_forecast(
+            self,
+            granularity=granularity,
+            n_jobs=n_jobs,
+            use_lgbm=use_lgbm,
+            n_windows=n_windows,
+            h=h,
+        )
 
-        with self.event_logger.span(
-            "purchase.recommendation",
-            module="purchase",
-            entity_type="sku",
-            entity_id=sku,
-            params={
-                "abc_class": abc_class,
-                "granularity": granularity,
-                "simple_safety_pct": simple_safety_pct,
-            },
-        ) as span:
-            params = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
-            demand_series = self.sku_demand_series(sku, granularity=granularity)
-            ss_result = compute_sku_safety_stock(
-                params, demand_series, granularity=granularity, simple_safety_pct=simple_safety_pct
-            )
+    def catalog_forecast_status(self, granularity: str | None = None) -> dict:
+        """Retorna el estado del artefacto de forecast materializado.
 
-            inventory = self.repository.load_table("inventory_snapshot")
-            latest_date = inventory["snapshot_date"].max()
-            sku_inv = inventory[(inventory["snapshot_date"] == latest_date) & (inventory["sku"] == sku)]
-            on_hand = float(sku_inv["on_hand_qty"].sum()) if not sku_inv.empty else 0.0
-            on_order = float(sku_inv["on_order_qty"].sum()) if not sku_inv.empty else 0.0
+        Lectura rápida del JSON de metadata — no abre el parquet.
 
-            transactions = self.repository.load_table("transactions")
-            sku_tx = transactions[transactions["sku"] == sku]
-            if not sku_tx.empty and "date" in sku_tx.columns:
-                last_mv = pd.to_datetime(sku_tx["date"]).max()
-                days_since = int((pd.to_datetime(transactions["date"]).max() - last_mv).days)
-            else:
-                days_since = 9999
-
-            from planning_core.inventory.diagnostics import diagnose_sku  # noqa: PLC0415
-            diagnosis = diagnose_sku(
-                sku=sku,
-                on_hand=on_hand,
-                on_order=on_order,
-                ss_result=ss_result,
-                params=params,
-                abc_class=abc_class,
-                days_since_last_movement=days_since,
-            )
-
-            catalog_row = cat_row.iloc[0] if not cat_row.empty else None
-            rec = build_purchase_recommendation(
-                sku=sku,
-                diagnosis=diagnosis,
-                params=params,
-                catalog_row=catalog_row,
-                manifest_config=manifest,
-            )
-            rec_dict = rec.to_dict()
-            span.set_metrics(
-                urgency_score=rec_dict.get("urgency_score"),
-                final_qty=rec_dict.get("final_qty"),
-                stockout_probability=rec_dict.get("stockout_probability"),
-                stock_efectivo=on_hand + on_order,
-            )
-            span.set_result(
-                health_status=rec_dict.get("health_status"),
-                alert_level=rec_dict.get("alert_level"),
-                action=rec_dict.get("action"),
-                order_deadline=rec_dict.get("order_deadline"),
-            )
-            return rec_dict
+        Returns
+        -------
+        dict
+            ``{status, run_date, n_skus, coverage_pct, top_model, is_stale}``
+            ``status`` puede ser ``"ok"``, ``"stale"`` o ``"missing"``.
+        """
+        return _forecast_pipeline.catalog_forecast_status(self, granularity=granularity)
