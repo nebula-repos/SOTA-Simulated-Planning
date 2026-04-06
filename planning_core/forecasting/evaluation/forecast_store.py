@@ -165,16 +165,30 @@ class ForecastStore:
         base_dir: Path,
         granularity: str,
     ) -> Path:
-        """Serializa la lista de entries a parquet + meta JSON. Sobreescribe."""
+        """Serializa la lista de entries a parquet + meta JSON.
+
+        Usa escritura atómica (write-then-rename) para garantizar que un batch
+        interrumpido no corrompe el artefacto anterior. El artefacto final solo
+        reemplaza al previo cuando ambos archivos (.parquet y .json) están
+        completamente escritos.
+        """
+        import os
+
         base_dir.mkdir(parents=True, exist_ok=True)
         parquet_path = base_dir / _PARQUET_FILE.format(granularity=granularity)
         meta_path = base_dir / _META_FILE.format(granularity=granularity)
+
+        # Rutas temporales en el mismo directorio (os.replace es atómico en el mismo filesystem)
+        parquet_tmp = base_dir / (_PARQUET_FILE.format(granularity=granularity) + ".tmp")
+        meta_tmp = base_dir / (_META_FILE.format(granularity=granularity) + ".tmp")
 
         run_date = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
         rows = [asdict(e) for e in entries]
         df = pd.DataFrame(rows)
-        df.to_parquet(parquet_path, index=False)
+
+        # Escribir a archivos temporales primero
+        df.to_parquet(parquet_tmp, index=False)
 
         n_ok = sum(1 for e in entries if e.status == "ok")
         n_no_forecast = sum(1 for e in entries if e.status == "no_forecast")
@@ -200,7 +214,12 @@ class ForecastStore:
             "coverage_pct": coverage_pct,
             "top_model": top_model,
         }
-        meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+        meta_tmp.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+
+        # Rename atómico: solo en este punto el artefacto anterior queda reemplazado
+        os.replace(parquet_tmp, parquet_path)
+        os.replace(meta_tmp, meta_path)
+
         return parquet_path
 
 

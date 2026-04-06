@@ -89,7 +89,8 @@ def run_backtest(
         ``mae``, ``rmse``, ``n_windows``, ``h``, ``status``.
 
         ``fill_rate`` = fracción de periodos en que yhat >= actual, promediada sobre ventanas.
-        Para series intermitentes/lumpy complementa a MASE como métrica operacional.
+        ``fill_rate_min`` = mínimo de fill_rate entre ventanas (peor escenario observado).
+        Para series intermitentes/lumpy complementan a MASE como métricas operacionales.
 
         Si la serie es demasiado corta: ``{"status": "series_too_short", ...}``.
 
@@ -120,6 +121,7 @@ def run_backtest(
             "rmsse": float("nan"),
             "bias": float("nan"),
             "fill_rate": float("nan"),
+            "fill_rate_min": float("nan"),
             "mae": float("nan"),
             "rmse": float("nan"),
             "n_windows": 0,
@@ -148,7 +150,7 @@ def run_backtest(
             results[model_name] = {
                 "status": "model_column_missing",
                 "mase": float("nan"), "wmape": float("nan"), "rmsse": float("nan"),
-                "bias": float("nan"), "fill_rate": float("nan"),
+                "bias": float("nan"), "fill_rate": float("nan"), "fill_rate_min": float("nan"),
                 "mae": float("nan"), "rmse": float("nan"),
                 "n_windows": 0, "h": h,
             }
@@ -174,10 +176,16 @@ def run_backtest(
 
 
 def _aggregate_window_metrics(windows: list[dict]) -> dict:
-    """Promedia metricas sobre ventanas del backtest ignorando NaN."""
+    """Promedia metricas sobre ventanas del backtest ignorando NaN.
+
+    ``fill_rate_min`` es el mínimo de ``fill_rate`` entre todas las ventanas.
+    Para decisiones de inventario, el peor escenario observado es más
+    informativo que el promedio: un modelo que subestima en una sola ventana
+    puede causar quiebre de stock en ese periodo.
+    """
     if not windows:
         return {"mase": float("nan"), "wmape": float("nan"), "rmsse": float("nan"),
-                "bias": float("nan"), "fill_rate": float("nan"),
+                "bias": float("nan"), "fill_rate": float("nan"), "fill_rate_min": float("nan"),
                 "mae": float("nan"), "rmse": float("nan")}
 
     keys = ["mase", "wmape", "rmsse", "bias", "fill_rate", "mae", "rmse"]
@@ -185,6 +193,11 @@ def _aggregate_window_metrics(windows: list[dict]) -> dict:
     for k in keys:
         values = [w[k] for w in windows if not np.isnan(w.get(k, float("nan")))]
         result[k] = float(np.mean(values)) if values else float("nan")
+
+    # fill_rate_min: mínimo entre ventanas (expone el peor escenario observado)
+    fr_values = [w["fill_rate"] for w in windows if not np.isnan(w.get("fill_rate", float("nan")))]
+    result["fill_rate_min"] = float(np.min(fr_values)) if fr_values else float("nan")
+
     return result
 
 

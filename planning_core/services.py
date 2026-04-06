@@ -24,6 +24,7 @@ from planning_core.purchase.recommendation import PurchaseRecommendation
 from planning_core.repository import CanonicalRepository
 from planning_core.system_log import EventLogger
 from planning_core.validation import basic_health_report
+import planning_core.pipelines.classification as _classification_pipeline
 import planning_core.pipelines.forecast as _forecast_pipeline
 import planning_core.pipelines.inventory as _inventory_pipeline
 import planning_core.pipelines.purchase as _purchase_pipeline
@@ -530,18 +531,53 @@ class PlanningService:
     # Clasificacion de demanda (Fase 1)
     # ------------------------------------------------------------------
 
-    def classify_catalog(self, granularity: str | None = None) -> pd.DataFrame:
+    def classify_catalog(
+        self,
+        granularity: str | None = None,
+        _skip_store: bool = False,
+    ) -> pd.DataFrame:
         """Clasifica todos los SKUs del catalogo.
 
-        La clasificacion oficial del repo se calcula a nivel SKU agregado de red.
-        Si no se fuerza granularidad, usa el default oficial definido en el manifest.
+        Intenta cargar primero el ``ClassificationStore`` desde
+        ``output/derived/``. Si está fresco, retorna instantáneamente sin
+        recalcular (resolve D14). Si el store está ausente, stale, o se pasa
+        ``_skip_store=True``, ejecuta el pipeline completo.
+
+        Parameters
+        ----------
+        granularity : str, optional
+            Granularidad temporal. Si None, usa el default oficial del manifest.
+        _skip_store : bool
+            Si True, ignora el store y fuerza recálculo completo. Usado
+            internamente por ``run_catalog_classification`` para materializar
+            un artefacto fresco.
         """
-        transactions = self.repository.load_table("transactions")
-        catalog = self.repository.load_table("product_catalog")
-        inventory = self.repository.load_table("inventory_snapshot")
+        from planning_core.classification_store import ClassificationStore
 
         if granularity is None:
             granularity = self.official_classification_granularity()
+
+        # Intentar cargar el artefacto persistido (D14)
+        if not _skip_store:
+            _output_dir = Path("output") / "derived"
+            store = ClassificationStore.load(_output_dir, granularity)
+            if store is not None and not store.is_stale():
+                self.event_logger.emit(
+                    event_name="classification.catalog.cache_hit",
+                    module="classification",
+                    level="INFO",
+                    status="ok",
+                    entity_type="catalog",
+                    entity_id="all",
+                    params={"granularity": granularity},
+                    metrics={"n_skus": len(store)},
+                    result={"source": "classification_store"},
+                )
+                return store.all_skus_df()
+
+        transactions = self.repository.load_table("transactions")
+        catalog = self.repository.load_table("product_catalog")
+        inventory = self.repository.load_table("inventory_snapshot")
 
         with self.event_logger.span(
             "classification.catalog",
@@ -1267,3 +1303,52 @@ class PlanningService:
             ``status`` puede ser ``"ok"``, ``"stale"`` o ``"missing"``.
         """
         return _forecast_pipeline.catalog_forecast_status(self, granularity=granularity)
+
+    # ---------------------------------------------------------------------------
+    # Clasificación batch + status  (Sprint 2 — ClassificationStore)
+    # ---------------------------------------------------------------------------
+
+    def run_catalog_classification(
+        self,
+        granularity: str | None = None,
+        persist: bool = True,
+    ) -> pd.DataFrame:
+        """Clasifica el catálogo completo y materializa el artefacto en disco.
+
+        El artefacto resultante es consumido automáticamente por
+        ``classify_catalog()`` en la próxima llamada, eliminando el recalculo
+        en cada request de la API (D14).
+
+        Parameters
+        ----------
+        granularity : str, optional
+            ``"M"``, ``"W"`` o ``"D"``. Si None, usa la oficial del manifest.
+        persist : bool
+            Si True (default), persiste en ``output/derived/``.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame de clasificación completa.
+        """
+        return _classification_pipeline.run_catalog_classification(
+            self,
+            granularity=granularity,
+            persist=persist,
+        )
+
+    def catalog_classification_status(self, granularity: str | None = None) -> dict:
+        """Retorna el estado del artefacto de clasificación materializado.
+
+        Lectura rápida del JSON de metadata — no abre el parquet.
+
+        Returns
+        -------
+        dict
+            ``{status, run_date, n_skus, classification_scope, abc_distribution,
+               seasonal_pct, avg_quality_score, is_stale}``
+            ``status`` puede ser ``"ok"``, ``"stale"`` o ``"missing"``.
+        """
+        return _classification_pipeline.catalog_classification_status(
+            self, granularity=granularity
+        )

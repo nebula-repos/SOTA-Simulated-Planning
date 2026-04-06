@@ -7,6 +7,7 @@ repositorio, al logger y al pipeline de inventario.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -279,6 +280,19 @@ def run_sku_purchase_recommendation(
     cat_row = catalog.loc[catalog["sku"] == sku]
     supplier = cat_row["supplier"].iloc[0] if not cat_row.empty else None
 
+    # Intentar señal forward-looking desde ForecastStore (Opción C)
+    # Mismo patrón que run_catalog_health_report para consistencia entre catálogo y SKU individual
+    from planning_core.forecasting.evaluation.forecast_store import ForecastStore
+    _output_dir = Path("output") / "derived"
+    _store = ForecastStore.load(_output_dir, granularity)
+    forecast_mean_daily: float | None = None
+    forecast_sigma_daily: float | None = None
+    if _store is not None and not _store.is_stale():
+        _entry = _store.get(sku)
+        if _entry is not None and _entry.status == "ok":
+            forecast_mean_daily = _entry.forecast_mean_daily
+            forecast_sigma_daily = _entry.forecast_sigma_daily
+
     with service.event_logger.span(
         "purchase.recommendation",
         module="purchase",
@@ -288,12 +302,15 @@ def run_sku_purchase_recommendation(
             "abc_class": abc_class,
             "granularity": granularity,
             "simple_safety_pct": simple_safety_pct,
+            "forecast_signal": "forecast" if forecast_mean_daily is not None else "historical",
         },
     ) as span:
         params = get_sku_params(sku, abc_class, supplier, service.repository, manifest)
         demand_series = service.sku_demand_series(sku, granularity=granularity)
         ss_result = compute_sku_safety_stock(
-            params, demand_series, granularity=granularity, simple_safety_pct=simple_safety_pct
+            params, demand_series, granularity=granularity, simple_safety_pct=simple_safety_pct,
+            forecast_mean_daily=forecast_mean_daily,
+            forecast_sigma_daily=forecast_sigma_daily,
         )
 
         inventory = service.repository.load_table("inventory_snapshot")
