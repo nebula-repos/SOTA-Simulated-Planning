@@ -2440,8 +2440,8 @@ def render_classification_tab(service: PlanningService):
             unsafe_allow_html=True,
         )
 
-    # Controles de granularidad
-    control_cols = st.columns([1.5, 4.5])
+    # Controles de granularidad + badge de frescura + botón materializar
+    control_cols = st.columns([1.5, 4, 2])
     with control_cols[0]:
         granularity_label = st.selectbox(
             "Granularidad de clasificacion",
@@ -2450,6 +2450,30 @@ def render_classification_tab(service: PlanningService):
             key="classification_granularity",
         )
     granularity = CLASSIFICATION_GRANULARITY_OPTIONS[granularity_label]
+
+    _cls_status = _get_classification_status(service)
+    with control_cols[1]:
+        if _cls_status["status"] == "missing":
+            st.caption("Sin artefacto de clasificación — calculando en vivo.")
+        elif _cls_status["status"] == "stale":
+            st.caption(f"Clasificación desactualizada ({_cls_status.get('run_date', '?')})")
+        else:
+            st.caption(
+                f"Clasificación materializada · {_cls_status.get('run_date', '?')} · "
+                f"{_cls_status.get('n_skus', '?')} SKUs"
+            )
+    with control_cols[2]:
+        if st.button("Materializar Clasificación", key="materialize_cls_btn",
+                     help="Persiste la clasificación en output/derived/ para acelerar los próximos requests"):
+            with st.spinner("Clasificando catálogo..."):
+                try:
+                    service.run_catalog_classification()
+                    _get_classification_status.clear()
+                    get_classification_data.clear()
+                    st.success("Clasificación materializada.")
+                    st.rerun()
+                except Exception as _exc:
+                    st.error(f"Error al materializar clasificación: {_exc}")
 
     # Cargar datos clasificados (cacheados)
     classification_df = get_classification_data(service, granularity=granularity)
@@ -2788,6 +2812,24 @@ def render_catalog_tab(service: PlanningService, classification_df: pd.DataFrame
     if result == "back":
         st.session_state["catalog_view"] = "Listado"
         st.rerun()
+
+
+@st.cache_data(show_spinner=False, ttl=60)
+def _get_forecast_status(_service: PlanningService) -> dict:
+    """Badge de frescura del ForecastStore (TTL 60s — lectura solo del meta JSON)."""
+    try:
+        return _service.catalog_forecast_status()
+    except Exception:
+        return {"status": "missing", "granularity": "M"}
+
+
+@st.cache_data(show_spinner=False, ttl=60)
+def _get_classification_status(_service: PlanningService) -> dict:
+    """Badge de frescura del ClassificationStore (TTL 60s — lectura solo del meta JSON)."""
+    try:
+        return _service.catalog_classification_status()
+    except Exception:
+        return {"status": "missing", "granularity": "M"}
 
 
 @st.cache_data(show_spinner=False, ttl=1800)
@@ -3334,9 +3376,10 @@ def render_compras_tab(service: PlanningService) -> None:
             _get_purchase_summary.clear()
             st.rerun()
 
-    # Badge de frescura del artefacto de forecast (Opción C)
-    try:
-        _fc_status = service.catalog_forecast_status()
+    # Badge de frescura + botón "Ejecutar Forecast"
+    _fc_status = _get_forecast_status(service)
+    _fc_badge_col, _fc_btn_col = st.columns([7, 2])
+    with _fc_badge_col:
         if _fc_status["status"] == "missing":
             st.warning(
                 "Sin forecast materializado — Safety Stock usa señal histórica. "
@@ -3345,8 +3388,7 @@ def render_compras_tab(service: PlanningService) -> None:
         elif _fc_status["status"] == "stale":
             st.warning(
                 f"Forecast desactualizado ({_fc_status.get('run_date', '?')}) — "
-                "considera re-ejecutar el batch para actualizar SS y ROP. "
-                f"`python apps/batch_forecast.py --granularity {_fc_status['granularity']} --jobs 4`"
+                "considera re-ejecutar para actualizar SS y ROP."
             )
         else:
             _cov = _fc_status.get("coverage_pct") or 0.0
@@ -3354,8 +3396,21 @@ def render_compras_tab(service: PlanningService) -> None:
                 f"Forecast activo · {_fc_status.get('run_date', '?')} · "
                 f"{_cov:.0%} cobertura · modelo dominante: {_fc_status.get('top_model', '?')}"
             )
-    except Exception:
-        pass  # No interrumpir la UI si el status falla
+    with _fc_btn_col:
+        if st.button("Ejecutar Forecast", key="run_forecast_btn",
+                     help="Materializa el forecast en output/derived/ y recarga el plan"):
+            with st.spinner("Ejecutando forecast del catálogo..."):
+                try:
+                    service.run_catalog_forecast()
+                    _get_forecast_status.clear()
+                    _get_catalog_health.clear()
+                    _get_purchase_plan.clear()
+                    _get_purchase_plan_by_supplier.clear()
+                    _get_purchase_summary.clear()
+                    st.success("Forecast materializado — plan actualizado.")
+                    st.rerun()
+                except Exception as _exc:
+                    st.error(f"Error al ejecutar forecast: {_exc}")
 
     with st.spinner("Generando plan de reposición..."):
         summary = _get_purchase_summary(service)

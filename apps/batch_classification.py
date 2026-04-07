@@ -61,7 +61,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _show_status(args: argparse.Namespace) -> None:
-    from planning_core.classification_store import ClassificationStore, DEFAULT_MAX_AGE_DAYS
+    from planning_core.classification.store import ClassificationStore, DEFAULT_MAX_AGE_DAYS
 
     output_dir = args.output_dir or (Path("output") / "derived")
     store = ClassificationStore.load(output_dir, args.granularity)

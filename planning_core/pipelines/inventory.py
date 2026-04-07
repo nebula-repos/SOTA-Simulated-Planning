@@ -249,6 +249,7 @@ def run_catalog_health_report(
             )
             d = diagnosis.to_dict()
             d["days_since_last_movement"] = days_since
+            d["ss_method"] = ss_result.ss_method
             d["category"] = category
             d["subcategory"] = subcategory
             d["supplier"] = supplier
@@ -277,3 +278,109 @@ def run_catalog_health_report(
             alert_level_distribution=_counts_dict(report_df["alert_level"]) if "alert_level" in report_df else {},
         )
         return report_df
+
+
+# ---------------------------------------------------------------------------
+# run_sku_safety_stock
+# ---------------------------------------------------------------------------
+
+def run_sku_safety_stock(
+    service: "PlanningService",
+    sku: str,
+    abc_class: str | None = None,
+    granularity: str | None = None,
+    simple_safety_pct: float = 0.5,
+    derived_dir: Path | None = None,
+) -> dict:
+    """Calcula safety stock y ROP para un SKU, inyectando señal de forecast si está disponible.
+
+    Mismo patrón que ``run_sku_purchase_recommendation``: intenta cargar el
+    ``ForecastStore`` desde ``output/derived/`` para usar ``forecast_mean_daily``
+    y ``forecast_sigma_daily`` en lugar de la media histórica, haciendo que SS y
+    ROP sean forward-looking cuando el artefacto está fresco.
+
+    Parameters
+    ----------
+    service : PlanningService
+        Servicio con acceso al repositorio y al logger.
+    sku : str
+        Identificador del SKU.
+    abc_class : str or None
+        Clase ABC. Si None, se deriva desde ``classify_single_sku()``.
+    granularity : str or None
+        Granularidad de la serie. Si None, usa la oficial del manifest.
+    simple_safety_pct : float
+        Fracción del LT demand para SS clase C. Default 0.5.
+    derived_dir : Path or None
+        Directorio del artefacto de forecast. Default: ``output/derived/``.
+
+    Returns
+    -------
+    dict
+        Campos de ``SafetyStockResult.to_dict()``:
+        ``sku, granularity, mean_demand_daily, sigma_demand_daily,
+        safety_stock, reorder_point, coverage_ss_days, ss_method, n_periods``.
+        El campo ``ss_method`` lleva el sufijo ``_forecast`` cuando se usó
+        señal forward-looking.
+    """
+    from planning_core.forecasting.evaluation.forecast_store import ForecastStore
+    from planning_core.inventory.params import get_sku_params
+    from planning_core.inventory.safety_stock import compute_sku_safety_stock
+
+    if granularity is None:
+        granularity = service.official_classification_granularity()
+
+    if abc_class is None:
+        profile = service.classify_single_sku(sku, granularity=granularity)
+        abc_class = profile.get("abc_class") if profile else None
+
+    catalog = service.repository.load_table("product_catalog")
+    cat_row = catalog.loc[catalog["sku"] == sku]
+    supplier = cat_row["supplier"].iloc[0] if not cat_row.empty else None
+    manifest = service.repository.load_manifest()
+
+    # Señal forward-looking desde ForecastStore (Opción C)
+    _output_dir = derived_dir or (Path("output") / "derived")
+    _store = ForecastStore.load(_output_dir, granularity)
+    forecast_mean_daily: float | None = None
+    forecast_sigma_daily: float | None = None
+    if _store is not None and not _store.is_stale():
+        _entry = _store.get(sku)
+        if _entry is not None and _entry.status == "ok":
+            forecast_mean_daily = _entry.forecast_mean_daily
+            forecast_sigma_daily = _entry.forecast_sigma_daily
+
+    with service.event_logger.span(
+        "inventory.safety_stock",
+        module="inventory",
+        entity_type="sku",
+        entity_id=sku,
+        params={
+            "abc_class": abc_class,
+            "granularity": granularity,
+            "simple_safety_pct": simple_safety_pct,
+            "forecast_signal": "forecast" if forecast_mean_daily is not None else "historical",
+        },
+    ) as span:
+        params = get_sku_params(sku, abc_class, supplier, service.repository, manifest)
+        demand_series = service.sku_demand_series(sku, granularity=granularity)
+
+        result = compute_sku_safety_stock(
+            params, demand_series, granularity=granularity,
+            simple_safety_pct=simple_safety_pct,
+            forecast_mean_daily=forecast_mean_daily,
+            forecast_sigma_daily=forecast_sigma_daily,
+        )
+        result_dict = result.to_dict()
+        span.set_metrics(
+            safety_stock=result_dict.get("safety_stock"),
+            reorder_point=result_dict.get("reorder_point"),
+            coverage_ss_days=result_dict.get("coverage_ss_days"),
+            n_periods=result_dict.get("n_periods"),
+        )
+        span.set_result(
+            ss_method=result_dict.get("ss_method"),
+            abc_class=abc_class,
+            granularity=granularity,
+        )
+        return result_dict

@@ -6,21 +6,14 @@ from typing import IO
 import pandas as pd
 
 from planning_core.classification import (
-    classify_all_skus,
-    classify_sku,
     compute_acf,
     detect_outliers,
     prepare_demand_series,
     select_granularity,
     treat_outliers,
 )
-from planning_core.inventory.diagnostics import InventoryDiagnosis, diagnose_sku
 from planning_core.inventory.params import get_sku_params
-from planning_core.inventory.safety_stock import compute_sku_safety_stock, SafetyStockResult
 from planning_core.inventory.service_level import get_csl_target
-from planning_core.preprocessing import censored_summary, mark_censored_demand
-from planning_core.purchase.order_proposal import PurchaseProposal
-from planning_core.purchase.recommendation import PurchaseRecommendation
 from planning_core.repository import CanonicalRepository
 from planning_core.system_log import EventLogger
 from planning_core.validation import basic_health_report
@@ -552,7 +545,7 @@ class PlanningService:
             internamente por ``run_catalog_classification`` para materializar
             un artefacto fresco.
         """
-        from planning_core.classification_store import ClassificationStore
+        from planning_core.classification.store import ClassificationStore
 
         if granularity is None:
             granularity = self.official_classification_granularity()
@@ -575,37 +568,7 @@ class PlanningService:
                 )
                 return store.all_skus_df()
 
-        transactions = self.repository.load_table("transactions")
-        catalog = self.repository.load_table("product_catalog")
-        inventory = self.repository.load_table("inventory_snapshot")
-
-        with self.event_logger.span(
-            "classification.catalog",
-            module="classification",
-            entity_type="catalog",
-            entity_id="all",
-            params={"granularity": granularity},
-        ) as span:
-            classification_df = classify_all_skus(transactions, catalog, granularity=granularity)
-            classification_df["classification_scope"] = self.classification_scope()
-            classification_df = self._augment_catalog_classification_with_censoring(
-                classification_df=classification_df,
-                transactions=transactions,
-                inventory=inventory,
-                granularity=granularity,
-            )
-            span.set_metrics(
-                n_skus=int(len(classification_df)),
-                seasonal_pct=round(float(classification_df["is_seasonal"].mean()), 4) if not classification_df.empty else 0.0,
-                censored_sku_pct=round(float(classification_df["has_censored_demand"].mean()), 4) if not classification_df.empty else 0.0,
-            )
-            span.set_result(
-                granularity=granularity,
-                classification_scope=self.classification_scope(),
-                sb_distribution=_counts_dict(classification_df["sb_class"]) if "sb_class" in classification_df else {},
-                abc_distribution=_counts_dict(classification_df["abc_class"]) if "abc_class" in classification_df else {},
-            )
-            return classification_df
+        return _classification_pipeline.run_catalog_classification_full(self, granularity)
 
     def classify_single_sku(
         self,
@@ -613,84 +576,13 @@ class PlanningService:
         location: str | None = None,
         granularity: str | None = None,
     ) -> dict | None:
-        """Clasifica un SKU individual.
+        """Clasifica un SKU individual con logging y enriquecimiento por censura.
 
         Si no se provee `location`, usa la clasificacion oficial agregada de red.
         """
-        transactions = self.repository.load_table("transactions")
-        inventory = self.repository.load_table("inventory_snapshot")
-
-        sku_tx = transactions[transactions["sku"] == sku]
-        sku_inv = inventory[inventory["sku"] == sku]
-
-        if location:
-            sku_tx = sku_tx[sku_tx["location"] == location]
-            sku_inv = sku_inv[sku_inv["location"] == location]
-
-        if sku_tx.empty:
-            granularity_out = granularity or self.official_classification_granularity()
-            result = {
-                "sku": sku,
-                "sb_class": "inactive",
-                "abc_class": None,
-                "xyz_class": None,
-                "abc_xyz": None,
-                "is_seasonal": False,
-                "has_trend": False,
-                "quality_score": 0.0,
-                "quality_flags": ["sin_transacciones"],
-                "granularity": granularity_out,
-                "classification_scope": self.classification_scope() if location is None else "location",
-            }
-            self.event_logger.emit(
-                event_name="classification.sku.completed",
-                module="classification",
-                level="WARN",
-                status="inactive",
-                entity_type="sku",
-                entity_id=sku,
-                params={"location": location, "granularity": granularity_out},
-                result={
-                    "sb_class": result["sb_class"],
-                    "abc_class": result["abc_class"],
-                    "xyz_class": result["xyz_class"],
-                    "classification_scope": result["classification_scope"],
-                },
-                metrics={"quality_score": result["quality_score"]},
-            )
-            return result
-
-        if granularity is None:
-            granularity = self.official_classification_granularity() if location is None else select_granularity(sku_tx)
-
-        with self.event_logger.span(
-            "classification.sku",
-            module="classification",
-            entity_type="sku",
-            entity_id=sku,
-            params={"location": location, "granularity": granularity},
-        ) as span:
-            profile = classify_sku(sku_tx, sku=sku, granularity=granularity)
-            profile["classification_scope"] = self.classification_scope() if location is None else "location"
-            profile = self._augment_profile_with_censoring(profile, sku_tx, sku_inv, granularity)
-            if profile.get("sb_class") == "inactive":
-                span.set_status("inactive")
-            span.set_metrics(
-                quality_score=profile.get("quality_score"),
-                quality_score_base=profile.get("quality_score_base"),
-                censored_pct=profile.get("censored_pct"),
-                censored_demand_pct=profile.get("censored_demand_pct"),
-            )
-            span.set_result(
-                sb_class=profile.get("sb_class"),
-                abc_class=profile.get("abc_class"),
-                xyz_class=profile.get("xyz_class"),
-                abc_xyz=profile.get("abc_xyz"),
-                is_seasonal=profile.get("is_seasonal"),
-                has_trend=profile.get("has_trend"),
-                classification_scope=profile.get("classification_scope"),
-            )
-            return profile
+        return _classification_pipeline.run_sku_classification(
+            self, sku, location=location, granularity=granularity,
+        )
 
     def sku_demand_series(
         self,
@@ -797,7 +689,7 @@ class PlanningService:
         if granularity is None:
             granularity = select_granularity(sku_tx)
 
-        demand_df, censored, summary = self._compute_censoring_info(
+        demand_df, censored, summary = _classification_pipeline.compute_censoring_info(
             sku_tx=sku_tx,
             sku_inv=sku_inv,
             granularity=granularity,
@@ -879,119 +771,7 @@ class PlanningService:
 
     def classification_summary(self, granularity: str | None = None) -> dict:
         """Resumen agregado de la clasificacion del catalogo."""
-        df = self.classify_catalog(granularity=granularity)
-
-        sb_counts = df["sb_class"].value_counts().to_dict()
-        abc_counts = df["abc_class"].value_counts().to_dict()
-        xyz_counts = df["xyz_class"].value_counts().to_dict()
-        lifecycle_counts = df["lifecycle"].value_counts().to_dict()
-        abc_xyz_counts = df["abc_xyz"].value_counts().to_dict()
-
-        abc_xyz_matrix = {}
-        for abc in ["A", "B", "C"]:
-            abc_xyz_matrix[abc] = {}
-            for xyz in ["X", "Y", "Z"]:
-                key = f"{abc}{xyz}"
-                abc_xyz_matrix[abc][xyz] = int(abc_xyz_counts.get(key, 0))
-
-        return {
-            "total_skus": len(df),
-            "granularity": df["granularity"].iloc[0] if not df.empty else None,
-            "classification_scope": df["classification_scope"].iloc[0] if not df.empty else self.classification_scope(),
-            "sb_counts": sb_counts,
-            "abc_counts": abc_counts,
-            "xyz_counts": xyz_counts,
-            "lifecycle_counts": lifecycle_counts,
-            "abc_xyz_matrix": abc_xyz_matrix,
-            "avg_quality_score": round(float(df["quality_score"].mean()), 3) if not df.empty else 0.0,
-            "seasonal_pct": round(float(df["is_seasonal"].mean()), 3) if not df.empty else 0.0,
-            "trend_pct": round(float(df["has_trend"].mean()), 3) if not df.empty else 0.0,
-            "censored_sku_pct": round(float(df["has_censored_demand"].mean()), 3) if not df.empty else 0.0,
-        }
-
-    def _compute_censoring_info(
-        self,
-        sku_tx: pd.DataFrame,
-        sku_inv: pd.DataFrame,
-        granularity: str,
-        stockout_threshold: float = 0.0,
-    ) -> tuple[pd.DataFrame, pd.Series, dict]:
-        demand_df = prepare_demand_series(sku_tx, granularity=granularity)
-        censored = mark_censored_demand(
-            demand_df,
-            sku_inv,
-            granularity=granularity,
-            stockout_threshold=stockout_threshold,
-        )
-        summary = censored_summary(censored, demand_df)
-        return demand_df, censored, summary
-
-    def _compute_censoring_penalty(self, summary: dict) -> float:
-        penalty = (0.15 * float(summary.get("censored_pct", 0.0))) + (0.35 * float(summary.get("censored_demand_pct", 0.0)))
-        return round(min(0.25, penalty), 3)
-
-    def _augment_profile_with_censoring(
-        self,
-        profile: dict,
-        sku_tx: pd.DataFrame,
-        sku_inv: pd.DataFrame,
-        granularity: str,
-    ) -> dict:
-        demand_df, censored, summary = self._compute_censoring_info(sku_tx, sku_inv, granularity=granularity)
-        stockout_no_sale_periods = int(((censored.values) & (demand_df["demand"].values == 0)).sum()) if not demand_df.empty else 0
-        total_periods = len(demand_df)
-        penalty = self._compute_censoring_penalty(summary)
-
-        base_quality = float(profile.get("quality_score", 0.0))
-        quality_flags = profile.get("quality_flags", [])
-        if not isinstance(quality_flags, list):
-            quality_flags = []
-
-        if summary["censored_periods"] > 0:
-            quality_flags.append(
-                f"demanda_censurada ({summary['censored_periods']}/{summary['total_periods']} periodos; {summary['censored_demand_pct']:.1%} volumen)"
-            )
-        if stockout_no_sale_periods > 0:
-            quality_flags.append(f"sin_venta_por_stockout ({stockout_no_sale_periods} periodos)")
-
-        profile["has_censored_demand"] = bool(summary["censored_periods"] > 0)
-        profile["censored_periods"] = int(summary["censored_periods"])
-        profile["censored_pct"] = float(summary["censored_pct"])
-        profile["censored_demand"] = float(summary["censored_demand"])
-        profile["censored_demand_pct"] = float(summary["censored_demand_pct"])
-        profile["stockout_no_sale_periods"] = stockout_no_sale_periods
-        profile["stockout_no_sale_pct"] = round(stockout_no_sale_periods / total_periods, 4) if total_periods > 0 else 0.0
-        profile["quality_score_base"] = round(base_quality, 3)
-        profile["censoring_penalty"] = penalty
-        profile["quality_score"] = round(max(0.0, base_quality - penalty), 3)
-        profile["quality_flags"] = quality_flags
-        return profile
-
-    def _augment_catalog_classification_with_censoring(
-        self,
-        classification_df: pd.DataFrame,
-        transactions: pd.DataFrame,
-        inventory: pd.DataFrame,
-        granularity: str,
-    ) -> pd.DataFrame:
-        tx_groups = {sku: frame.copy() for sku, frame in transactions.groupby("sku")}
-        inv_groups = {sku: frame.copy() for sku, frame in inventory.groupby("sku")}
-
-        enriched_rows = []
-        empty_tx = transactions.iloc[0:0].copy()
-        empty_inv = inventory.iloc[0:0].copy()
-        for _, row in classification_df.iterrows():
-            sku = row["sku"]
-            enriched_rows.append(
-                self._augment_profile_with_censoring(
-                    row.to_dict(),
-                    sku_tx=tx_groups.get(sku, empty_tx),
-                    sku_inv=inv_groups.get(sku, empty_inv),
-                    granularity=granularity,
-                )
-            )
-
-        return pd.DataFrame(enriched_rows)
+        return _classification_pipeline.run_classification_summary(self, granularity=granularity)
 
     # -----------------------------------------------------------------------
     # Módulo de inventario
@@ -1044,6 +824,9 @@ class PlanningService:
     ) -> dict:
         """Calcula safety stock y ROP para un SKU.
 
+        Inyecta señal forward-looking desde ``ForecastStore`` si el artefacto
+        está fresco (mismo comportamiento que ``catalog_health_report``).
+
         Parameters
         ----------
         sku : str
@@ -1061,49 +844,15 @@ class PlanningService:
             Campos de ``SafetyStockResult.to_dict()``:
             ``sku, granularity, mean_demand_daily, sigma_demand_daily,
             safety_stock, reorder_point, coverage_ss_days, ss_method, n_periods``.
+            El campo ``ss_method`` lleva el sufijo ``_forecast`` cuando se usó
+            señal forward-looking.
         """
-        if granularity is None:
-            granularity = self.official_classification_granularity()
-
-        if abc_class is None:
-            profile = self.classify_single_sku(sku, granularity=granularity)
-            abc_class = profile.get("abc_class") if profile else None
-
-        catalog = self.repository.load_table("product_catalog")
-        row = catalog.loc[catalog["sku"] == sku]
-        supplier = row["supplier"].iloc[0] if not row.empty else None
-        manifest = self.repository.load_manifest()
-
-        with self.event_logger.span(
-            "inventory.safety_stock",
-            module="inventory",
-            entity_type="sku",
-            entity_id=sku,
-            params={
-                "abc_class": abc_class,
-                "granularity": granularity,
-                "simple_safety_pct": simple_safety_pct,
-            },
-        ) as span:
-            params = get_sku_params(sku, abc_class, supplier, self.repository, manifest)
-            demand_series = self.sku_demand_series(sku, granularity=granularity)
-
-            result = compute_sku_safety_stock(
-                params, demand_series, granularity=granularity, simple_safety_pct=simple_safety_pct
-            )
-            result_dict = result.to_dict()
-            span.set_metrics(
-                safety_stock=result_dict.get("safety_stock"),
-                reorder_point=result_dict.get("reorder_point"),
-                coverage_ss_days=result_dict.get("coverage_ss_days"),
-                n_periods=result_dict.get("n_periods"),
-            )
-            span.set_result(
-                ss_method=result_dict.get("ss_method"),
-                abc_class=abc_class,
-                granularity=granularity,
-            )
-            return result_dict
+        return _inventory_pipeline.run_sku_safety_stock(
+            self, sku,
+            abc_class=abc_class,
+            granularity=granularity,
+            simple_safety_pct=simple_safety_pct,
+        )
 
     def catalog_health_report(
         self,

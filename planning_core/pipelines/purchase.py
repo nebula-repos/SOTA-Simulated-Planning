@@ -338,12 +338,14 @@ def run_sku_purchase_recommendation(
         )
 
         catalog_row = cat_row.iloc[0] if not cat_row.empty else None
+        from planning_core.purchase.recommendation import _demand_signal_from_ss_method
         rec = build_purchase_recommendation(
             sku=sku,
             diagnosis=diagnosis,
             params=params,
             catalog_row=catalog_row,
             manifest_config=manifest,
+            demand_signal_source=_demand_signal_from_ss_method(ss_result.ss_method),
         )
         rec_dict = rec.to_dict()
         span.set_metrics(

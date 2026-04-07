@@ -322,6 +322,7 @@ class TestAggregateBySupplier:
             days_to_normal=0.0, excess_carrying_cost=0.0,
             unit_cost=unit_cost, carrying_cost_rate=0.25,
             diagnosis_text="test", action="Ordenar",
+            demand_signal_source="historical",
         )
 
     def test_groups_by_supplier(self):
@@ -388,6 +389,7 @@ class TestPurchasePlanSummary:
             excess_units=excess_units, days_to_normal=0.0, excess_carrying_cost=0.0,
             unit_cost=50_000, carrying_cost_rate=0.25,
             diagnosis_text="", action="",
+            demand_signal_source="historical",
         )
 
     def test_counts_by_status(self):

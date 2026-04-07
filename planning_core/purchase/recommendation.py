@@ -109,6 +109,9 @@ class PurchaseRecommendation:
         Acción recomendada en lenguaje natural:
         "Ordenar N unidades urgente" | "Ordenar N unidades" | "No ordenar" |
         "Evaluar reducción / liquidación" | "Sin acción".
+    demand_signal_source : str
+        Origen de la señal de demanda usada para SS/ROP:
+        ``"forecast"`` si se usó ForecastStore, ``"historical"`` si se usó señal histórica.
     """
 
     sku: str
@@ -141,6 +144,7 @@ class PurchaseRecommendation:
     # Explicabilidad
     diagnosis_text: str
     action: str
+    demand_signal_source: str  # "forecast" | "historical"
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -439,6 +443,13 @@ def _build_action_text(
     return "Sin acción"
 
 
+def _demand_signal_from_ss_method(ss_method: str | None) -> str:
+    """Deriva 'forecast' o 'historical' desde el campo ss_method."""
+    if ss_method and ss_method.endswith("_forecast"):
+        return "forecast"
+    return "historical"
+
+
 def build_purchase_recommendation(
     sku: str,
     diagnosis: InventoryDiagnosis,
@@ -446,6 +457,7 @@ def build_purchase_recommendation(
     catalog_row: pd.Series | None = None,
     manifest_config: dict | None = None,
     reference_date: date | None = None,
+    demand_signal_source: str | None = None,
 ) -> PurchaseRecommendation:
     """Construye una PurchaseRecommendation a partir del diagnóstico e inventario params.
 
@@ -560,6 +572,7 @@ def build_purchase_recommendation(
         carrying_cost_rate=params.carrying_cost_rate,
         diagnosis_text=diagnosis.diagnosis_text,
         action=action,
+        demand_signal_source=demand_signal_source or "historical",
     )
 
 
@@ -693,6 +706,7 @@ def generate_purchase_plan(
             catalog_row=catalog_row,
             manifest_config=manifest_config,
             reference_date=reference_date,
+            demand_signal_source=_demand_signal_from_ss_method(row.get("ss_method")),
         )
         recommendations.append(rec)
 

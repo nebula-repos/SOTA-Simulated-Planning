@@ -5,7 +5,7 @@
 Backlog de deuda técnica, bugs no declarados y oportunidades de mejora detectadas en inspecciones del repo.
 Solo contiene ítems **vigentes**. Lo resuelto debe eliminarse del registro.
 
-Última actualización: `2026-04-04` (Opción C + Refactor services.py en pipelines)
+Última actualización: `2026-04-06` (Sprint 1-4: ClassificationStore, demand_signal_source, UI badges, reorganización planning_core)
 
 ---
 
@@ -13,10 +13,13 @@ Solo contiene ítems **vigentes**. Lo resuelto debe eliminarse del registro.
 
 | Frente | Items vigentes | Prioridad más alta |
 |---|---|---|
+| Arquitectura / refactor | services.py thin facade pendiente | Alta |
 | Validación de datos | D08 | Alta |
 | Testing / cobertura | D09 (parcial — API cubierta) | Media |
-| Arquitectura / performance | D14, D15 (parcial) | Media |
-| Forecasting / observabilidad | D21, D33, D38 | Media / Baja |
+| Arquitectura / performance | D14 (API), D15 (resuelto) | Media |
+| Forecasting / observabilidad | D21, D33 | Media / Baja |
+
+Resueltos en esta sesión: **D38** (fill_rate_min), **D15** (ClassificationStore completa la capa de artefactos), escritura atómica en ForecastStore, `demand_signal_source` en PurchaseRecommendation.
 
 ---
 
@@ -24,13 +27,12 @@ Solo contiene ítems **vigentes**. Lo resuelto debe eliminarse del registro.
 
 | ID | Prio | Tipo | Resumen |
 |---|---|---|---|
+| — | Alta | Arquitectura | `services.py` aún tiene 1.354 líneas — refactor a thin facade pendiente |
 | D08 | Alta | Validación | `validation.py` sigue muy por debajo del framework documentado |
-| D09 | Media | Testing | Cobertura 0 en `classification.py`, `preprocessing.py`, `validation.py` (API ya cubierta) |
-| D14 | Media | Performance | `classify_catalog()` sigue sin caché en la API |
-| D15 | Media | Arquitectura | Sin capa formal para artefactos derivados persistidos |
+| D09 | Media | Testing | Cobertura 0 en `classification/core.py`, `preprocessing.py`, `validation.py` |
+| D14 | Media | Performance | `classify_catalog()` en la API no verifica el store primero |
 | D21 | Baja | Analítica | Falta notebook reproducible del sweep de parametrización |
 | D33 | Media | Forecasting | Falta dashboard agregado de calidad de forecast en UI |
-| D38 | Media | Calidad | `fill_rate` en backtest se promedia entre ventanas; para planning debería reportarse también el mínimo |
 
 ---
 
@@ -86,35 +88,29 @@ Suite verde con 222 tests. Pero la cobertura es muy desigual por capa:
 
 ---
 
-### D14. `classify_catalog()` sigue sin caché en la API
+### D14. `classify_catalog()` en la API no verifica el store primero
 
 **Tipo**: performance
 **Prioridad**: media
 
-La UI mitiga esto con `@st.cache_data`, pero la API recalcula la clasificación completa en cada request.
+`classify_catalog()` en `services.py` ya tiene la lógica de store-first incorporada (devuelve el `ClassificationStore` si está fresco). Pero el endpoint `/catalog/classification` en `apps/api/main.py` debe verificar que no llame con `_skip_store=True`.
 
-**Acción**: agregar caché simple en memoria o materialización liviana con TTL.
+La UI mitiga esto con `@st.cache_data(ttl=600)`. Para la API, la solución es verificar que el endpoint use el método correcto.
+
+**Acción**: confirmar que el endpoint de clasificación en la API llama a `service.classify_catalog()` sin `_skip_store=True`.
 
 ---
 
-### D15. Sin capa formal para artefactos derivados persistidos (parcialmente resuelto)
+### D15. Sin capa formal para artefactos derivados persistidos — RESUELTO ✅
 
-**Tipo**: arquitectura
-**Prioridad**: media
-
-**Resuelto parcialmente** (2026-04-04): `ForecastStore` en
-`planning_core/forecasting/evaluation/forecast_store.py` define el contrato
-de persistencia para forecasts. Los artefactos viven en `output/derived/`
-con metadata JSON + parquet por granularidad. CLI `apps/batch_forecast.py`
-para materializarlos. `catalog_health_report` los consume automáticamente.
-
-Pendiente:
-- Clasificaciones: aún se recalculan on-demand sin persistencia (D14).
-- Health reports: sin store propio.
-- Diagnósticos por SKU: sin store propio.
-
-**Acción residual**: extender el patrón `ForecastStore` a clasificaciones
-si el costo de recalcular en la API se vuelve inaceptable (D14).
+**Resuelto** (2026-04-06): tanto `ForecastStore` como `ClassificationStore` implementan el contrato completo de persistencia:
+- Parquet + meta JSON por granularidad en `output/derived/`
+- Escritura atómica (write-then-rename)
+- Modelo de frescura con `DEFAULT_MAX_AGE_DAYS`
+- CLIs `apps/batch_forecast.py` y `apps/batch_classification.py`
+- Badges de estado en la UI con TTL=60s
+- `catalog_health_report` consume `ForecastStore` automáticamente
+- `classify_catalog()` consume `ClassificationStore` automáticamente
 
 ---
 
@@ -146,19 +142,9 @@ Hoy no se puede responder fácilmente desde la UI:
 
 ---
 
-### D38. `fill_rate` en backtest se promedia entre ventanas
+### D38. `fill_rate_min` en backtest — RESUELTO ✅
 
-**Tipo**: calidad de métricas
-**Prioridad**: media
-
-`planning_core/forecasting/backtest.py` — `_aggregate_window_metrics` promedia `fill_rate` entre todas las ventanas del backtest, igual que MASE y WMAPE. Pero para decisiones de inventario el promedio puede ser engañoso: un modelo que subestima en el 50% de los períodos de una ventana es muy diferente de uno que subestima solo esporádicamente.
-
-Ejemplo:
-- Ventana 1: fill_rate = 1.0 (cero subestimaciones)
-- Ventana 2: fill_rate = 0.0 (subestima siempre)
-- Promedio = 0.5 → parece aceptable, pero el modelo es inestable
-
-**Acción**: en `_aggregate_window_metrics`, agregar `fill_rate_min` (mínimo entre ventanas) junto al promedio, para exponer el peor escenario observado.
+**Resuelto** (2026-04-06): `_aggregate_window_metrics` ahora calcula `fill_rate_min` (mínimo entre ventanas) además del promedio. Expone el peor escenario observado para decisiones de inventario.
 
 ---
 

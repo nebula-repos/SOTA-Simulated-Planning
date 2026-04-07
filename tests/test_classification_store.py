@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from planning_core.classification_store import ClassificationStore, DEFAULT_MAX_AGE_DAYS
+from planning_core.classification.store import ClassificationStore, DEFAULT_MAX_AGE_DAYS
 
 
 # ---------------------------------------------------------------------------
